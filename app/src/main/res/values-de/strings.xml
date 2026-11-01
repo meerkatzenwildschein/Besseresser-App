@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Besseresser</string>
+
+    <!-- Common -->
+    <string name="main_title">Besseresser</string>
+    <string name="menu_open_description">Menü öffnen</string>
+    <string name="menu_settings">Einstellungen</string>
+    <string name="menu_history">Historie</string>
+    <string name="cd_back_no_save">Zurück ohne Speichern</string>
+    <string name="photo_of_meal">Foto des Essens</string>
+    <string name="error_prefix">Fehler: %1$s</string>
+    <string name="my_goals">Deine Ziele</string>
+    <string name="summary_prefix">🧠 %1$s</string>
+    <string name="ampel_green">Grün</string>
+    <string name="ampel_yellow">Gelb</string>
+    <string name="ampel_red">Rot</string>
+    <string name="ampel_unknown">?</string>
+    <string name="delete">Löschen</string>
+    <string name="cancel">Abbrechen</string>
+    <string name="close">Schließen</string>
+    <string name="goals_preview_more">+%1$d</string>
+
+    <!-- Main screen -->
+    <string name="main_take_photo">Essen fotografieren</string>
+    <string name="main_rate_now">Essen bewerten</string>
+    <string name="main_retake">Foto neu aufnehmen</string>
+    <string name="review_title">Foto prüfen</string>
+    <string name="main_note_placeholder">Anmerkungen (optional), z. B. Restaurant, Zubereitung …</string>
+    <string name="cam_permission_text">Zum direkten Fotografieren braucht die App die Kamera-Berechtigung.</string>
+    <string name="cam_retry_permission">Berechtigung erteilen</string>
+    <string name="cam_use_system">Systemkamera benutzen</string>
+    <string name="prompt_note_header">Zusätzliche Nutzer-Hinweise zum Foto (berücksichtige diese):\n%1$s</string>
+    <string name="history_note_prefix">📝 %1$s</string>
+    <string name="main_ai_working">KI bewertet …</string>
+    <string name="main_no_rating_yet">Noch keine Bewertung</string>
+    <string name="main_save_to_history">In Historie speichern</string>
+    <string name="main_saving">Speichere …</string>
+    <string name="main_discard">Ohne Speichern verwerfen</string>
+    <string name="main_saved_banner">✓ In der Historie gespeichert (Menü → Historie)</string>
+    <string name="main_new_photo">Neues Foto aufnehmen</string>
+
+    <!-- Setup -->
+    <string name="setup_welcome">Willkommen!</string>
+    <string name="setup_welcome_text">Einmal einrichten – danach kannst du dein Essen fotografieren und bekommst zu jedem Ziel eine Ampel.</string>
+    <string name="setup_edit_title">Einstellungen ändern</string>
+    <string name="setup_edit_text">Hier kannst du URL, Key, Modell und Ziele neu einstellen. Gespeicherte Bewertungen und dein letztes Foto bleiben unberührt.</string>
+    <string name="setup_url_label">API-URL (OpenAI-kompatibel)</string>
+    <string name="setup_key_label">API-Key</string>
+    <string name="setup_key_placeholder">sk-…</string>
+    <string name="setup_model_label">Modell (mit Bildverstehen, z. B. gpt-4o-mini)</string>
+    <string name="setup_goals_label">Deine Ziele</string>
+    <string name="setup_pick_provider">Anbieter wählen</string>
+    <string name="setup_models_link">Modelle laden &amp; auswählen</string>
+    <string name="setup_save_continue">Speichern &amp; weiter</string>
+    <string name="setup_ai_splitting_button">KI teilt Ziele auf …</string>
+    <string name="setup_ai_splitting_text">Die KI zerlegt deine Ziele …</string>
+    <string name="split_title_ok">Ziele von der KI aufgeteilt</string>
+    <string name="split_title_fail">Ziele teilen nicht möglich</string>
+    <string name="split_local_hint">Vorschlag lokal aus Satzzeichen zerlegt – bitte prüfen und anpassen:</string>
+    <string name="split_check_hint">Bitte prüfen und anpassen (eine Zeile = ein Ziel):</string>
+    <string name="split_save">So speichern</string>
+    <string name="split_keep_original">Original behalten</string>
+    <string name="provider_picker_title">Anbieter wählen</string>
+    <string name="provider_note_aggregator">Aggregator, 400+ Modelle</string>
+    <string name="provider_note_fr">frz. Aggregator</string>
+    <string name="provider_note_free_quota">kostenloses Kontingent</string>
+    <string name="provider_note_fast">sehr schnell, Free Tier</string>
+    <string name="provider_note_text_only">reine Textmodelle – kein Bild-Input!</string>
+    <string name="provider_note_compat">Claude über OpenAI-Schicht</string>
+    <string name="model_picker_title">Modelle wählen</string>
+    <string name="models_vision_title">Bildfähige Modelle (%1$d)</string>
+    <string name="models_all_title">Modelle (%1$d)</string>
+    <string name="models_loading">Lade Modelle von %1$s/models …</string>
+    <string name="models_vision_summary">Bildfähige Modelle: %1$d (von %2$d insgesamt) – antippen zum Übernehmen</string>
+    <string name="models_all_summary">Alle %1$d Modelle (Bildverarbeitung war nicht sicher erkennbar) – antippen zum Übernehmen</string>
+    <string name="models_none_found">Keine Modelle gefunden.</string>
+    <string name="models_debug_hint">Tipp: URL und Key prüfen (z. B. Slash nach /v1), oder Modellname manuell ins Feld eintragen.</string>
+    <string name="build_label">Build: %1$s</string>
+
+    <!-- KI-Prompts (JSON-Schlüssel bleiben konstant, nur die Anweisungssprache ändert sich) -->
+    <string name="prompt_eval_intro">Ich habe ein Foto meines Essens geschickt.\nBewerte dieses Essen im Hinblick auf jedes der folgenden Ziele:</string>
+    <string name="prompt_eval_format">Antworte AUSSCHLIESSLICH mit einem JSON-Objekt (kein Text davor oder danach) in genau diesem Format:</string>
+    <string name="prompt_eval_ampel_meaning">ampel bedeutet: gruen = für dieses Ziel unproblematisch/förderlich, gelb = akzeptabel mit Einschränkungen, rot = allgemein schlecht für dieses Ziel.</string>
+    <string name="prompt_eval_exactly_one">Es muss genau eine Bewertung pro Ziel geben, mit dem exakten Zielwortlaut.</string>
+    <string name="prompt_eval_language">Antworte in deutscher Sprache.</string>
+    <string name="prompt_split_intro">Teile den folgenden Freitext mit Gesundheitszielen in einzelne, eigenständige Ziele auf.</string>
+    <string name="prompt_split_rules">Regeln: jedes Ziel ein eigener Punkt, prägnant (maximal 8 Worte), ohne Nummerierung.</string>
+
+    <!-- Default goals -->
+    <string-array name="default_goals">
+        <item>Blutdruck senken</item>
+        <item>Weniger Zucker</item>
+        <item>Gewicht verlieren</item>
+        <item>Insgesamt gesünder ernähren</item>
+    </string-array>
+
+    <!-- History -->
+    <string name="history_title">Historie</string>
+    <string name="history_empty">Noch keine Bewertungen.\nFotografiere dein erstes Essen!</string>
+    <string name="history_list_hint">%1$d Bewertungen – nach links wischen zum Löschen</string>
+    <string name="history_delete_action">🗑 Löschen</string>
+    <string name="history_no_goals">Keine Ziele erfasst</string>
+    <string name="score_caption">Ampelschnitt</string>
+    <string name="score_tooltip_ok">Ampelschnitt der bewerteten Ziele: 🟢 100 · 🟡 50 · 🔴 0</string>
+    <string name="score_tooltip_unknown">Kein Ampelschnitt: keine Bewertung erhalten</string>
+    <string name="history_entry_delete">Eintrag löschen</string>
+    <string name="history_delete_confirm_title">Eintrag löschen?</string>
+    <string name="history_delete_confirm_text">Foto und Bewertung werden unwiderruflich entfernt.</string>
+</resources>

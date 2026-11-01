@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Teller -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,54m-26,0a26,26 0,1 1,52 0a26,26 0,1 1,-52 0" />
+    <path
+        android:fillColor="#2E7D32"
+        android:pathData="M54,54m-19,0a19,19 0,1 1,38 0a19,19 0,1 1,-38 0" />
+    <!-- Blatt -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,62c0,-14 10,-22 20,-24c-2,10 -6,16 -20,20z M46,62c-1,2 -2,5 -2,5l2.5,-1z" />
+</vector>
