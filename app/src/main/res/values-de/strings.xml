@@ -76,7 +76,7 @@
     <string name="models_all_summary">Alle %1$d Modelle (Bildverarbeitung war nicht sicher erkennbar) – antippen zum Übernehmen</string>
     <string name="models_none_found">Keine Modelle gefunden.</string>
     <string name="models_debug_hint">Tipp: URL und Key prüfen (z. B. Slash nach /v1), oder Modellname manuell ins Feld eintragen.</string>
-    <string name="build_label">Build: %1$s</string>
+    <string name="build_label">Version %1$s · Build %2$s</string>
 
     <!-- KI-Prompts (JSON-Schlüssel bleiben konstant, nur die Anweisungssprache ändert sich) -->
     <string name="prompt_eval_intro">Ich habe ein Foto meines Essens geschickt.\nBewerte dieses Essen im Hinblick auf jedes der folgenden Ziele:</string>

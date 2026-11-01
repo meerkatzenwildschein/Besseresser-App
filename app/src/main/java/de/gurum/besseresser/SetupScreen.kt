@@ -212,7 +212,7 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
 
         Spacer(Modifier.height(28.dp))
         Text(
-            stringResource(R.string.build_label, BuildConfig.BUILD_TIME),
+            stringResource(R.string.build_label, BuildConfig.APP_VERSION, BuildConfig.BUILD_TIME),
             fontSize = 12.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

@@ -10,6 +10,8 @@ plugins {
 val buildTime: String =
     LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"))
 
+val appVersion = "1.0.0"
+
 android {
     namespace = "de.gurum.besseresser"
     compileSdk = 34
@@ -19,8 +21,9 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0"
+        versionName = appVersion
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
+        buildConfigField("String", "APP_VERSION", "\"$appVersion\"")
     }
 
     buildTypes {

@@ -76,7 +76,7 @@
     <string name="models_all_summary">All %1$d models (image capability unclear) – tap to apply</string>
     <string name="models_none_found">No models found.</string>
     <string name="models_debug_hint">Tip: check URL and key (e.g. slash after /v1), or enter the model name manually.</string>
-    <string name="build_label">Build: %1$s</string>
+    <string name="build_label">Version %1$s · Build %2$s</string>
 
     <!-- KI prompts (JSON-Schlüssel bleiben konstant, nur die Sprache der Anweisung ändert sich) -->
     <string name="prompt_eval_intro">I sent a photo of my meal.\nEvaluate this meal with respect to each of the following goals:</string>
