@@ -55,7 +55,17 @@ Gruppenkopf = Datum (dd.MM.yyyy, lokal, links) + **KI-Tagesfazit-Chip** rechts (
 Chip „✨ Tagesfazit ermitteln" (Tap = Generate); ② Generating → grauer Chip mit Spinner „Tagesfazit …" + Ersatztextzeile
 „KI bewertet den Tag …"; ③ fertig → farbiger Chip (ampelColor der KI-Ampel), der Tap klappt das Fazit als Textblock
 unter dem Kopf ein/aus (Chevron rotiert); ④ veraltet → Chip „⟳ Neu bewerten" + altes Fazit gedimmt (2 Zeilen Ellipsis).
-**Veraltet** = Entry-IDs des Tages stimmen nicht mehr mit dem Snapshot `entryIds` im `DayFazit` überein.
+**Veraltet** = Entry-IDs des Tages stimmen nicht mehr mit dem Snapshot `entryIds` im `DayFazit` überein,
+ODER der `fingerprint` weicht ab (`dayFingerprint`, HistoryStore.kt: Hash aus ID+erkannt je Eintrag) —
+so erkennt auch eine erkannt-Userkorrektur den Tag als dirty; Alte Fazit-Dateien ohne `fp`-Feld gelten
+bewusst erst einmal als frisch (kein false-stale nach Update).
+**erkannt-Korrektur (Pencil-Feature):** Am 🍽️-Text im `CollapsibleSummaryBlock` sitzt ein Stift-Button
+(`Icons.Filled.Create`, optionaler Callback `onEditErkannt`) → `ErkanntEditDialog` (AlertDialog mit
+Textfeld, Strings `erkannt_edit_*`). EIN Dialog für beide Orte: Auswertung (nur `evaluation.copy`
+im Speicher; wenn bereits SAVED, zusätzlich `HistoryStore.updateErkannt(ctx, savedEntryId, text)` +
+`fazitEpoch++` → „Dein Tag bisher" wird neu generiert) und Historie-Detail (lokal `current`-State,
+persistiert via `updateErkannt`). Nach Detail-Korrektur lädt die Liste frisch → Fingerprint-Mismatch
+→ veraltet bzw. Auto-Regeneration für die 2 neuesten Gruppen. Pencil nur bei nicht-leerem erkannt.
 **Prompt (`ApiClient.dayFazit`, text-only, kein Foto nötig):** Zeilen „HH:mm · erkannt mit Menge · Anmerkung" des Tages
 + Ziele → JSON {ampel, text}; Bausteine `prompt_dayfazit_*` (beide strings.xml); Kernregel: kleine Genuss-Snacks werden
 in Kontext gewichtet – ein Bonbon macht einen sonst vollwertigen Tag nicht rot. Rechnerischer „Tagesscore" (Kreis +

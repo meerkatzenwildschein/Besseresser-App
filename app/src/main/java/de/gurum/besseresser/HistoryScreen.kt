@@ -101,7 +101,10 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
             onOk = { ampel, text ->
                 DayFazitStore.save(
                     ctx,
-                    DayFazit(key, ampel, text, entriesOfDay.map { it.id }, System.currentTimeMillis())
+                    DayFazit(
+                        key, ampel, text, entriesOfDay.map { it.id },
+                        System.currentTimeMillis(), dayFingerprint(entriesOfDay)
+                    )
                 )
                 loadingFazits.remove(key)
                 fazitMap = DayFazitStore.loadAll(ctx).associateBy { it.dayKey }
@@ -180,8 +183,11 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                     val dayKey = dayKeyOf(group.day)
                     val fazit = fazitMap[dayKey]
                     val loadingFazit = dayKey in loadingFazits
-                    val staleFazit = fazit != null &&
-                        fazit.entryIds.toSet() != group.entries.map { it.id }.toSet()
+                    val staleFazit = fazit != null && (
+                        fazit.entryIds.toSet() != group.entries.map { it.id }.toSet() ||
+                            // geänderte erkannt-Texte (Korrekturen) machen das Fazit ebenfalls veraltet
+                            (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(group.entries))
+                        )
                     item(key = "day-$dayKey") {
                         DayGroupHeader(
                             date = group.day,
@@ -510,6 +516,8 @@ fun HistoryDetailScreen(entry: HistoryEntry, onBack: () -> Unit) {
     // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
     BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf(false) }
+    var showErkanntEdit by remember { mutableStateOf(false) }
+    var current by remember { mutableStateOf(entry) }
     val thumb = remember(entry.id) {
         HistoryStore.photoFileOf(ctx, entry)?.let { decodeThumb(it, target = 1280) }
     }
@@ -546,15 +554,33 @@ fun HistoryDetailScreen(entry: HistoryEntry, onBack: () -> Unit) {
             }
         }
 
-        if (entry.summary.isNotBlank() || entry.erkannt.isNotBlank() || entry.note.isNotBlank()) {
-            // Gleicher antipbarer Block wie in der Auswertung: 🧠 sichtbar, 🍽️/📝 einklappbar
-            CollapsibleSummaryBlock(entry.summary, entry.erkannt, entry.note)
+        if (current.summary.isNotBlank() || current.erkannt.isNotBlank() || current.note.isNotBlank()) {
+            // Gleicher antipbarer Block wie in der Auswertung: 🧠 sichtbar, 🍽️/📝 einklappbar,
+            // 🍽️ mit Pencil → erkannt userkorrigierbar
+            CollapsibleSummaryBlock(
+                summary = current.summary,
+                erkannt = current.erkannt,
+                note = current.note,
+                onEditErkannt = { if (current.erkannt.isNotBlank()) showErkanntEdit = true }
+            )
         }
 
         Text(stringResource(R.string.my_goals), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-        entry.goalResults.forEach { GoalRow(it.goal, it) }
+        current.goalResults.forEach { GoalRow(it.goal, it) }
 
         Spacer(Modifier.height(16.dp))
+    }
+
+    if (showErkanntEdit) {
+        ErkanntEditDialog(
+            initialText = current.erkannt,
+            onOk = { newText ->
+                HistoryStore.updateErkannt(ctx, current.id, newText)
+                current = current.copy(erkannt = newText)
+                showErkanntEdit = false
+            },
+            onDismiss = { showErkanntEdit = false }
+        )
     }
 
     if (confirmDelete) {

@@ -102,6 +102,20 @@ object HistoryStore {
         DayFazitStore.deleteForEntry(ctx, entry)
     }
 
+    /** erkannt-Text eines gespeicherten Eintrags userkorrigieren (JSON neu schreiben).
+     *  Das Tagesfazit bleibt auf Platte, wird aber über den Fingerprint als veraltet erkannt. */
+    fun updateErkannt(ctx: Context, id: Long, newText: String) {
+        val f = File(dir(ctx), "$id.json")
+        if (!f.exists()) return
+        try {
+            val o = JSONObject(f.readText())
+            o.put("erkannt", newText.trim())
+            f.writeText(o.toString())
+        } catch (e: Exception) {
+            // Snapshot unverändert lassen, wenn das Umschreiben scheitert
+        }
+    }
+
     /** Foto downgesampelt (<1024px) speichern, JPEG-Qualitaet Schritt fuer Schritt bis < 100 KB. */
     private fun saveScaledJpeg(ctx: Context, uri: Uri, out: File) {
         val res = ctx.contentResolver
@@ -178,7 +192,8 @@ data class DayFazit(
     val ampel: String,              // "gruen" | "gelb" | "rot" (grau nur im Fehlerfall-Fallback)
     val text: String,
     val entryIds: List<Long>,       // Snapshot der zugrunde liegenden Einträge (= Veraltetscheck)
-    val createdAt: Long
+    val createdAt: Long,
+    val fingerprint: String = ""    // Hash-Mix aus ID+erkannt je Eintrag (Text-Korrekturen → veraltet)
 )
 
 /** Persistenz day_<tag>.json im selben Verzeichnis; entries() filtert diese Dateien via day_-Präfix. */
@@ -192,17 +207,7 @@ object DayFazitStore {
         if (!f.exists()) return null
         return try {
             val o = JSONObject(f.readText())
-            val ids = mutableListOf<Long>()
-            o.optJSONArray("eintrage")?.let { arr ->
-                (0 until arr.length()).forEach { ids.add(arr.optLong(it)) }
-            }
-            DayFazit(
-                dayKey = o.optString("tag"),
-                ampel = o.optString("ampel"),
-                text = o.optString("text"),
-                entryIds = ids,
-                createdAt = o.optLong("erstellt", 0L)
-            )
+            readFrom(o)
         } catch (e: Exception) {
             null
         }
@@ -213,22 +218,26 @@ object DayFazitStore {
             .listFiles { f -> f.name.startsWith("day_") && f.extension == "json" } ?: return emptyList()
         return files.mapNotNull { f ->
             try {
-                val o = JSONObject(f.readText())
-                val ids = mutableListOf<Long>()
-                o.optJSONArray("eintrage")?.let { arr ->
-                    (0 until arr.length()).forEach { ids.add(arr.optLong(it)) }
-                }
-                DayFazit(
-                    dayKey = o.optString("tag"),
-                    ampel = o.optString("ampel"),
-                    text = o.optString("text"),
-                    entryIds = ids,
-                    createdAt = o.optLong("erstellt", 0L)
-                )
+                readFrom(JSONObject(f.readText()))
             } catch (e: Exception) {
                 null
             }
         }
+    }
+
+    private fun readFrom(o: JSONObject): DayFazit {
+        val ids = mutableListOf<Long>()
+        o.optJSONArray("eintrage")?.let { arr ->
+            (0 until arr.length()).forEach { ids.add(arr.optLong(it)) }
+        }
+        return DayFazit(
+            dayKey = o.optString("tag"),
+            ampel = o.optString("ampel"),
+            text = o.optString("text"),
+            entryIds = ids,
+            createdAt = o.optLong("erstellt", 0L),
+            fingerprint = o.optString("fp")
+        )
     }
 
     fun save(ctx: Context, fazit: DayFazit) {
@@ -237,7 +246,11 @@ object DayFazitStore {
             put("ampel", fazit.ampel)
             put("text", fazit.text)
             put("erstellt", fazit.createdAt)
-           .put("eintrage", JSONArray().also { arr -> fazit.entryIds.forEach { arr.put(it) } })
+            put("fp", fazit.fingerprint)
+            put(
+                "eintrage",
+                JSONArray().also { arr -> fazit.entryIds.forEach { arr.put(it) } }
+            )
         }
         file(ctx, fazit.dayKey).writeText(o.toString())
     }
@@ -252,3 +265,8 @@ object DayFazitStore {
 object DayFazitSession {
     val attempted = mutableSetOf<String>()
 }
+
+/** „Quellen-Fingerprint" eines Tages: ID+erkannt je Eintrag. Bearbeitete erkannt-Texte
+ *  oder gelöschte/ergänzte Einträge machen jedes Tagesfazit auf dieser Basis KEINEN gültigen Basis mehr. */
+fun dayFingerprint(entries: List<HistoryEntry>): String =
+    entries.sortedBy { it.id }.joinToString("|") { "${it.id}:${it.erkannt}" }.hashCode().toString(16)

@@ -19,6 +19,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
@@ -200,6 +201,9 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
     var note by remember { mutableStateOf("") }   // WhatsApp-Stil: Anmerkung zum Foto
     var showReview by remember { mutableStateOf(false) }   // Review-Zweig (Fallback über Systemkamera)
     var showCamera by remember { mutableStateOf(false) }   // Eigene Kamera (CameraX)
+    var showErkanntEdit by remember { mutableStateOf(false) }
+    var savedEntryId by remember { mutableStateOf<Long?>(null) }
+    var fazitEpoch by remember { mutableStateOf(0) }  // Re-Trigger der „Dein Tag bisher"-Bewertung
 
     val photoFile = remember {
         File(ctx.cacheDir, "photos").also { it.mkdirs() }
@@ -228,6 +232,7 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
         lastGoaled = false
         photoPreview = null
         savedToHistory = false
+        savedEntryId = null
         error = null
         note = ""
         Unit
@@ -250,7 +255,7 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
 
     // Beim Speichern in den Verlauf: Tagesfazit für HEUTE ermitteln (Text-Call)
     // und persistieren – die Verlaufs-Liste sieht es dann als frisches Fazit.
-    LaunchedEffect(savedToHistory) {
+    LaunchedEffect(savedToHistory, fazitEpoch) {
         if (!savedToHistory) return@LaunchedEffect
         dayFazitBusy = true
         dayFazit = null
@@ -266,7 +271,10 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
             promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
             promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
             onOk = { ampel, text ->
-                val f = DayFazit(todayKey, ampel, text, todayEntries.map { it.id }, System.currentTimeMillis())
+                val f = DayFazit(
+                    todayKey, ampel, text, todayEntries.map { it.id },
+                    System.currentTimeMillis(), dayFingerprint(todayEntries)
+                )
                 DayFazitStore.save(ctx, f)
                 dayFazit = f
                 dayFazitBusy = false
@@ -603,8 +611,16 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                     val summary = evaluation?.summary ?: ""
                     val det = evaluation?.erkannt.orEmpty()
                     if (summary.isNotBlank() || det.isNotBlank()) {
-                        // 🧠 sichtbar, 🍽️/📝 eingeklappt im antippbaren Block
-                        CollapsibleSummaryBlock(summary, det, note)
+                        // 🧠 sichtbar, 🍽️/📝 eingeklappt im antippbaren Block;
+                        // 🍽️-Zeile bekommt den Pencil (Korrektur der KI-Erkennung)
+                        CollapsibleSummaryBlock(
+                            summary = summary,
+                            erkannt = det,
+                            note = note,
+                            onEditErkannt = {
+                                if (det.isNotBlank()) showErkanntEdit = true
+                            }
+                        )
                     }
                     // Manueller Speichern-Button (kein Auto-Save)
                     Button(
@@ -612,11 +628,11 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                             savingHistory = true
                             val ev = evaluation
                             if (ev != null) {
-                                val ok = try {
+                                val stored = try {
                                     HistoryStore.add(ctx, photoUri, ev, note.trim())
-                                    true
-                                } catch (e: Exception) { false }
-                                savedToHistory = ok
+                                } catch (e: Exception) { null }
+                                savedToHistory = stored != null
+                                savedEntryId = stored?.id
                             }
                             savingHistory = false
                         },
@@ -783,6 +799,23 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                 }
             }
             }
+
+            // Erkannt-Essens-Korrektur: Dialog; bei gespeichertem Durchlauf persistieren
+            // (Store + Tagesfazit-Regeneration via fazitEpoch)
+            if (showErkanntEdit && evaluation != null) {
+                ErkanntEditDialog(
+                    initialText = evaluation?.erkannt.orEmpty(),
+                    onOk = { newText ->
+                        evaluation = evaluation?.copy(erkannt = newText)
+                        showErkanntEdit = false
+                        if (savedToHistory && savedEntryId != null) {
+                            HistoryStore.updateErkannt(ctx, savedEntryId!!, newText)
+                            fazitEpoch++   // „Dein Tag bisher" mit dem korrigierten Text neu bewerten
+                        }
+                    },
+                    onDismiss = { showErkanntEdit = false }
+                )
+            }
         }
     }
 }
@@ -804,18 +837,21 @@ fun ErrorBanner(message: String) {
 }
 
 /**
- * Zusammenfassungs-Block: 🧠 Gesamteindruck immer sichtbar; 🍽️ „Erkannt“ und 📝 Anmerkung
+ * Zusammenfassungs-Block: 🧠 Gesamteindruck immer sichtbar; 🍽️ „Erkannt" und 📝 Anmerkung
  * eingeklappt hinter einem Toggle (der ganze Block antippbar = großes Touch-Ziel), Chevron
  * rotiert mit, animateContentSize animiert das Auf-/ Zuklappen. Nutzt Auswertung UND
- * Historie-Detail – bewusst identisch verhalten.
+ * Historie-Detail – bewusst identisch verhalten. Pencil an der 🍽️-Zeile (wenn onEditErkannt
+ * gesetzt) öffnet den ErkanntEditDialog – der erkannt-Text ist userkorrigierbar.
  */
 @Composable
-fun CollapsibleSummaryBlock(summary: String, erkannt: String, note: String) {
+fun CollapsibleSummaryBlock(
+    summary: String,
+    erkannt: String,
+    note: String,
+    onEditErkannt: (() -> Unit)? = null
+) {
     val ctx = LocalContext.current
-    val lines = buildList {
-        if (erkannt.isNotBlank()) add(R.string.detected_prefix to erkannt)
-        if (note.isNotBlank()) add(R.string.history_note_prefix to note)
-    }
+    val extraCount = listOf(erkannt.isNotBlank(), note.isNotBlank()).count { it }
     var expanded by remember { mutableStateOf(false) }
     val chevron by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
 
@@ -835,17 +871,38 @@ fun CollapsibleSummaryBlock(summary: String, erkannt: String, note: String) {
             }
             if (expanded) {
                 if (summary.isNotBlank()) Spacer(Modifier.height(4.dp))
-                lines.forEach { (prefixRes, text) ->
-                    Text(stringResource(prefixRes, text))
+                if (erkannt.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(R.string.detected_prefix, erkannt),
+                            modifier = if (onEditErkannt != null) Modifier.weight(1f) else Modifier
+                        )
+                        if (onEditErkannt != null) {
+                            IconButton(
+                                onClick = { onEditErkannt.invoke() },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Create,
+                                    contentDescription = stringResource(R.string.erkannt_edit_desc),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                if (note.isNotBlank()) {
+                    Text(stringResource(R.string.history_note_prefix, note))
                 }
             }
-            if (lines.isNotEmpty()) {
+            if (extraCount > 0) {
                 Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = if (expanded)
                             stringResource(R.string.details_toggle_less)
-                        else ctx.resources.getQuantityString(R.plurals.details_toggle_more, lines.size, lines.size),
+                        else ctx.resources.getQuantityString(R.plurals.details_toggle_more, extraCount, extraCount),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -860,6 +917,31 @@ fun CollapsibleSummaryBlock(summary: String, erkannt: String, note: String) {
             }
         }
     }
+}
+
+/** Dialog zum direkten Korrigieren des erkannt-Essens-Textes. */
+@Composable
+fun ErkanntEditDialog(initialText: String, onOk: (String) -> Unit, onDismiss: () -> Unit) {
+    var text by remember { mutableStateOf(initialText) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.erkannt_edit_title)) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                minLines = 2,
+                maxLines = 6,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onOk(text.trim()) }) { Text(stringResource(R.string.profile_ok)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
 }
 
 @Composable
