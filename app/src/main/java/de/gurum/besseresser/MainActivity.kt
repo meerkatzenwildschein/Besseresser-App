@@ -221,6 +221,18 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
         }
     }
 
+    // Ein frischer Erfassungs-Durchlauf: verwirft Evaluierung, Foto, Anmerkung, Historie-Status
+    // und Fehler – genutzt vom fixierten CTA, dem „Neues Foto aufnehmen“-CTA und „Verwerfen“.
+    val resetCycle = {
+        evaluation = null
+        lastGoaled = false
+        photoPreview = null
+        savedToHistory = false
+        error = null
+        note = ""
+        Unit
+    }
+
     // Android-Zurück-Button: Overlay-Ebenen der Aufnahme schließen, statt die App zu beenden.
     // Gleiche Wirkung wie die On-Screen-Zurückpfeile: Kamera ohne Bewerten verlassen; Review
     // verwirft Foto + Anmerkung + Fehler.
@@ -244,14 +256,7 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
         dayFazit = null
         val todayKey = dayKeyOf(System.currentTimeMillis())
         val todayEntries = HistoryStore.entries(ctx).filter { dayKeyOf(it.dateMillis) == todayKey }
-        val lines = todayEntries.map { e ->
-            val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(e.dateMillis))
-            val recog = e.erkannt.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
-            var line = "$time · $recog"
-            e.note.takeIf { it.isNotBlank() }
-                ?.let { line += " · " + ctx.getString(R.string.dayfazit_line_note, it.trim()) }
-            line
-        }
+        val lines = dayFazitMealLines(ctx, todayEntries)
         ApiClient.dayFazit(
             settings = settings,
             goals = settings.goals,
@@ -352,7 +357,6 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                         photoUri = photoUri,
                         settings = settings,
                         promptBundle = prompts,
-                        userNote = note,
                         onResult = {
                             evaluation = it
                             busy = false
@@ -403,17 +407,7 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                     }
                 }
                 if (error != null) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            stringResource(R.string.error_prefix, error ?: ""),
-                            modifier = Modifier.padding(12.dp),
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
+                    ErrorBanner(error ?: "")
                 }
                 OutlinedTextField(
                     value = note,
@@ -456,7 +450,6 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                             photoUri = photoUri,
                             settings = settings,
                             promptBundle = prompts,
-                            userNote = note.trim(),
                             onResult = {
                                 evaluation = it
                                 busy = false
@@ -594,17 +587,7 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                 }
 
                 error?.let { msg ->
-                    Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            stringResource(R.string.error_prefix, msg),
-                            modifier = Modifier.padding(12.dp),
-                            color = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    }
+                    ErrorBanner(msg)
                 }
 
                 // Ampeln pro Ziel
@@ -643,10 +626,7 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                             .height(52.dp)
                     ) { Text(stringResource(if (savingHistory) R.string.main_saving else R.string.main_save_to_history)) }
                     TextButton(
-                        onClick = {
-                            evaluation = null; lastGoaled = false; photoPreview = null
-                            savedToHistory = false; note = ""
-                        },
+                        onClick = { resetCycle() },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text(stringResource(R.string.main_discard)) }
                 }
@@ -755,22 +735,17 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
             if (lastGoaled && savedToHistory) {
                 Button(
                     onClick = {
-                        // Frischer Durchlauf UND direkt in die Kamera: nach dem Speichern ist
-                        // „das nächste Essen fotografieren" der einzig sinnvolle nächste Schritt
-                        evaluation = null
-                        lastGoaled = false
-                        photoPreview = null
-                        savedToHistory = false
-                        error = null
-                        note = ""
-                        showCamera = true
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(16.dp)
-                        .fillMaxWidth()
-                        .height(56.dp)
-                ) {
+                    // Frischer Durchlauf UND direkt in die Kamera: nach dem Speichern ist
+                    // „das nächste Essen fotografieren“ der einzig sinnvolle nächste Schritt
+                    resetCycle()
+                    showCamera = true
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+                    .fillMaxWidth()
+                    .height(56.dp)
+            ) {
                     Text(stringResource(R.string.main_new_photo), fontSize = 17.sp)
                 }
             } else if (!reportShown) {
@@ -778,12 +753,7 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                 onClick = {
                     // Frischer Durchlauf: alte Anmerkung + altes Ergebnis verwerfen,
                     // damit Kamera-Note leer ist und die Ampeln grau wie beim Erststart sind
-                    evaluation = null
-                    lastGoaled = false
-                    photoPreview = null
-                    savedToHistory = false
-                    error = null
-                    note = ""
+                    resetCycle()
                     showCamera = true
                 },
                 enabled = !busy,
@@ -817,8 +787,24 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
     }
 }
 
+/** Roter Fehler-Hinweisblock – Material-Farben, identisch in Review/Main/Profil. */
+@Composable
+fun ErrorBanner(message: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            stringResource(R.string.error_prefix, message),
+            modifier = Modifier.padding(12.dp),
+            color = MaterialTheme.colorScheme.onErrorContainer
+        )
+    }
+}
+
 /**
- * Zusammenfassungs-Block: 🧠 Gesamteindruck immer sichtbar; 🍽️ „Erkannt" und 📝 Anmerkung
+ * Zusammenfassungs-Block: 🧠 Gesamteindruck immer sichtbar; 🍽️ „Erkannt“ und 📝 Anmerkung
  * eingeklappt hinter einem Toggle (der ganze Block antippbar = großes Touch-Ziel), Chevron
  * rotiert mit, animateContentSize animiert das Auf-/ Zuklappen. Nutzt Auswertung UND
  * Historie-Detail – bewusst identisch verhalten.
@@ -878,7 +864,7 @@ fun CollapsibleSummaryBlock(summary: String, erkannt: String, note: String) {
 
 @Composable
 fun GoalRow(goal: String, res: GoalResult?) {
-    val color = if (res == null) Color(0xFF9E9E9E) else ampelColor(res.ampel)
+    val color = ampelColor(res?.ampel ?: "unbekannt")
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
