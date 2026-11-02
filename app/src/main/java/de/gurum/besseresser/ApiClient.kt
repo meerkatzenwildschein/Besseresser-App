@@ -22,7 +22,9 @@ data class PromptBundle(
     val exactlyOne: String,
     val responseLanguage: String,
     // Formatierte Nutzer-Anmerkung (leer = keine); wird nur bei nicht-leerem Text in den Prompt übernommen
-    val noteHeader: String = ""
+    val noteHeader: String = "",
+    // Anweisungs-Satz für das "erkannt"-Feld (was ist auf dem Foto zu sehen)
+    val recognized: String = ""
 )
 
 /** Kommunikation mit der OpenAI-kompatiblen API: Foto-Bewertung, Modell-Liste, Ziele-Aufteilung. */
@@ -62,12 +64,13 @@ object ApiClient {
                         appendLine(promptBundle.noteHeader)
                     }
                     appendLine("")
-                    // JSON-Schluessel (bewertung/ziel/ampel/begruendung/zusatz) sind bewusst
+                    // JSON-Schluessel (bewertung/ziel/ampel/begruendung/zusatz/erkannt) sind bewusst
                     // fest verdrahtet – der Parser kennt diese Namen; nur die Anweisungssprache variiert.
                     appendLine(promptBundle.formatIntro)
-                    appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","begruendung":"<short reason>"}],"zusatz":"<one-sentence overall impression>"}""")
+                    appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","begruendung":"<short reason>"}],"zusatz":"<one-sentence overall impression>","erkannt":"<one short sentence: food you recognize on the photo>"}""")
                     appendLine(promptBundle.ampelMeaning)
                     appendLine(promptBundle.exactlyOne)
+                    if (promptBundle.recognized.isNotBlank()) appendLine(promptBundle.recognized)
                     appendLine(promptBundle.responseLanguage)
                 }
 
@@ -435,7 +438,8 @@ object ApiClient {
             }
         }
         val summary = obj.optString("zusatz", obj.optString("summary", ""))
-        return Evaluation(list, summary)
+        val erkannt = obj.optString("erkannt", obj.optString("detected", obj.optString("food", obj.optString("meal", ""))))
+        return Evaluation(list, summary, erkannt)
     }
 
     private val AMP_KEYS = listOf("ampel", "ampelfarbe", "farbe", "color", "status", "rating", "trafficlight")

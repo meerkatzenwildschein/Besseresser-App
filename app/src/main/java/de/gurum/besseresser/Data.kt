@@ -27,7 +27,8 @@ data class GoalResult(
 /** Ergebnis einer Foto-Bewertung durch die KI. */
 data class Evaluation(
     val goalResults: List<GoalResult>,
-    val summary: String
+    val summary: String,
+    val erkannt: String = ""    // Was die KI auf dem Foto (inkl. Nutzer-Anmerkung) erkannt zu haben meint
 )
 
 // ----------------------------------------------------------------- Ampel-Helfer

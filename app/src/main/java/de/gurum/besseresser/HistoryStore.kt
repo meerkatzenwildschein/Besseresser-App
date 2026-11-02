@@ -15,7 +15,8 @@ data class HistoryEntry(
     val photoFile: String,          // Dateiname in filesDir/history ("" = kein Foto)
     val goalResults: List<GoalResult>,
     val summary: String,
-    val note: String = ""           // Nutzer-Anmerkung zum Foto (WhatsApp-Stil)
+    val note: String = "",          // Nutzer-Anmerkung zum Foto (WhatsApp-Stil)
+    val erkannt: String = ""        // Was die KI auf dem Foto erkannt zu haben meint
 ) {
     /** Ampel-Score 0..100 (gruen=100, gelb=50, rot=0, grau ausgeschlossen); -1 = nicht bewertbar. */
     val score: Int
@@ -55,7 +56,7 @@ object HistoryStore {
         } catch (e: Exception) {
             photoFile = ""
         }
-        val entry = HistoryEntry(id, id, photoFile, ev.goalResults, ev.summary, note)
+        val entry = HistoryEntry(id, id, photoFile, ev.goalResults, ev.summary, note, ev.erkannt)
         File(dir(ctx), "$id.json").writeText(toJson(entry).toString())
         return entry
     }
@@ -80,7 +81,8 @@ object HistoryStore {
                     photoFile = o.optString("foto"),
                     goalResults = goals,
                     summary = o.optString("zusatz"),
-                    note = o.optString("anmerkung")
+                    note = o.optString("anmerkung"),
+                    erkannt = o.optString("erkannt")
                 )
             } catch (e: Exception) {
                 null
@@ -123,6 +125,7 @@ object HistoryStore {
         put("foto", e.photoFile)
         put("zusatz", e.summary)
         put("anmerkung", e.note)
+        put("erkannt", e.erkannt)
         put(
             "ziele",
             JSONArray().also { arr ->

@@ -220,6 +220,7 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                         ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
                         exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
                         responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                        recognized = ctx.getString(R.string.prompt_eval_recognized),
                         noteHeader = if (note.isNotBlank())
                             ctx.getString(R.string.prompt_note_header, note)
                         else ""
@@ -323,6 +324,7 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                             ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
                             exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
                             responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                            recognized = ctx.getString(R.string.prompt_eval_recognized),
                             noteHeader = if (note.isNotBlank())
                                 ctx.getString(R.string.prompt_note_header, note.trim())
                             else ""
@@ -472,7 +474,25 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                             color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(stringResource(R.string.summary_prefix, summary), modifier = Modifier.padding(12.dp))
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(stringResource(R.string.summary_prefix, summary))
+                                evaluation?.erkannt?.takeIf { it.isNotBlank() }?.let { det ->
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(stringResource(R.string.detected_prefix, det))
+                                }
+                            }
+                        }
+                    } else {
+                        // Kein Gesamteindruck, aber Erkennung -> Block trotzdem zeigen
+                        val det = evaluation?.erkannt.orEmpty()
+                        if (det.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.detected_prefix, det), modifier = Modifier.padding(12.dp))
+                            }
                         }
                     }
                     // Manueller Speichern-Button (kein Auto-Save)
