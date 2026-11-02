@@ -156,8 +156,10 @@ Gesund_Essen_App/
 │       │     Store.kt          SharedPreferences für Einstellungen
 │       │     ApiClient.kt      OpenAI-kompatible API: analyze, splitGoals(+lokal), fetchModels, tolerantes JSON-Parsing (auch `content` als Parts-Array/`reasoning_content`, Fehler mit Rohantwort-Auszug, `closeJson`-Reparatur für abgeschnittene Antworten, max_tokens 4096) — **Reasoning-Modelle:** bei OpenRouter-DeepSeek wird `reasoning:{exclude:true}` mitgeschickt und Budget erhöht (DeepSeek v4.1 kann inzwischen Bild-Input!)
 │       │     HistoryStore.kt   HistoryEntry, HistoryStore (JSON+JPG in filesDir/history), decodeThumb
-│       │     MainActivity.kt   Activity, GesundEssenApp-Navigation, MainScreen, GoalRow
-│       │     SetupScreen.kt    TopBarRow, SetupScreen, LabelledField, ModelListScreen
+│       │     MainActivity.kt   Activity, Theme, GesundEssenApp-Navigation (AppScreen-Enum, AnimatedContent, BackHandler-Setup)
+│       │     MainScreen.kt     Der komplette Hauptbildschirm: Kamera-Overlay/Review-Zweig, Auswertung, CTA-Zustandsmaschinen, Tagesfazit „Dein Tag bisher"
+│       │     CommonUi.kt       Geteilte Bausteine: TopBarRow, GoalRow, CollapsibleSummaryBlock, ErkanntEditDialog, ErrorBanner
+│       │     SetupScreen.kt    Setup, LabelledField, ModelListScreen (TopBarRow lebt in CommonUi)
 │       │     HistoryScreen.kt  HistoryScreen (Liste, Wisch-Löschen/Back), ScoreBadge, HistoryDetailScreen
 │       └── res/
 │           ├── values/          strings.xml, themes.xml, colors.xml
