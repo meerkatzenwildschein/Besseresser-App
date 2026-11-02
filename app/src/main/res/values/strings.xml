@@ -32,7 +32,7 @@
     <string name="main_rate_now">Rate this meal</string>
     <string name="main_retake">Retake photo</string>
     <string name="review_title">Check the photo</string>
-    <string name="main_note_placeholder">What\'s on the plate (optional)? e.g. spaghetti bolognese with parmesan …</string>
+    <string name="main_note_placeholder">What\'s on the plate (optional)? e.g. spaghetti bolognese with parmesan, portion sizes, anything special …</string>
     <string name="cam_permission_text">To capture photos directly, the app needs the camera permission.</string>
     <string name="cam_retry_permission">Grant permission</string>
     <string name="cam_use_system">Use system camera</string>
