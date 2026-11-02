@@ -31,3 +31,45 @@ object Store {
             .apply()
     }
 }
+
+// ----------------------------------------------------------------- Profil
+
+/** Nutzerprofil: alles optional (Alter/Gewicht/Größe + Freitext wie Vorerkrankungen). */
+data class Profile(
+    val ageYears: Int? = null,
+    val weightKg: Double? = null,
+    val heightCm: Int? = null,
+    val notes: String = ""
+) {
+    val isEmpty: Boolean
+        get() = ageYears == null && weightKg == null && heightCm == null && notes.isBlank()
+}
+
+object ProfileStore {
+    fun load(ctx: Context): Profile {
+        val p: SharedPreferences = ctx.getSharedPreferences("besseresser_prefs", Context.MODE_PRIVATE)
+        return Profile(
+            ageYears = p.getInt("profileAge", -1).takeIf { it > 0 },
+            weightKg = p.getString("profileWeight", null)
+                ?.replace(',', '.')?.toDoubleOrNull()?.takeIf { it > 0 },
+            heightCm = p.getInt("profileHeight", -1).takeIf { it > 0 },
+            notes = p.getString("profileNotes", "") ?: ""
+        )
+    }
+
+    /** Leere Eingaben speichern als "nicht gesetzt" – das Profil darf komplett leer bleiben. */
+    fun save(
+        ctx: Context,
+        ageYears: Int?,
+        weightKg: Double?,
+        heightCm: Int?,
+        notes: String
+    ) {
+        ctx.getSharedPreferences("besseresser_prefs", Context.MODE_PRIVATE).edit()
+            .putInt("profileAge", ageYears ?: -1)
+            .putString("profileWeight", weightKg?.toString())
+            .putInt("profileHeight", heightCm ?: -1)
+            .putString("profileNotes", notes.trim())
+            .apply()
+    }
+}
