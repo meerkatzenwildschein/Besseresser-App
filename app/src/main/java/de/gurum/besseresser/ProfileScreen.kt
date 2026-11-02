@@ -4,7 +4,6 @@ import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -63,7 +62,6 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
     var notesText by remember { mutableStateOf(initial.notes) }
     var error by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
-    val dateInteractionSource = remember { MutableInteractionSource() }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -90,26 +88,39 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
                 ErrorBanner(msg)
             }
 
-            // Geburtsdatum: Material-DatePicker (System-lokalisiert), Anzeige dd.MM.yyyy
-            OutlinedTextField(
-                value = birthDateIso?.let {
-                    LocalDate.parse(it).format(BIRTH_DISPLAY_FORMAT)
-                } ?: "",
-                onValueChange = { },
-                readOnly = true,
-                label = { Text(stringResource(R.string.profile_birth_label)) },
-                trailingIcon = {
-                    Icon(Icons.Filled.DateRange, contentDescription = null)
-                },
-                interactionSource = dateInteractionSource,
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(
-                        interactionSource = dateInteractionSource,
-                        indication = null
-                    ) { showDatePicker = true }
-            )
+            // Geburtsdatum: Material-DatePicker (System-lokalisiert), Anzeige dd.MM.yyyy.
+            // Bitte-nicht-fixable-Falle: readOnly-TextField mit clickable(interactionSource) schluckt
+            // den Tap (TextField-eigene Gestures). Robustes Muster: Feld optisch normal
+            // (enabled=false + Farben über OutlinedTextFieldDefaults zurückgesetzt), dann
+            // transparente Click-Box drüber – die fängt den Tap zuverlässig ab.
+            Box {
+                OutlinedTextField(
+                    value = birthDateIso?.let {
+                        LocalDate.parse(it).format(BIRTH_DISPLAY_FORMAT)
+                    } ?: "",
+                    onValueChange = { },
+                    enabled = false,
+                    readOnly = true,
+                    label = { Text(stringResource(R.string.profile_birth_label)) },
+                    trailingIcon = {
+                        Icon(Icons.Filled.DateRange, contentDescription = null)
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                        disabledContainerColor = MaterialTheme.colorScheme.surface,
+                        disabledBorderColor = MaterialTheme.colorScheme.outline,
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clickable { showDatePicker = true }
+                )
+            }
 
             OutlinedTextField(
                 value = weightText,
