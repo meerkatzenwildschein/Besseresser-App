@@ -49,6 +49,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.core.content.FileProvider
 import java.io.File
 import java.text.SimpleDateFormat
@@ -58,12 +59,18 @@ import java.util.Locale
 
 // ----------------------------------------------------------------- Gemeinsame UI-Bausteine (von Main, Verlauf-Detail und Profil genutzt)
 
-/** Top-Leiste: Zurueck-Pfeil links, Titel mittig-Links, optionales Element rechts. */
+/** Top-Leiste: Zurueck-Pfeil links, Titel mittig, optionales Element rechts.
+ *  Optional kleines Icon vor dem Titel (Wiedererkennung: dasselbe Symbol wie im Burger-Menü).
+ *  Der rechte Slot hat immer 48dp (Icon-Größe), damit der Titel frei von trailing-Inhalt mittig bleibt. */
 @Composable
-fun TopBarRow(title: String, onBack: () -> Unit, trailing: @Composable () -> Unit = {}) {
+fun TopBarRow(
+    title: String,
+    onBack: () -> Unit,
+    trailing: @Composable () -> Unit = {},
+    icon: ImageVector? = null
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBack) {
@@ -72,8 +79,26 @@ fun TopBarRow(title: String, onBack: () -> Unit, trailing: @Composable () -> Uni
                 contentDescription = stringResource(R.string.cd_back_no_save)
             )
         }
-        Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        trailing()
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.weight(1f)
+        ) {
+            if (icon != null) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        }
+        Box(
+            modifier = Modifier.size(48.dp),
+            contentAlignment = Alignment.Center
+        ) { trailing() }
     }
 }
 
