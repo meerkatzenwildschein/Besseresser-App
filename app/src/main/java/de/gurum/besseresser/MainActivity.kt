@@ -407,6 +407,10 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
             }
         } else {
             // ------------------------------------------------- Normalzustand
+            // Zeigt ein Bericht mit Ergebnissen? Dann übernehmen die Inline-Aktionen
+            // (Speichern/Verwerfen bzw. „Neues Foto aufnehmen") – der fixierte Foto-CTA
+            // wäre redundant und wird ausgeblendet.
+            val reportShown = lastGoaled && !evaluation?.goalResults.isNullOrEmpty()
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -557,11 +561,15 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                 }
 
                 // Platzhalter, damit nichts unter dem fixierten Foto-Button versteckt wird
-                Spacer(Modifier.height(100.dp))
+                // (kleiner, wenn der CTA wegen angezeigtem Bericht ausgeblendet ist)
+                Spacer(Modifier.height(if (reportShown) 24.dp else 100.dp))
             }
 
-            // Fixierter Kamera-CTA unten
-            Button(
+            // Fixierter Kamera-CTA unten – ausgeblendet, solange ein Bericht mit
+            // Ergebnissen angezeigt wird (dann sind Speichern/Verwerfen bzw.
+            // „Neues Foto aufnehmen" die einzigen sinnvollen nächsten Schritte)
+            if (!reportShown) {
+                Button(
                 onClick = {
                     // Frischer Durchlauf: alte Anmerkung + altes Ergebnis verwerfen,
                     // damit Kamera-Note leer ist und die Ampeln grau wie beim Erststart sind
@@ -587,13 +595,14 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                     fontSize = 17.sp
                 )
             }
+            }
         }
     }
 }
 
 /**
  * Zusammenfassungs-Block: 🧠 Gesamteindruck immer sichtbar; 🍽️ „Erkannt" und 📝 Anmerkung
- * eingeklappt hinter einem Toggle (גם ganze Block antippbar = großes Touch-Ziel), Chevron
+ * eingeklappt hinter einem Toggle (der ganze Block antippbar = großes Touch-Ziel), Chevron
  * rotiert mit, animateContentSize animiert das Auf-/ Zuklappen. Nutzt Auswertung UND
  * Historie-Detail – bewusst identisch verhalten.
  */
