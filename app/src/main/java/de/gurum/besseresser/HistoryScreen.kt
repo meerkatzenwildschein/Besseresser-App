@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,10 +28,35 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.io.File
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 
 // ----------------------------------------------------------------- Historie-Screen (Liste)
+
+/** Ein Kalendertag mit allen gespeicherten Bewertungen desselben Tages. */
+private data class DayGroup(
+    val day: LocalDate,
+    val entries: List<HistoryEntry>,
+    val score: Int          // Tagesschnitt 0..100; -1 = kein Eintrag bewertbar
+)
+
+/** Nach Kalendertag gruppieren (absteigend); Einträge bleiben innerhalb der Gruppe absteigend. */
+private fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
+    entries.groupBy {
+        Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+    }.map { (day, list) ->
+        val rated = list.map { it.score }.filter { it >= 0 }
+        DayGroup(
+            day = day,
+            entries = list,
+            score = if (rated.isEmpty()) -1
+                    else Math.round(rated.sumOf { it }.toDouble() / rated.size).toInt()
+        )
+    }.sortedByDescending { it.day }
 
 @Composable
 fun HistoryScreen(onPick: (HistoryEntry) -> Unit, onBack: () -> Unit) {
@@ -81,41 +105,76 @@ fun HistoryScreen(onPick: (HistoryEntry) -> Unit, onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(entries, key = { it.id }) { entry ->
-                    val dismissState = rememberSwipeToDismissBoxState(
-                        confirmValueChange = { value ->
-                            if (value == SwipeToDismissBoxValue.EndToStart) {
-                                entries = entries.filterNot { it.id == entry.id }
-                                HistoryStore.delete(ctx, entry)
-                                true
-                            } else false
-                        }
-                    )
-                    SwipeToDismissBox(
-                        state = dismissState,
-                        enableDismissFromStartToEnd = false,
-                        backgroundContent = {
-                            Box(
-                                modifier = Modifier
-                                    // Gleiche Rundung wie die Karte, sonst schimmert Rot an den Ecken
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .fillMaxSize()
-                                    .background(Color(0xFFD32F2F)),
-                                contentAlignment = Alignment.CenterEnd
+                groupByDay(entries).forEach { group ->
+                    item(key = "day-${group.day}") { DayGroupHeader(group) }
+                    group.entries.forEach { entry ->
+                        item(key = entry.id) {
+                            val dismissState = rememberSwipeToDismissBoxState(
+                                confirmValueChange = { value ->
+                                    if (value == SwipeToDismissBoxValue.EndToStart) {
+                                        entries = entries.filterNot { it.id == entry.id }
+                                        HistoryStore.delete(ctx, entry)
+                                        true
+                                    } else false
+                                }
+                            )
+                            SwipeToDismissBox(
+                                state = dismissState,
+                                enableDismissFromStartToEnd = false,
+                                backgroundContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            // Gleiche Rundung wie die Karte, sonst schimmert Rot an den Ecken
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .fillMaxSize()
+                                            .background(Color(0xFFD32F2F)),
+                                        contentAlignment = Alignment.CenterEnd
+                                    ) {
+                                        Text(
+                                            stringResource(R.string.history_delete_action),
+                                            color = Color.White,
+                                            fontWeight = FontWeight.SemiBold,
+                                            modifier = Modifier.padding(horizontal = 24.dp)
+                                        )
+                                    }
+                                }
                             ) {
-                                Text(
-                                    stringResource(R.string.history_delete_action),
-                                    color = Color.White,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.padding(horizontal = 24.dp)
-                                )
+                                HistoryItem(entry, onClick = { onPick(entry) })
                             }
                         }
-                    ) {
-                        HistoryItem(entry, onClick = { onPick(entry) })
                     }
                 }
             }
+        }
+    }
+}
+
+/** Kopfzeile einer Tagesgruppe: Datum links, Tagesscore-Ampel rechts. */
+@Composable
+private fun DayGroupHeader(group: DayGroup) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 2.dp, start = 4.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            group.day.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            ScoreCircle(
+                score = group.score,
+                tooltipRes = if (group.score >= 0) R.string.score_tooltip_day
+                             else R.string.score_tooltip_unknown
+            )
+            Text(
+                stringResource(R.string.score_caption_day),
+                fontSize = 10.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -157,7 +216,7 @@ private fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault())
+                    SimpleDateFormat("HH:mm", Locale.getDefault())
                         .format(Date(entry.dateMillis)),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
@@ -189,47 +248,51 @@ private fun zielePreview(entry: HistoryEntry, emptyText: String, moreText: Strin
     }
 }
 
+/** Farbskala für Ampel-Scores (auch der Tagesscore): grau = nichts bewertbar, ≥80 grün, ≥50 gelb, sonst rot. */
+private fun scoreColor(score: Int): Color = when {
+    score < 0 -> Color(0xFF9E9E9E)
+    score >= 80 -> Color(0xFF2E9E44)
+    score >= 50 -> Color(0xFFE6A817)
+    else -> Color(0xFFD32F2F)
+}
+
+/** Farbiges Kreis-Badge mit Score (Long-Press-Erklärung via Tooltip). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScoreCircle(score: Int, tooltipRes: Int) {
+    val tooltipState = rememberTooltipState()
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        state = tooltipState,
+        tooltip = { PlainTooltip { Text(stringResource(tooltipRes)) } }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(scoreColor(score))
+                .padding(3.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                if (score >= 0) "$score" else "–",
+                fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
 /** Ampel-Score als farbiger Kreis + Bezeichnung; Long-Press erklärt die Berechnung. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScoreBadge(entry: HistoryEntry) {
     val score = entry.score
-    val color = when {
-        score < 0 -> Color(0xFF9E9E9E)
-        score >= 80 -> Color(0xFF2E9E44)
-        score >= 50 -> Color(0xFFE6A817)
-        else -> Color(0xFFD32F2F)
-    }
-    val tooltipState = rememberTooltipState()
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        TooltipBox(
-            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-            state = tooltipState,
-            tooltip = {
-                PlainTooltip {
-                    Text(
-                        stringResource(
-                            if (score >= 0) R.string.score_tooltip_ok
-                            else R.string.score_tooltip_unknown
-                        )
-                    )
-                }
-            }
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(color)
-                    .padding(3.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    if (score >= 0) "$score" else "–",
-                    fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold
-                )
-            }
-        }
+        ScoreCircle(
+            score = score,
+            tooltipRes = if (score >= 0) R.string.score_tooltip_ok
+                         else R.string.score_tooltip_unknown
+        )
         Text(stringResource(R.string.score_caption), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

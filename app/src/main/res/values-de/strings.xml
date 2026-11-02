@@ -102,7 +102,9 @@
     <string name="history_delete_action">🗑 Löschen</string>
     <string name="history_no_goals">Keine Ziele erfasst</string>
     <string name="score_caption">Ampelschnitt</string>
+    <string name="score_caption_day">Tagesscore</string>
     <string name="score_tooltip_ok">Ampelschnitt der bewerteten Ziele: 🟢 100 · 🟡 50 · 🔴 0</string>
+    <string name="score_tooltip_day">Tagesschnitt der Ampelschnitte aller Essen: 🟢 100 · 🟡 50 · 🔴 0</string>
     <string name="score_tooltip_unknown">Kein Ampelschnitt: keine Bewertung erhalten</string>
     <string name="history_entry_delete">Eintrag löschen</string>
     <string name="history_delete_confirm_title">Eintrag löschen?</string>
