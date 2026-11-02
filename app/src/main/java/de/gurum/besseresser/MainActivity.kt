@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -78,6 +79,12 @@ fun GesundEssenApp() {
                 settings = Store.load(ctx)
                 showSetup = !settings.isComplete
                 loaded = true
+            }
+
+            // Einstellungs-Overlay über einem bestehenden Setup: Android-Zurück schließt
+            // es (wie der Zurückpfeil). Beim Erst-Setup (unvollständig) bleibt Zurück = App beenden.
+            if (loaded && showSetup && settings.isComplete) {
+                BackHandler { showSetup = false }
             }
 
             when {
@@ -187,6 +194,17 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
             photoPreview = photoUri
             showReview = true
         }
+    }
+
+    // Android-Zurück-Button: Overlay-Ebenen der Aufnahme schließen, statt die App zu beenden.
+    // Gleiche Wirkung wie die On-Screen-Zurückpfeile: Kamera ohne Bewerten verlassen; Review
+    // verwirft Foto + Anmerkung + Fehler.
+    BackHandler(enabled = showCamera) { showCamera = false }
+    BackHandler(enabled = showReview) {
+        showReview = false
+        photoPreview = null
+        note = ""
+        error = null
     }
 
     Box(
