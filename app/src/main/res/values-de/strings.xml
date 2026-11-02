@@ -6,7 +6,7 @@
     <string name="main_title">Besseresser</string>
     <string name="menu_open_description">Menü öffnen</string>
     <string name="menu_settings">Einstellungen</string>
-    <string name="menu_history">Historie</string>
+    <string name="menu_history">Verlauf</string>
     <string name="cd_back_no_save">Zurück ohne Speichern</string>
     <string name="photo_of_meal">Foto des Essens</string>
     <string name="error_prefix">Fehler: %1$s</string>
@@ -40,10 +40,10 @@
     <string name="history_note_prefix">📝 %1$s</string>
     <string name="main_ai_working">KI bewertet …</string>
     <string name="main_no_rating_yet">Noch keine Bewertung</string>
-    <string name="main_save_to_history">In Historie speichern</string>
+    <string name="main_save_to_history">In den Verlauf speichern</string>
     <string name="main_saving">Speichere …</string>
     <string name="main_discard">Ohne Speichern verwerfen</string>
-    <string name="main_saved_banner">✓ In der Historie gespeichert (Menü → Historie)</string>
+    <string name="main_saved_banner">✓ Im Verlauf gespeichert (Menü → Verlauf)</string>
     <string name="main_new_photo">Neues Foto aufnehmen</string>
 
     <!-- Setup -->
@@ -103,7 +103,7 @@
     </string-array>
 
     <!-- History -->
-    <string name="history_title">Historie</string>
+    <string name="history_title">Verlauf</string>
     <string name="history_empty">Noch keine Bewertungen.\nFotografiere dein erstes Essen!</string>
     <string name="history_list_hint">%1$d Bewertungen – nach links wischen zum Löschen</string>
     <string name="history_delete_action">🗑 Löschen</string>
