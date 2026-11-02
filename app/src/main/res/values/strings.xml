@@ -13,6 +13,11 @@
     <string name="my_goals">Your goals</string>
     <string name="summary_prefix">🧠 %1$s</string>
     <string name="detected_prefix">🍽️ %1$s</string>
+    <plurals name="details_toggle_more">
+        <item quantity="one">%1$d more detail</item>
+        <item quantity="other">%1$d more details</item>
+    </plurals>
+    <string name="details_toggle_less">Collapse details</string>
     <string name="ampel_green">Green</string>
     <string name="ampel_yellow">Yellow</string>
     <string name="ampel_red">Red</string>
