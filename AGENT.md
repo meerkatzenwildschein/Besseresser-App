@@ -49,13 +49,18 @@ zwischen je-Entry-`item(key=id)`; java.time (minSdk 26), Systemzeitzone.
   "bewertung": [
     { "ziel": "<exaktes Ziel>", "ampel": "gruen|gelb|rot", "begruendung": "..." }
   ],
-  "zusatz": "<Gesamteindruck-Satz>"
+  "zusatz": "<Gesamteindruck-Satz>",
+  "erkannt": "<kurzer Satz: was die KI auf dem Foto (inkl. Nutzer-Anmerkung) erkennt>"
 }
 ```
 
 Parsen ist tolerant (`results`/`summary`/`reason` als Alias, Code-Fences werden gestrippt,
 Ziel-Zuordnung ignoriert Groß-/Kleinschreibung und Leerzeichen; normalisiert `green/yellow/red`
-ebenso). Fehlende Ziele → Ampel „unbekannt" (grau).
+ebenso). **`erkannt`:** Alias `detected`/`food`/`meal`, leer erlaubt; Zeile 🍽️ (`detected_prefix`) im
+Zusammenfassungs-Block der Auswertung (MainActivity) und Detail-Historie; in der Listenansicht
+steht sie direkt unter der Uhrzeit (max. 2 Zeilen, Ellipsis). Persistiert im History-JSON unter
+`"erkannt"`. Prompt-Baustein `prompt_eval_recognized` (beide `strings.xml`), Feld im
+JSON-Format-Beispiel in `ApiClient.analyze`. Fehlende Ziele → Ampel „unbekannt" (grau).
 
 ## Technik-Stack
 

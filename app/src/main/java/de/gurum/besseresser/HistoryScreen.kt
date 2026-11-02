@@ -24,6 +24,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.io.File
@@ -221,6 +222,14 @@ private fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
                 )
+                if (entry.erkannt.isNotBlank()) {
+                    Text(
+                        stringResource(R.string.detected_prefix, entry.erkannt),
+                        fontSize = 12.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
                 Text(
                     zielePreview(
                         entry,
@@ -339,7 +348,7 @@ fun HistoryDetailScreen(entry: HistoryEntry, onBack: () -> Unit) {
             }
         }
 
-        if (entry.summary.isNotBlank() || entry.note.isNotBlank()) {
+        if (entry.summary.isNotBlank() || entry.erkannt.isNotBlank() || entry.note.isNotBlank()) {
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -349,6 +358,9 @@ fun HistoryDetailScreen(entry: HistoryEntry, onBack: () -> Unit) {
                     buildString {
                         if (entry.summary.isNotBlank()) {
                             appendLine(stringResource(R.string.summary_prefix, entry.summary))
+                        }
+                        if (entry.erkannt.isNotBlank()) {
+                            appendLine(stringResource(R.string.detected_prefix, entry.erkannt))
                         }
                         if (entry.note.isNotBlank()) {
                             append(stringResource(R.string.history_note_prefix, entry.note))
