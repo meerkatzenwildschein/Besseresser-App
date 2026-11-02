@@ -3,6 +3,7 @@ package de.gurum.besseresser
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -192,17 +193,35 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
         modifier = Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
-                // Nach links wischen → Historie (Schwellwert, kein vertik. Scrollkonflikt)
+                // Nach links wischen → Verlauf (Schwellwert, kein vertik. Scrollkonflikt).
+                // GESPERRT, solange der Durchlauf ungespeichert ist (Bericht offen / Foto-Review /
+                // Kamera / KI läuft): der Screen-Wechsel würde den MainScreen-State (Foto, Note,
+                // Auswertung) verwerfen. Hinweis-Toast, max. einmal pro Wisch-Geste.
                 var acc = 0f
+                var hintShown = false
                 detectHorizontalDragGestures(
-                    onDragEnd = { acc = 0f },
-                    onDragCancel = { acc = 0f }
+                    onDragEnd = { acc = 0f; hintShown = false },
+                    onDragCancel = { acc = 0f; hintShown = false }
                 ) { _, dragAmount ->
                     if (dragAmount < 0) {
                         acc += dragAmount
+                        val blocked = busy || showCamera || showReview ||
+                            (lastGoaled && !savedToHistory)
                         if (acc < -160f) {
-                            acc = 0f
-                            onOpenHistory()
+                            if (blocked) {
+                                if (!hintShown) {
+                                    Toast.makeText(
+                                        ctx,
+                                        ctx.getString(R.string.nav_blocked_hint),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    hintShown = true
+                                }
+                                acc = 0f
+                            } else {
+                                acc = 0f
+                                onOpenHistory()
+                            }
                         }
                     } else {
                         acc = 0f
@@ -425,7 +444,10 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                                 onClick = {
                                     menuOpen = false
                                     onOpenHistory()
-                                }
+                                },
+                                // Gesperrt bei ungespeichertem Durchlauf (s. Wisch-Sperre)
+                                enabled = !busy && !showCamera && !showReview &&
+                                    !(lastGoaled && !savedToHistory)
                             )
                         }
                     }
