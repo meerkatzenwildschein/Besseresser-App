@@ -32,6 +32,62 @@ object ApiClient {
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
 
+    // ---------------------------------------------------------------- gemeinsame Call-Bausteine
+
+    /** Reiner Post an /chat/completions; wirft ChatHttpException (mit Code + Roh-Body) bei Fehler,
+     *  liefert sonst den Antwort-Body als String. */
+    private fun postChat(url: String, apiKey: String, body: JSONObject): String {
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 15000
+            readTimeout = 120000
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("Authorization", "Bearer ${apiKey.trim()}")
+        }
+        conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+        val code = conn.responseCode
+        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+        val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
+        if (code !in 200..299) throw ChatHttpException(code, text)
+        return text
+    }
+
+    /** HTTP-Fehlerobjekt mit Code + Roh-Body für Debug-Reports/Toasts. */
+    private class ChatHttpException(val code: Int, val bodyText: String) :
+        RuntimeException("HTTP $code: ${bodyText.take(300)}")
+
+    /** Gemeinsamer JSON-Request-Kern: Modell/Temperatur/Budget + Reasoning-Aus für OpenRouter/DeepSeek. */
+    private fun chatBody(
+        model: String,
+        baseUrl: String,
+        temperature: Double,
+        maxTokens: Int,
+        messages: JSONArray
+    ): JSONObject = JSONObject().apply {
+        put("model", model.trim())
+        put("temperature", temperature)
+        // Budget großzügig: Reasoning-Modelle „denken“ vom selben Konto —
+        // zu knapp → finish=length mit LEEREM content (klassischer stiller Fehler)
+        put("max_tokens", maxTokens)
+        if (baseUrl.contains("openrouter", true) || baseUrl.contains("deepseek", true) ||
+            model.contains("deepseek", true)
+        ) {
+            put("reasoning", JSONObject().put("exclude", true))
+        }
+        put("messages", messages)
+    }
+
+    /** Toleranter JSON-Parser für KI-Antworten: Code-Fences strippen, {…}-Block suchen, closeJson-Reparatur. */
+    private fun tolerantJson(content: String): JSONObject {
+        val cleaned = content.replace("```json", "", true).replace("```", "").trim()
+        val start = cleaned.indexOf('{')
+        val end = cleaned.lastIndexOf('}')
+        if (start < 0 || end <= start) throw IllegalStateException("KI-Antwort ohne JSON")
+        val jsonStr = cleaned.substring(start, end + 1)
+        return try { JSONObject(jsonStr) } catch (e: Exception) { JSONObject(closeJson(jsonStr)) }
+    }
+
     // ---------------------------------------------------------------- Foto bewerten
 
     fun analyze(
@@ -39,7 +95,6 @@ object ApiClient {
         photoUri: Uri,
         settings: Settings,
         promptBundle: PromptBundle,
-        userNote: String,
         onResult: (Evaluation) -> Unit,
         onError: (String) -> Unit
     ) {
@@ -74,55 +129,31 @@ object ApiClient {
                     appendLine(promptBundle.responseLanguage)
                 }
 
-                val body = JSONObject().apply {
-                    put("model", settings.model)
-                    put("temperature", 0.3)
-                    put("max_tokens", 4096)
-                    // Reasoning-Modelle verbrennen das max_tokens-Budget mit Nachdenk-Erzeugung;
-                    // OpenRouter kennt dafür "exclude", damit nur der Antworttext kommt.
-                    if (settings.baseUrl.contains("openrouter", true)) {
-                        put("reasoning", JSONObject().put("exclude", true))
-                    }
-                    put(
-                        "messages",
-                        JSONArray().put(
-                            JSONObject().apply {
-                                put("role", "user")
-                                put(
-                                    "content",
-                                    JSONArray()
-                                        .put(JSONObject().put("type", "text").put("text", prompt))
-                                        .put(
-                                            JSONObject().put("type", "image_url").put(
-                                                "image_url",
-                                                JSONObject().put("url", dataUri)
-                                            )
+                val body = chatBody(
+                    model = settings.model,
+                    baseUrl = settings.baseUrl,
+                    temperature = 0.3,
+                    maxTokens = 4096,
+                    messages = JSONArray().put(
+                        JSONObject().apply {
+                            put("role", "user")
+                            put(
+                                "content",
+                                JSONArray()
+                                    .put(JSONObject().put("type", "text").put("text", prompt))
+                                    .put(
+                                        JSONObject().put("type", "image_url").put(
+                                            "image_url",
+                                            JSONObject().put("url", dataUri)
                                         )
-                                )
-                            }
-                        )
+                                    )
+                            )
+                        }
                     )
-                }
+                )
 
                 val url = settings.baseUrl.trim().trimEnd('/') + "/chat/completions"
-                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 15000
-                    readTimeout = 120000
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/json")
-                    setRequestProperty("Authorization", "Bearer ${settings.apiKey.trim()}")
-                }
-
-                conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
-
-                val code = conn.responseCode
-                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-                val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
-
-                if (code !in 200..299) {
-                    throw IllegalStateException("HTTP $code: ${text.take(300)}")
-                }
+                val text = postChat(url, settings.apiKey, body)
 
                 // Antwort parsen
                 val resp = JSONObject(text)
@@ -188,38 +219,18 @@ object ApiClient {
                     appendLine("""{"ampel":"gruen|gelb|rot","text":"<2-3 sentences: day summary in the app language, directly to the point>"}""")
                     appendLine(promptLanguage)
                 }
-                val body = JSONObject().apply {
-                    put("model", settings.model)
-                    put("temperature", 0.3)
-                    // Budget großzügig: Reasoning-Modelle „denken" vom selben Konto —
-                    // zu knapp → finish=length mit LEEREM content (klassischer Stiller Fehler)
-                    put("max_tokens", 3000)
-                    if (settings.baseUrl.contains("openrouter", true)) {
-                        put("reasoning", JSONObject().put("exclude", true))
-                    }
-                    if (settings.baseUrl.contains("deepseek", true)) {
-                        put("reasoning", JSONObject().put("exclude", true))
-                    }
-                    put("messages", JSONArray().put(
-                        JSONObject().put("role", "user")
-                            .put("content", prompt)
-                    ))
-                }
+                val body = chatBody(
+                    model = settings.model,
+                    baseUrl = settings.baseUrl,
+                    temperature = 0.3,
+                    maxTokens = 3000,
+                    messages = JSONArray().put(
+                        JSONObject().put("role", "user").put("content", prompt)
+                    )
+                )
 
                 val url = settings.baseUrl.trim().trimEnd('/') + "/chat/completions"
-                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 15000
-                    readTimeout = 120000
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/json")
-                    setRequestProperty("Authorization", "Bearer ${settings.apiKey.trim()}")
-                }
-                conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
-                val code = conn.responseCode
-                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-                val respText = stream?.bufferedReader()?.use { it.readText() } ?: ""
-                if (code !in 200..299) throw IllegalStateException("HTTP $code: ${respText.take(300)}")
+                val respText = postChat(url, settings.apiKey, body)
 
                 val respObj = JSONObject(respText)
                 val rawContent = extractContent(respObj)
@@ -241,16 +252,11 @@ object ApiClient {
                 }
 
                 // tolerantes JSON-Parsing (Code-Fences, closeJson)
-                val cleaned = rawContent.replace("```json", "", true).replace("```", "").trim()
-                val start = cleaned.indexOf('{')
-                val end = cleaned.lastIndexOf('}')
-                if (start < 0 || end <= start) throw IllegalStateException("KI-Antwort ohne JSON")
-                val jsonStr = cleaned.substring(start, end + 1)
-                val obj = try { JSONObject(jsonStr) } catch (e: Exception) { JSONObject(closeJson(jsonStr)) }
+                val obj = tolerantJson(rawContent)
                 val ampel = normalizeAmpel(obj.optString("ampel", obj.optString("rating", "")))
                 val fazitText = obj.optString("text", obj.optString("fazit", obj.optString("summary", "")))
                 // Ampel "unbekannt" ist okay (grauer Chip) – nur ganz ohne Text ist ein echter Fehler.
-                if (fazitText.isBlank()) throw IllegalStateException("KI-Antwort ohne Fazit-Text (Roh: ${cleaned.take(200)})")
+                if (fazitText.isBlank()) throw IllegalStateException("KI-Antwort ohne Fazit-Text (Roh: ${rawContent.take(200)})")
                 main.post { onOk(ampel, fazitText.trim()) }
             } catch (e: Exception) {
                 main.post { onError("${e.message ?: e.javaClass.simpleName}") }
@@ -271,8 +277,6 @@ object ApiClient {
         onError: (debugReport: String) -> Unit
     ) {
         val requestUrl = baseUrl.trim().trimEnd('/') + "/chat/completions"
-        var httpCode = -1
-        var body = ""
         executor.execute {
             try {
                 val prompt = buildString {
@@ -283,41 +287,18 @@ object ApiClient {
                     appendLine()
                     appendLine(rawGoals)
                 }
-                val req = JSONObject().apply {
-                    put("model", model.trim())
-                    put("temperature", 0.1)
-                    put("max_tokens", 1600)
-                    if (model.contains("deepseek", true)) {
-                        put("reasoning", JSONObject().put("exclude", true))
-                    }
-                    put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", prompt)))
-                }
-                val conn = (URL(requestUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 15000
-                    readTimeout = 120000
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/json")
-                    setRequestProperty("Authorization", "Bearer ${apiKey.trim()}")
-                }
-                conn.outputStream.use { it.write(req.toString().toByteArray(Charsets.UTF_8)) }
-                httpCode = conn.responseCode
-                val stream = if (httpCode in 200..299) conn.inputStream else conn.errorStream
-                body = stream?.bufferedReader()?.use { it.readText() } ?: ""
-                if (httpCode !in 200..299) throw IllegalStateException("HTTP $httpCode")
+                val req = chatBody(
+                    model = model,
+                    baseUrl = baseUrl,
+                    temperature = 0.1,
+                    maxTokens = 1600,
+                    messages = JSONArray().put(JSONObject().put("role", "user").put("content", prompt))
+                )
+                val respBody = postChat(requestUrl, apiKey, req)
 
-                val content = JSONObject(body).getJSONArray("choices")
+                val content = JSONObject(respBody).getJSONArray("choices")
                     .getJSONObject(0).getJSONObject("message").getString("content")
-                val cleaned = content.replace("```json", "", true).replace("```", "").trim()
-                val start = cleaned.indexOf('{')
-                val end = cleaned.lastIndexOf('}')
-                if (start < 0 || end <= start) throw IllegalStateException("KI-Antwort ohne JSON")
-                val jsonSplit = cleaned.substring(start, end + 1)
-                val obj = try {
-                    JSONObject(jsonSplit)
-                } catch (e: Exception) {
-                    JSONObject(closeJson(jsonSplit))
-                }
+                val obj = tolerantJson(content)
                 val rawArr = obj.optJSONArray("ziele")
                     ?: obj.optJSONArray("goals")
                     ?: obj.optJSONArray("ziel_liste")
@@ -334,11 +315,11 @@ object ApiClient {
             } catch (e: Exception) {
                 val debug = buildString {
                     appendLine("Anfrage:  POST $requestUrl (Modell: $model)")
-                    appendLine("Status:   HTTP $httpCode")
+                    appendLine("Status:   HTTP ${(e as? ChatHttpException)?.code ?: "?"}")
                     appendLine("Fehler:   ${e.message ?: e.javaClass.simpleName}")
                     appendLine()
                     appendLine("Rohantwort (erste 800 Zeichen):")
-                    appendLine(body.take(800).ifBlank { "(leer)" })
+                    appendLine((e as? ChatHttpException)?.bodyText.orEmpty().take(800).ifBlank { "(leer bzw. Netzfehler)" })
                 }
                 main.post { onError(debug) }
             }

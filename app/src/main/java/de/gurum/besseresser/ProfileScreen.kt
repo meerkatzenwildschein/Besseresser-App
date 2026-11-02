@@ -87,14 +87,7 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
             )
 
             error?.let { msg ->
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(msg, modifier = Modifier.padding(12.dp),
-                        color = MaterialTheme.colorScheme.onErrorContainer)
-                }
+                ErrorBanner(msg)
             }
 
             // Geburtsdatum: Material-DatePicker (System-lokalisiert), Anzeige dd.MM.yyyy

@@ -3,9 +3,12 @@ package de.gurum.besseresser
 import android.content.Context
 import android.content.SharedPreferences
 
+/** Eine gemeinsame Prefs-Datei für Einstellungen UND Profil (lokal auf dem Gerät). */
+internal const val BETTERESSER_PREFS = "besseresser_prefs"
+
 /** Persistenz der Einstellungen in SharedPreferences; API-Key via KeyVault verschlüsselt. */
 object Store {
-    private const val PREFS = "besseresser_prefs"
+    private const val PREFS = BETTERESSER_PREFS
 
     fun load(ctx: Context): Settings {
         val p: SharedPreferences = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -55,7 +58,7 @@ data class Profile(
 
 object ProfileStore {
     fun load(ctx: Context): Profile {
-        val p: SharedPreferences = ctx.getSharedPreferences("besseresser_prefs", Context.MODE_PRIVATE)
+        val p: SharedPreferences = ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
         return Profile(
             birthDate = p.getString("birthDate", null)?.takeIf { it.isNotBlank() },
             weightKg = p.getString("profileWeight", null)
@@ -73,7 +76,7 @@ object ProfileStore {
         heightCm: Int?,
         notes: String
     ) {
-        ctx.getSharedPreferences("besseresser_prefs", Context.MODE_PRIVATE).edit()
+        ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
             .putString("birthDate", birthDateIso?.takeIf { it.isNotBlank() })
             .putString("profileWeight", weightKg?.toString())
             .putInt("profileHeight", heightCm ?: -1)

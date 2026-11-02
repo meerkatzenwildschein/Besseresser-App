@@ -51,6 +51,17 @@ private data class DayGroup(
     val entries: List<HistoryEntry>
 )
 
+/** Mahlzeiten-Zeilen für den Tagesfazit-Prompt: „HH:mm · Erkanntes mit Menge · Anmerkung“. */
+fun dayFazitMealLines(ctx: android.content.Context, entriesOfDay: List<HistoryEntry>): List<String> =
+    entriesOfDay.sortedBy { it.dateMillis }.map { e ->
+        val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(e.dateMillis))
+        val recog = e.erkannt.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
+        var line = "$time · $recog"
+        e.note.takeIf { it.isNotBlank() }
+            ?.let { line += " · " + ctx.getString(R.string.dayfazit_line_note, it.trim()) }
+        line
+    }
+
 /** Nach Kalendertag gruppieren (absteigend); Einträge bleiben innerhalb der Gruppe absteigend. */
 private fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
     entries.groupBy {
@@ -78,14 +89,7 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
         if (key in loadingFazits) return
         loadingFazits.add(key)
         expandedFazits.add(key)   // während/neu nach dem Laden direkt anzeigen
-        val lines = entriesOfDay.sortedBy { it.dateMillis }.map { e ->
-            val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(e.dateMillis))
-            val recog = e.erkannt.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
-            var line = "$time · $recog"
-            e.note.takeIf { it.isNotBlank() }
-                ?.let { line += " · " + ctx.getString(R.string.dayfazit_line_note, it.trim()) }
-            line
-        }
+        val lines = dayFazitMealLines(ctx, entriesOfDay)
         ApiClient.dayFazit(
             settings = settings,
             goals = settings.goals,
@@ -449,12 +453,12 @@ private fun zielePreview(entry: HistoryEntry, emptyText: String, moreText: Strin
     }
 }
 
-/** Farbskala für Ampel-Scores (auch der Tagesscore): grau = nichts bewertbar, ≥80 grün, ≥50 gelb, sonst rot. */
+/** Farbskala für Ampel-Scores (auch der Tagesscore): grau = nichts bewertbar, sonst Ampel. */
 private fun scoreColor(score: Int): Color = when {
-    score < 0 -> Color(0xFF9E9E9E)
-    score >= 80 -> Color(0xFF2E9E44)
-    score >= 50 -> Color(0xFFE6A817)
-    else -> Color(0xFFD32F2F)
+    score < 0 -> ampelColor("unbekannt")
+    score >= 80 -> ampelColor("gruen")
+    score >= 50 -> ampelColor("gelb")
+    else -> ampelColor("rot")
 }
 
 /** Farbiges Kreis-Badge mit Score (Long-Press-Erklärung via Tooltip). */
