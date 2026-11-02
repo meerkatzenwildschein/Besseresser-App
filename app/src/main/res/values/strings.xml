@@ -88,7 +88,7 @@
     <!-- KI prompts (JSON-Schlüssel bleiben konstant, nur die Sprache der Anweisung ändert sich) -->
     <string name="prompt_eval_intro">I sent a photo of my meal.\nEvaluate this meal with respect to each of the following goals:</string>
     <string name="prompt_eval_format">Answer ONLY with a JSON object (no text before or after) in exactly this format:</string>
-    <string name="prompt_eval_recognized">In the field "erkannt", state in one short sentence what food or dishes you recognize on the photo (generic, e.g. ingredients and preparation); take the user notes above into account and resolve them to concrete food items.</string>
+    <string name="prompt_eval_recognized">In the field "erkannt", state in one short sentence what food or dishes you recognize on the photo (generic, e.g. ingredients and preparation); take the user notes above into account and resolve them to concrete food items. Do not use introductory phrases such as "visible on the photo", "the photo shows" or "you can see" – start directly with the food.</string>
     <string name="prompt_eval_ampel_meaning">ampel means: gruen = harmless or beneficial for this goal, gelb = acceptable with limitations, rot = generally bad for this goal.</string>
     <string name="prompt_eval_exactly_one">There must be exactly one rating per goal, using the exact goal wording.</string>
     <string name="prompt_eval_language">Answer in English.</string>
