@@ -551,31 +551,40 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                             fontSize = 13.sp
                         )
                     }
-                    OutlinedButton(
-                        onClick = {
-                            // Frischer Durchlauf UND direkt in die Kamera: nach dem Speichern ist
-                            // „das nächste Essen fotografieren" der einzig sinnvolle nächste Schritt
-                            evaluation = null
-                            lastGoaled = false
-                            photoPreview = null
-                            savedToHistory = false
-                            error = null
-                            note = ""
-                            showCamera = true
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(stringResource(R.string.main_new_photo)) }
+                    // Der eigentliche „Neues Foto aufnehmen"-CTA steht fixiert unten
+                    // (gleiche Optik/Position wie der Start-CTA) – hier nur das Banner
                 }
 
                 // Platzhalter, damit nichts unter dem fixierten Foto-Button versteckt wird
-                // (kleiner, wenn der CTA wegen angezeigtem Bericht ausgeblendet ist)
-                Spacer(Modifier.height(if (reportShown) 24.dp else 100.dp))
+                // (kleiner, wenn der CTA wegen angezeigtem Bericht ausgeblendet ist —
+                // AUSNAHME: nach dem Speichern sitzt stattdessen der neue Foto-CTA fixiert unten)
+                Spacer(Modifier.height(if (reportShown && !savedToHistory) 24.dp else 100.dp))
             }
 
-            // Fixierter Kamera-CTA unten – ausgeblendet, solange ein Bericht mit
-            // Ergebnissen angezeigt wird (dann sind Speichern/Verwerfen bzw.
-            // „Neues Foto aufnehmen" die einzigen sinnvollen nächsten Schritte)
-            if (!reportShown) {
+            // Fixierter „Neues Foto aufnehmen"-CTA nach dem Speichern – gleiche Optik
+            // und Daumen-Position wie der Start-CTA (ausgefüllt statt outlined).
+            if (lastGoaled && savedToHistory) {
+                Button(
+                    onClick = {
+                        // Frischer Durchlauf UND direkt in die Kamera: nach dem Speichern ist
+                        // „das nächste Essen fotografieren" der einzig sinnvolle nächste Schritt
+                        evaluation = null
+                        lastGoaled = false
+                        photoPreview = null
+                        savedToHistory = false
+                        error = null
+                        note = ""
+                        showCamera = true
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp)
+                        .fillMaxWidth()
+                        .height(56.dp)
+                ) {
+                    Text(stringResource(R.string.main_new_photo), fontSize = 17.sp)
+                }
+            } else if (!reportShown) {
                 Button(
                 onClick = {
                     // Frischer Durchlauf: alte Anmerkung + altes Ergebnis verwerfen,
