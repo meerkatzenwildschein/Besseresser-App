@@ -1,5 +1,6 @@
 package de.gurum.besseresser
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -99,7 +100,10 @@ fun HistoryScreen(settings: Settings, onPick: (HistoryEntry) -> Unit, onBack: ()
                 loadingFazits.remove(key)
                 fazitMap = DayFazitStore.loadAll(ctx).associateBy { it.dayKey }
             },
-            onError = { loadingFazits.remove(key) }
+            onError = { msg ->
+                Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_SHORT).show()
+                loadingFazits.remove(key)
+            }
         )
     }
 

@@ -116,6 +116,7 @@
     <string name="dayfazit_chip_stale">⟳ Neu bewerten</string>
     <string name="dayfazit_loading_line">KI bewertet den Tag …</string>
     <string name="dayfazit_today_title">Dein Tag bisher</string>
+    <string name="dayfazit_error_prefix">Tagesfazit fehlgeschlagen: %1$s</string>
     <string name="dayfazit_line_none">keine Erkennung gespeichert</string>
     <string name="dayfazit_line_note">Anmerkung: %1$s</string>
     <string name="prompt_dayfazit_intro">Hier sind alle Mahlzeiten eines Tages (Format: Uhrzeit · erkanntes Essen mit geschätzter Menge · Nutzer-Anmerkung). Bewerte den Tag als GANZES im Hinblick auf folgende Ziele:</string>
