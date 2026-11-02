@@ -81,7 +81,7 @@ fun TopBarRow(
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
+            horizontalArrangement = Arrangement.End,
             modifier = Modifier.weight(1f)
         ) {
             if (icon != null) {
