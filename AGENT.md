@@ -57,7 +57,7 @@ zwischen je-Entry-`item(key=id)`; java.time (minSdk 26), Systemzeitzone.
     { "ziel": "<exaktes Ziel>", "ampel": "gruen|gelb|rot", "begruendung": "..." }
   ],
   "zusatz": "<Gesamteindruck-Satz>",
-  "erkannt": "<kurzer Satz: was die KI auf dem Foto (inkl. Nutzer-Anmerkung) erkennt>"
+  "erkannt": "<kurzer Satz: was die KI auf dem Foto (inkl. Nutzer-Anmerkung) erkennt, MIT geschätzter Menge wie '100 g Nudeln, ein Stück Apfel'>"
 }
 ```
 
