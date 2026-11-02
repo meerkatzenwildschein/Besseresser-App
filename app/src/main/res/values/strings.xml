@@ -102,7 +102,9 @@
     <string name="history_delete_action">🗑 Delete</string>
     <string name="history_no_goals">No goals captured</string>
     <string name="score_caption">Traffic-light average</string>
+    <string name="score_caption_day">Day score</string>
     <string name="score_tooltip_ok">Average of the rated goals: 🟢 100 · 🟡 50 · 🔴 0</string>
+    <string name="score_tooltip_day">Day average across all meal ratings: 🟢 100 · 🟡 50 · 🔴 0</string>
     <string name="score_tooltip_unknown">No average: no rating received</string>
     <string name="history_entry_delete">Delete entry</string>
     <string name="history_delete_confirm_title">Delete entry?</string>
