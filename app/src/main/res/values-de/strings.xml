@@ -39,6 +39,7 @@
     <string name="prompt_note_header">Zusätzliche Nutzer-Hinweise zum Foto (berücksichtige diese):\n%1$s</string>
     <string name="history_note_prefix">📝 %1$s</string>
     <string name="main_ai_working">KI bewertet …</string>
+    <string name="main_ai_working_sub">Das kann einige Sekunden dauern.</string>
     <string name="main_no_rating_yet">Noch keine Bewertung</string>
     <string name="main_save_to_history">In den Verlauf speichern</string>
     <string name="main_saving">Speichere …</string>
