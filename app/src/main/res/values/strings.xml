@@ -39,6 +39,7 @@
     <string name="prompt_note_header">Additional user notes about the photo (take them into account):\n%1$s</string>
     <string name="history_note_prefix">📝 %1$s</string>
     <string name="main_ai_working">AI is evaluating …</string>
+    <string name="main_ai_working_sub">This can take a few seconds.</string>
     <string name="main_no_rating_yet">No rating yet</string>
     <string name="main_save_to_history">Save to history</string>
     <string name="main_saving">Saving …</string>

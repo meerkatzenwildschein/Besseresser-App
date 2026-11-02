@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -667,6 +668,41 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                 // (kleiner, wenn der CTA wegen angezeigtem Bericht ausgeblendet ist —
                 // AUSNAHME: nach dem Speichern sitzt stattdessen der neue Foto-CTA fixiert unten)
                 Spacer(Modifier.height(if (reportShown && !savedToHistory) 24.dp else 100.dp))
+            }
+
+            // Zentrierte „KI denkt"-Karte (wie Play-Protect-Ladegetüm): großer Spinner + Text,
+            // während der KI-Call im frischen Durchlauf läuft (Bericht ist da ja noch leer/gemischt)
+            if (busy && evaluation == null) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = 32.dp)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(52.dp),
+                            strokeWidth = 4.dp
+                        )
+                        Text(
+                            stringResource(R.string.main_ai_working),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            stringResource(R.string.main_ai_working_sub),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
             }
 
             // Fixierter „Neues Foto aufnehmen"-CTA nach dem Speichern – gleiche Optik
