@@ -8,6 +8,13 @@ Der Name ist sprachneutral (Markwort), `app_name` in beiden Locale-Dateien „Be
 
 ## Ablauf für den Nutzer
 
+0. **Android-Zurück-Button (`BackHandler`):** System-Zurück navigiert wie die On-Screen-Pfeile –
+   Detail → Verlauf (`historyEntry = null`), Verlauf → Main (`showHistory = false`), Einstellungs-
+   Overlay über abgeschlossenem Setup → Main (`showSetup = false`), Kamera-Overlay → schließen,
+   Foto-Review → verwerfen (Foto/Note/Fehler wie TopBar-Zurück). Root-Screen (Main ohne Overlay)
+   und Erst-Setup lassen Zurück = App beenden (Android-konform, kein BackHandler). Ein „Zurück
+   beendet die App"-Bug existierte, weil gar keine BackHandlers gesetzt waren.
+
 1. **Erster Start (Setup):**
    - Ziele als Freitext, **ein Ziel pro Zeile** (z. B. „Gesünder essen", „Weniger Zucker", „Blutdruck")
    - **API-URL** einer OpenAI-kompatiblen API (z. B. `https://api.openai.com/v1`)

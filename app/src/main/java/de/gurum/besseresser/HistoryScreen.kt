@@ -1,5 +1,6 @@
 package de.gurum.besseresser
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -62,6 +63,8 @@ private fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
 @Composable
 fun HistoryScreen(onPick: (HistoryEntry) -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
+    // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
+    BackHandler(onBack = onBack)
     var entries by remember { mutableStateOf<List<HistoryEntry>>(emptyList()) }
     LaunchedEffect(Unit) { entries = HistoryStore.entries(ctx) }
 
@@ -311,6 +314,8 @@ fun ScoreBadge(entry: HistoryEntry) {
 @Composable
 fun HistoryDetailScreen(entry: HistoryEntry, onBack: () -> Unit) {
     val ctx = LocalContext.current
+    // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
+    BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf(false) }
     val thumb = remember(entry.id) {
         HistoryStore.photoFileOf(ctx, entry)?.let { decodeThumb(it, target = 1280) }
