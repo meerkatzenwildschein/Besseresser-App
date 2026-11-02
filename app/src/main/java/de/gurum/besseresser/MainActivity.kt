@@ -130,10 +130,19 @@ fun GesundEssenApp() {
                                 onPick = { historyEntry = it },
                                 onBack = { showHistory = false }
                             )
-                            AppScreen.Detail -> HistoryDetailScreen(
-                                entry = historyEntry!!,
-                                onBack = { historyEntry = null }
-                            )
+                            AppScreen.Detail -> {
+                                // Wichtig-Pitfall: onBack nullt historyEntry, während der Detail-Screen
+                                // als outgoing-Content der Back-Animation NOCH komponiert ist. Ein
+                                // `historyEntry!!` direkt im Branch würde beim Re-Compose mit null
+                                // crashen. Deshalb: Eintrag einmalig per remember einfrieren.
+                                val entry = remember { historyEntry }
+                                if (entry != null) {
+                                    HistoryDetailScreen(
+                                        entry = entry,
+                                        onBack = { historyEntry = null }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
