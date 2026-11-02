@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -136,9 +137,9 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
         TopBarRow(
             title = "Einstellungen",
             onBack = onCancel,
-            trailing = { }
+            trailing = { },
+            icon = Icons.Filled.Settings
         )
-
         Spacer(Modifier.height(4.dp))
         if (firstRun) {
             Text(stringResource(R.string.setup_welcome), fontSize = 28.sp, fontWeight = FontWeight.Bold)
@@ -374,7 +375,12 @@ fun ModelListScreen(url: String, apiKey: String, onPick: (String) -> Unit, onBac
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        TopBarRow(title = stringResource(R.string.model_picker_title), onBack = onBack, trailing = { })
+        TopBarRow(
+            title = stringResource(R.string.model_picker_title),
+            onBack = onBack,
+            trailing = { },
+            icon = Icons.Filled.Settings
+        )
 
         if (loading) {
             Row(verticalAlignment = Alignment.CenterVertically) {

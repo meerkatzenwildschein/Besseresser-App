@@ -11,6 +11,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -71,7 +73,12 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            TopBarRow(title = stringResource(R.string.profile_title), onBack = onCancel, trailing = { })
+            TopBarRow(
+                title = stringResource(R.string.profile_title),
+                onBack = onCancel,
+                trailing = { },
+                icon = Icons.Filled.Person
+            )
 
             Text(
                 stringResource(R.string.profile_intro),

@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
@@ -162,7 +163,12 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        TopBarRow(title = stringResource(R.string.history_title), onBack = onBack, trailing = { })
+        TopBarRow(
+            title = stringResource(R.string.history_title),
+            onBack = onBack,
+            trailing = { },
+            icon = Icons.Filled.DateRange
+        )
 
         if (entries.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
