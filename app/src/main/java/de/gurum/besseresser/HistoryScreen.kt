@@ -349,26 +349,8 @@ fun HistoryDetailScreen(entry: HistoryEntry, onBack: () -> Unit) {
         }
 
         if (entry.summary.isNotBlank() || entry.erkannt.isNotBlank() || entry.note.isNotBlank()) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    buildString {
-                        if (entry.summary.isNotBlank()) {
-                            appendLine(stringResource(R.string.summary_prefix, entry.summary))
-                        }
-                        if (entry.erkannt.isNotBlank()) {
-                            appendLine(stringResource(R.string.detected_prefix, entry.erkannt))
-                        }
-                        if (entry.note.isNotBlank()) {
-                            append(stringResource(R.string.history_note_prefix, entry.note))
-                        }
-                    }.trim(),
-                    modifier = Modifier.padding(12.dp)
-                )
-            }
+            // Gleicher antipbarer Block wie in der Auswertung: 🧠 sichtbar, 🍽️/📝 einklappbar
+            CollapsibleSummaryBlock(entry.summary, entry.erkannt, entry.note)
         }
 
         Text(stringResource(R.string.my_goals), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)

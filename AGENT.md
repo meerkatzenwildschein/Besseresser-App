@@ -58,9 +58,14 @@ Parsen ist tolerant (`results`/`summary`/`reason` als Alias, Code-Fences werden 
 Ziel-Zuordnung ignoriert Groß-/Kleinschreibung und Leerzeichen; normalisiert `green/yellow/red`
 ebenso). **`erkannt`:** Alias `detected`/`food`/`meal`, leer erlaubt; Zeile 🍽️ (`detected_prefix`) im
 Zusammenfassungs-Block der Auswertung (MainActivity) und Detail-Historie; in der Listenansicht
-steht sie direkt unter der Uhrzeit (max. 2 Zeilen, Ellipsis). Persistiert im History-JSON unter
-`"erkannt"`. Prompt-Baustein `prompt_eval_recognized` (beide `strings.xml`), Feld im
-JSON-Format-Beispiel in `ApiClient.analyze`. Fehlende Ziele → Ampel „unbekannt" (grau).
+steht sie direkt unter der Uhrzeit (max. 2 Zeilen, Ellipsis). **Zusammenfassungs-Block einklappbar**
+(„CollapsibleSummaryBlock", MainActivity.kt, identisch in Auswertung und Historie-Detail):
+🧠 immer sichtbar; 🍽️ Erkannt + 📝 Anmerkung eingeklappt, die ganze Karte antippbar
+(`animateContentSize`, rotierender Chevron `KeyboardArrowDown`), Caption „N weitere Details"
+(Plurals `details_toggle_more`) / „Details einklappen". Listenansicht ohne Toggle.
+Persistiert im History-JSON unter `"erkannt"`. Prompt-Baustein `prompt_eval_recognized`
+(beide `strings.xml`), Feld im JSON-Format-Beispiel in `ApiClient.analyze`. Fehlende Ziele →
+Ampel „unbekannt" (grau).
 
 ## Technik-Stack
 

@@ -8,12 +8,15 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -28,6 +31,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
@@ -468,32 +472,10 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
 
                 if (lastGoaled && !results.isNullOrEmpty() && !savedToHistory) {
                     val summary = evaluation?.summary ?: ""
-                    if (summary.isNotBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(stringResource(R.string.summary_prefix, summary))
-                                evaluation?.erkannt?.takeIf { it.isNotBlank() }?.let { det ->
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(stringResource(R.string.detected_prefix, det))
-                                }
-                            }
-                        }
-                    } else {
-                        // Kein Gesamteindruck, aber Erkennung -> Block trotzdem zeigen
-                        val det = evaluation?.erkannt.orEmpty()
-                        if (det.isNotBlank()) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(stringResource(R.string.detected_prefix, det), modifier = Modifier.padding(12.dp))
-                            }
-                        }
+                    val det = evaluation?.erkannt.orEmpty()
+                    if (summary.isNotBlank() || det.isNotBlank()) {
+                        // 🧠 sichtbar, 🍽️/📝 eingeklappt im antippbaren Block
+                        CollapsibleSummaryBlock(summary, det, note)
                     }
                     // Manueller Speichern-Button (kein Auto-Save)
                     Button(
@@ -573,6 +555,65 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                     ),
                     fontSize = 17.sp
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Zusammenfassungs-Block: 🧠 Gesamteindruck immer sichtbar; 🍽️ „Erkannt" und 📝 Anmerkung
+ * eingeklappt hinter einem Toggle (גם ganze Block antippbar = großes Touch-Ziel), Chevron
+ * rotiert mit, animateContentSize animiert das Auf-/ Zuklappen. Nutzt Auswertung UND
+ * Historie-Detail – bewusst identisch verhalten.
+ */
+@Composable
+fun CollapsibleSummaryBlock(summary: String, erkannt: String, note: String) {
+    val ctx = LocalContext.current
+    val lines = buildList {
+        if (erkannt.isNotBlank()) add(R.string.detected_prefix to erkannt)
+        if (note.isNotBlank()) add(R.string.history_note_prefix to note)
+    }
+    var expanded by remember { mutableStateOf(false) }
+    val chevron by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
+
+    Surface(
+        onClick = { expanded = !expanded },
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(12.dp)
+                .animateContentSize()
+        ) {
+            if (summary.isNotBlank()) {
+                Text(stringResource(R.string.summary_prefix, summary))
+            }
+            if (expanded) {
+                if (summary.isNotBlank()) Spacer(Modifier.height(4.dp))
+                lines.forEach { (prefixRes, text) ->
+                    Text(stringResource(prefixRes, text))
+                }
+            }
+            if (lines.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (expanded)
+                            stringResource(R.string.details_toggle_less)
+                        else ctx.resources.getQuantityString(R.plurals.details_toggle_more, lines.size, lines.size),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.rotate(chevron)
+                    )
+                }
             }
         }
     }
