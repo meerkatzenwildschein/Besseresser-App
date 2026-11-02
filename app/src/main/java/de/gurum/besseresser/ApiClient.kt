@@ -67,7 +67,7 @@ object ApiClient {
                     // JSON-Schluessel (bewertung/ziel/ampel/begruendung/zusatz/erkannt) sind bewusst
                     // fest verdrahtet – der Parser kennt diese Namen; nur die Anweisungssprache variiert.
                     appendLine(promptBundle.formatIntro)
-                    appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","begruendung":"<short reason>"}],"zusatz":"<one-sentence overall impression>","erkannt":"<one short sentence: food you recognize on the photo>"}""")
+                    appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","begruendung":"<short reason>"}],"zusatz":"<one-sentence overall impression>","erkannt":"<one short sentence: food with estimated quantities, e.g. '100 g pasta with sauce, one apple'>"}""")
                     appendLine(promptBundle.ampelMeaning)
                     appendLine(promptBundle.exactlyOne)
                     if (promptBundle.recognized.isNotBlank()) appendLine(promptBundle.recognized)
