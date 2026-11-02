@@ -45,6 +45,7 @@
     <string name="main_discard">Ohne Speichern verwerfen</string>
     <string name="main_saved_banner">✓ Im Verlauf gespeichert (Menü → Verlauf)</string>
     <string name="main_new_photo">Neues Foto aufnehmen</string>
+    <string name="nav_blocked_hint">Bitte speichere oder verwerfe die Bewertung erst.</string>
 
     <!-- Setup -->
     <string name="setup_welcome">Willkommen!</string>

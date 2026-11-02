@@ -45,6 +45,7 @@
     <string name="main_discard">Discard without saving</string>
     <string name="main_saved_banner">✓ Saved to history (menu → history)</string>
     <string name="main_new_photo">Take a new photo</string>
+    <string name="nav_blocked_hint">Please save or discard the rating first.</string>
 
     <!-- Setup -->
     <string name="setup_welcome">Welcome!</string>
