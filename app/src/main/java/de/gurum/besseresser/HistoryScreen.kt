@@ -13,17 +13,21 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,37 +40,90 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 // ----------------------------------------------------------------- Historie-Screen (Liste)
 
 /** Ein Kalendertag mit allen gespeicherten Bewertungen desselben Tages. */
 private data class DayGroup(
     val day: LocalDate,
-    val entries: List<HistoryEntry>,
-    val score: Int          // Tagesschnitt 0..100; -1 = kein Eintrag bewertbar
+    val entries: List<HistoryEntry>
 )
 
 /** Nach Kalendertag gruppieren (absteigend); Einträge bleiben innerhalb der Gruppe absteigend. */
 private fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
     entries.groupBy {
         Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate()
-    }.map { (day, list) ->
-        val rated = list.map { it.score }.filter { it >= 0 }
-        DayGroup(
-            day = day,
-            entries = list,
-            score = if (rated.isEmpty()) -1
-                    else Math.round(rated.sumOf { it }.toDouble() / rated.size).toInt()
-        )
-    }.sortedByDescending { it.day }
+    }.map { (day, list) -> DayGroup(day = day, entries = list) }
+    .sortedByDescending { it.day }
 
 @Composable
-fun HistoryScreen(onPick: (HistoryEntry) -> Unit, onBack: () -> Unit) {
+fun HistoryScreen(settings: Settings, onPick: (HistoryEntry) -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
     // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
     BackHandler(onBack = onBack)
     var entries by remember { mutableStateOf<List<HistoryEntry>>(emptyList()) }
     LaunchedEffect(Unit) { entries = HistoryStore.entries(ctx) }
+
+    // ------------------------------------------------- KI-Tagesfazit-Zustand
+    var fazitMap by remember { mutableStateOf<Map<String, DayFazit>>(emptyMap()) }
+    val loadingFazits = remember { mutableStateListOf<String>() }
+    var expandedFazits = remember { mutableStateListOf<String>() }
+
+    LaunchedEffect(entries) { fazitMap = DayFazitStore.loadAll(ctx).associateBy { it.dayKey } }
+
+    fun generateFazit(day: LocalDate, entriesOfDay: List<HistoryEntry>) {
+        val key = dayKeyOf(day)
+        if (key in loadingFazits) return
+        loadingFazits.add(key)
+        expandedFazits.add(key)   // während/neu nach dem Laden direkt anzeigen
+        val lines = entriesOfDay.sortedBy { it.dateMillis }.map { e ->
+            val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(e.dateMillis))
+            val recog = e.erkannt.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
+            var line = "$time · $recog"
+            e.note.takeIf { it.isNotBlank() }
+                ?.let { line += " · " + ctx.getString(R.string.dayfazit_line_note, it.trim()) }
+            line
+        }
+        ApiClient.dayFazit(
+            settings = settings,
+            mealLines = lines,
+            promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
+            promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+            promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+            onOk = { ampel, text ->
+                DayFazitStore.save(
+                    ctx,
+                    DayFazit(key, ampel, text, entriesOfDay.map { it.id }, System.currentTimeMillis())
+                )
+                loadingFazits.remove(key)
+                fazitMap = DayFazitStore.loadAll(ctx).associateBy { it.dayKey }
+            },
+            onError = { loadingFazits.remove(key) }
+        )
+    }
+
+    // Auto-Logik (nur die beiden neuesten Tagesgruppen):
+    //  • kein Fazit     → 1× pro Tag & App-Session automatisch (Ersatztext „KI bewertet den Tag …")
+    //  • Fazit veraltet → automatisch neu bewerten (veraltet = Entry-IDs weichen vom Snapshot ab)
+    //  • ältere Gruppen nur manuell per Chip-Tap
+    LaunchedEffect(entries, fazitMap) {
+        if (entries.isEmpty()) return@LaunchedEffect
+        delay(1200)   // Debounce: schnelles Löschen mehrerer Einträge löst nur einen Call aus
+        groupByDay(entries).take(2).forEach { group ->
+            val key = dayKeyOf(group.day)
+            if (key in loadingFazits) return@forEach
+            val fazit = fazitMap[key]
+            if (fazit == null) {
+                if (key !in DayFazitSession.attempted) {
+                    DayFazitSession.attempted.add(key)
+                    generateFazit(group.day, group.entries)
+                }
+            } else if (fazit.entryIds.toSet() != group.entries.map { it.id }.toSet()) {
+                generateFazit(group.day, group.entries)
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -110,7 +167,53 @@ fun HistoryScreen(onPick: (HistoryEntry) -> Unit, onBack: () -> Unit) {
             )
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 groupByDay(entries).forEach { group ->
-                    item(key = "day-${group.day}") { DayGroupHeader(group) }
+                    val dayKey = dayKeyOf(group.day)
+                    val fazit = fazitMap[dayKey]
+                    val loadingFazit = dayKey in loadingFazits
+                    val staleFazit = fazit != null &&
+                        fazit.entryIds.toSet() != group.entries.map { it.id }.toSet()
+                    item(key = "day-$dayKey") {
+                        DayGroupHeader(
+                            date = group.day,
+                            fazit = fazit,
+                            loading = loadingFazit,
+                            stale = staleFazit,
+                            expanded = dayKey in expandedFazits,
+                            onToggleExpand = {
+                                if (dayKey in expandedFazits) expandedFazits.remove(dayKey)
+                                else expandedFazits.add(dayKey)
+                            },
+                            onGenerate = { generateFazit(group.day, group.entries) }
+                        )
+                        when {
+                            loadingFazit -> Text(
+                                stringResource(R.string.dayfazit_loading_line),
+                                fontSize = 11.sp,
+                                fontStyle = FontStyle.Italic,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 4.dp)
+                            )
+                            staleFazit && fazit != null -> Text(
+                                fazit.text,   // alte Fassung, gedimmt angedeutet
+                                fontSize = 12.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                            fazit != null && dayKey in expandedFazits -> Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    fazit.text,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
+                        }
+                    }
                     group.entries.forEach { entry ->
                         item(key = entry.id) {
                             val dismissState = rememberSwipeToDismissBoxState(
@@ -153,9 +256,17 @@ fun HistoryScreen(onPick: (HistoryEntry) -> Unit, onBack: () -> Unit) {
     }
 }
 
-/** Kopfzeile einer Tagesgruppe: Datum links, Tagesscore-Ampel rechts. */
+/** Kopfzeile einer Tagesgruppe: Datum links, Tagesfazit-Chip rechts (Zustandsmaschine). */
 @Composable
-private fun DayGroupHeader(group: DayGroup) {
+private fun DayGroupHeader(
+    date: LocalDate,
+    fazit: DayFazit?,
+    loading: Boolean,
+    stale: Boolean,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onGenerate: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -163,22 +274,94 @@ private fun DayGroupHeader(group: DayGroup) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            group.day.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
+            date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
         )
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            ScoreCircle(
-                score = group.score,
-                tooltipRes = if (group.score >= 0) R.string.score_tooltip_day
-                             else R.string.score_tooltip_unknown
-            )
-            Text(
-                stringResource(R.string.score_caption_day),
-                fontSize = 10.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        when {
+            loading -> Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(12.dp),
+                        strokeWidth = 1.5.dp
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        stringResource(R.string.dayfazit_chip_loading),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            fazit == null -> Surface(
+                onClick = onGenerate,
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Text(
+                    stringResource(R.string.dayfazit_chip_idle),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
+            stale -> Surface(
+                onClick = onGenerate,
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Refresh,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        stringResource(R.string.dayfazit_chip_stale),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            else -> Surface(
+                onClick = onToggleExpand,
+                shape = RoundedCornerShape(18.dp),
+                color = ampelColor(fazit.ampel)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Box(Modifier.size(9.dp).clip(CircleShape).background(Color.White))
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        stringResource(R.string.dayfazit_chip_label),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp).rotate(if (expanded) 180f else 0f)
+                    )
+                }
+            }
         }
     }
 }

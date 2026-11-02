@@ -33,6 +33,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -135,6 +136,7 @@ fun GesundEssenApp() {
                                 }
                             )
                             AppScreen.History -> HistoryScreen(
+                                settings = settings,
                                 onPick = { historyEntry = it },
                                 onBack = { showHistory = false }
                             )
@@ -200,6 +202,50 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
     // Gleiche Wirkung wie die On-Screen-Zurückpfeile: Kamera ohne Bewerten verlassen; Review
     // verwirft Foto + Anmerkung + Fehler.
     BackHandler(enabled = showCamera) { showCamera = false }
+    BackHandler(enabled = showReview) {
+        showReview = false
+        photoPreview = null
+        note = ""
+        error = null
+    }
+
+    // ------------------------------------------------- KI-Tagesfazit für „Dein Tag bisher"
+    var dayFazit by remember { mutableStateOf<DayFazit?>(null) }
+    var dayFazitBusy by remember { mutableStateOf(false) }
+
+    // Beim Speichern in den Verlauf: Tagesfazit für HEUTE ermitteln (Text-Call)
+    // und persistieren – die Verlaufs-Liste sieht es dann als frisches Fazit.
+    LaunchedEffect(savedToHistory) {
+        if (!savedToHistory) return@LaunchedEffect
+        dayFazitBusy = true
+        dayFazit = null
+        val todayKey = dayKeyOf(System.currentTimeMillis())
+        val todayEntries = HistoryStore.entries(ctx).filter { dayKeyOf(it.dateMillis) == todayKey }
+        val lines = todayEntries.map { e ->
+            val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(e.dateMillis))
+            val recog = e.erkannt.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
+            var line = "$time · $recog"
+            e.note.takeIf { it.isNotBlank() }
+                ?.let { line += " · " + ctx.getString(R.string.dayfazit_line_note, it.trim()) }
+            line
+        }
+        ApiClient.dayFazit(
+            settings = settings,
+            mealLines = lines,
+            promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
+            promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+            promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+            onOk = { ampel, text ->
+                val f = DayFazit(todayKey, ampel, text, todayEntries.map { it.id }, System.currentTimeMillis())
+                DayFazitStore.save(ctx, f)
+                dayFazit = f
+                dayFazitBusy = false
+            },
+            onError = {
+                dayFazitBusy = false
+            }
+        )
+    }
     BackHandler(enabled = showReview) {
         showReview = false
         photoPreview = null
@@ -569,8 +615,51 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                             fontSize = 13.sp
                         )
                     }
+                    // „Dein Tag bisher": KI-Tagesfazit (wird beim Speichern angestoßen)
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (dayFazitBusy) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                } else if (dayFazit != null) {
+                                    Box(
+                                        Modifier
+                                            .size(11.dp)
+                                            .clip(CircleShape)
+                                            .background(ampelColor(dayFazit!!.ampel))
+                                    )
+                                }
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    stringResource(R.string.dayfazit_today_title),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            if (dayFazitBusy) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    stringResource(R.string.dayfazit_loading_line),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            dayFazit?.let { f ->
+                                Spacer(Modifier.height(4.dp))
+                                Text(f.text, fontSize = 13.sp)
+                            }
+                        }
+                    }
                     // Der eigentliche „Neues Foto aufnehmen"-CTA steht fixiert unten
-                    // (gleiche Optik/Position wie der Start-CTA) – hier nur das Banner
+                    // (gleiche Optik/Position wie der Start-CTA) – hier nur der Banner
                 }
 
                 // Platzhalter, damit nichts unter dem fixierten Foto-Button versteckt wird

@@ -156,6 +156,78 @@ object ApiClient {
         }
     }
 
+    /** Text-only Tagesfazit: Mahlzeiten-Zeilen (Zeit · Erkanntes mit Menge · Anmerkung) + Ziele
+     *  → JSON {ampel, text}. Kein Foto, kein Bilder-Modell nötig; benutzt denselben /chat/completions-Endpunkt. */
+    fun dayFazit(
+        settings: Settings,
+        mealLines: List<String>,
+        promptIntro: String,
+        promptRules: String,
+        promptLanguage: String,
+        onOk: (ampel: String, text: String) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        executor.execute {
+            try {
+                val prompt = buildString {
+                    appendLine(promptIntro)
+                    mealLines.forEach { appendLine(it) }
+                    appendLine("")
+                    appendLine(promptRules)
+                    appendLine("")
+                    // JSON-Schluessel (ampel/text) fest verdrahtet, Sprache via promptLanguage
+                    appendLine("""{"ampel":"gruen|gelb|rot","text":"<2-3 sentences: day summary in the app language, directly to the point>"}""")
+                    appendLine(promptLanguage)
+                }
+                val body = JSONObject().apply {
+                    put("model", settings.model)
+                    put("temperature", 0.3)
+                    put("max_tokens", 800)
+                    if (settings.baseUrl.contains("openrouter", true)) {
+                        put("reasoning", JSONObject().put("exclude", true))
+                    }
+                    put("messages", JSONArray().put(
+                        JSONObject().put("role", "user")
+                            .put("content", prompt)
+                    ))
+                }
+
+                val url = settings.baseUrl.trim().trimEnd('/') + "/chat/completions"
+                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 15000
+                    readTimeout = 120000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                    setRequestProperty("Authorization", "Bearer ${settings.apiKey.trim()}")
+                }
+                conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+                val code = conn.responseCode
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                val respText = stream?.bufferedReader()?.use { it.readText() } ?: ""
+                if (code !in 200..299) throw IllegalStateException("HTTP $code: ${respText.take(300)}")
+
+                val rawContent = extractContent(JSONObject(respText))
+                if (rawContent.isNullOrBlank()) throw IllegalStateException("Die KI hat keinen Text geliefert.")
+
+                // tolerantes JSON-Parsing (Code-Fences, closeJson)
+                val cleaned = rawContent.replace("```json", "", true).replace("```", "").trim()
+                val start = cleaned.indexOf('{')
+                val end = cleaned.lastIndexOf('}')
+                if (start < 0 || end <= start) throw IllegalStateException("KI-Antwort ohne JSON")
+                val jsonStr = cleaned.substring(start, end + 1)
+                val obj = try { JSONObject(jsonStr) } catch (e: Exception) { JSONObject(closeJson(jsonStr)) }
+                val ampel = normalizeAmpel(obj.optString("ampel", obj.optString("rating", "")))
+                val fazitText = obj.optString("text", obj.optString("fazit", obj.optString("summary", "")))
+                if (ampel !in listOf("gruen", "gelb", "rot")) throw IllegalStateException("Unerwartete Ampel: '$ampel'")
+                if (fazitText.isBlank()) throw IllegalStateException("KI-Antwort ohne Fazit-Text")
+                main.post { onOk(ampel, fazitText.trim()) }
+            } catch (e: Exception) {
+                main.post { onError("${e.message ?: e.javaClass.simpleName}") }
+            }
+        }
+    }
+
     /** Ziele-Freitext von der KI in einzelne prägnante Ziele zerlegen lassen.
      *  onError bekommt einen mehrzeiligen Debug-Report inkl. Rohantwort. */
     fun splitGoals(
