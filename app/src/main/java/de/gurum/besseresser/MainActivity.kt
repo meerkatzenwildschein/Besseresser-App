@@ -553,8 +553,15 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                     }
                     OutlinedButton(
                         onClick = {
-                            evaluation = null; lastGoaled = false; photoPreview = null
-                            savedToHistory = false; note = ""
+                            // Frischer Durchlauf UND direkt in die Kamera: nach dem Speichern ist
+                            // „das nächste Essen fotografieren" der einzig sinnvolle nächste Schritt
+                            evaluation = null
+                            lastGoaled = false
+                            photoPreview = null
+                            savedToHistory = false
+                            error = null
+                            note = ""
+                            showCamera = true
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) { Text(stringResource(R.string.main_new_photo)) }
