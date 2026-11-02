@@ -64,8 +64,10 @@ Oder das Projekt in Android Studio öffnen und auf das Gerät deployen. Benötig
 
 ```
 app/src/main/java/de/gurum/besseresser/
-├── MainActivity.kt     Screens, Navigation, Animationen
-├── SetupScreen.kt      Setup, Anbieter & Modell-Auswahl
+│       ├── MainActivity.kt       Activity, Theme, Navigation (GesundEssenApp, AppScreen-Enum)
+│       ├── MainScreen.kt         Hauptbildschirm komplett (Kamera-Overlay, Review-Zweig, Auswertung, CTA)
+│       ├── CommonUi.kt           Gemeinsame Bausteine: TopBarRow, GoalRow, CollapsibleSummaryBlock, ErkanntEditDialog, ErrorBanner
+│       ├── SetupScreen.kt        Setup, Anbieter & Modell-Auswahl (TopBarRow ist nach CommonUi gezogen)
 ├── CameraScreen.kt     Eigene Kamera + Foto-Review
 ├── HistoryScreen.kt    Historie & Detail-Ansicht
 ├── ApiClient.kt        OpenAI-kompatible API (KI-Calls, Parsing)

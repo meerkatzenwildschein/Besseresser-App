@@ -445,25 +445,6 @@ fun ModelListScreen(url: String, apiKey: String, onPick: (String) -> Unit, onBac
 
 // ----------------------------------------------------------------- Gemeinsame Bausteine
 
-/** Top-Leiste: Zurueck-Pfeil links, Titel mittig-Links, optionales Element rechts. */
-@Composable
-fun TopBarRow(title: String, onBack: () -> Unit, trailing: @Composable () -> Unit = {}) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onBack) {
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = stringResource(R.string.cd_back_no_save)
-            )
-        }
-        Text(title, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        trailing()
-    }
-}
-
 /** Feld mit Label; Pflichtfelder bekommen einen roten Stern. */
 @Composable
 private fun LabelledField(
