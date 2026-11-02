@@ -241,7 +241,8 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                 dayFazit = f
                 dayFazitBusy = false
             },
-            onError = {
+            onError = { msg ->
+                Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_SHORT).show()
                 dayFazitBusy = false
             }
         )

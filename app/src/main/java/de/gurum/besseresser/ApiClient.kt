@@ -208,7 +208,9 @@ object ApiClient {
                 if (code !in 200..299) throw IllegalStateException("HTTP $code: ${respText.take(300)}")
 
                 val rawContent = extractContent(JSONObject(respText))
-                if (rawContent.isNullOrBlank()) throw IllegalStateException("Die KI hat keinen Text geliefert.")
+                if (rawContent.isNullOrBlank()) {
+                    throw IllegalStateException("Die KI hat keinen Text geliefert. Roh: ${respText.take(200)}")
+                }
 
                 // tolerantes JSON-Parsing (Code-Fences, closeJson)
                 val cleaned = rawContent.replace("```json", "", true).replace("```", "").trim()
@@ -219,8 +221,8 @@ object ApiClient {
                 val obj = try { JSONObject(jsonStr) } catch (e: Exception) { JSONObject(closeJson(jsonStr)) }
                 val ampel = normalizeAmpel(obj.optString("ampel", obj.optString("rating", "")))
                 val fazitText = obj.optString("text", obj.optString("fazit", obj.optString("summary", "")))
-                if (ampel !in listOf("gruen", "gelb", "rot")) throw IllegalStateException("Unerwartete Ampel: '$ampel'")
-                if (fazitText.isBlank()) throw IllegalStateException("KI-Antwort ohne Fazit-Text")
+                // Ampel "unbekannt" ist okay (grauer Chip) – nur ganz ohne Text ist ein echter Fehler.
+                if (fazitText.isBlank()) throw IllegalStateException("KI-Antwort ohne Fazit-Text (Roh: ${cleaned.take(200)})")
                 main.post { onOk(ampel, fazitText.trim()) }
             } catch (e: Exception) {
                 main.post { onError("${e.message ?: e.javaClass.simpleName}") }
