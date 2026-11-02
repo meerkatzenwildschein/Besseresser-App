@@ -588,12 +588,24 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                     .fillMaxWidth()
                     .height(56.dp)
             ) {
-                Text(
-                    stringResource(
-                        if (busy) R.string.main_ai_working else R.string.main_take_photo
-                    ),
-                    fontSize = 17.sp
-                )
+                if (busy) {
+                    // M3-Muster: indeterminierter Spinner IM Button – der Fortschritt ist
+                    // sofort sichtbar, während der Text „KI bewertet …" daneben steht
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(stringResource(R.string.main_ai_working), fontSize = 17.sp)
+                    }
+                } else {
+                    Text(stringResource(R.string.main_take_photo), fontSize = 17.sp)
+                }
             }
             }
         }
