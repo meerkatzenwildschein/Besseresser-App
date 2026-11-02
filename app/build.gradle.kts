@@ -10,7 +10,7 @@ plugins {
 val buildTime: String =
     LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"))
 
-val appVersion = "1.0.0"
+val appVersion = "1.1.0"
 
 android {
     namespace = "de.gurum.besseresser"
@@ -20,7 +20,7 @@ android {
         applicationId = "de.gurum.besseresser"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
+        versionCode = 2
         versionName = appVersion
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
         buildConfigField("String", "APP_VERSION", "\"$appVersion\"")
