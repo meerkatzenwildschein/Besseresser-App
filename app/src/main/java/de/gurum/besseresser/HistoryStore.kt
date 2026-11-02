@@ -7,6 +7,10 @@ import android.net.Uri
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /** Eine gespeicherte Foto-Bewertung. */
 data class HistoryEntry(
@@ -62,7 +66,7 @@ object HistoryStore {
     }
 
     fun entries(ctx: Context): List<HistoryEntry> {
-        val files = dir(ctx).listFiles { f -> f.extension == "json" } ?: return emptyList()
+        val files = dir(ctx).listFiles { f -> f.extension == "json" && !f.name.startsWith("day_") } ?: return emptyList()
         return files.mapNotNull { f ->
             try {
                 val o = JSONObject(f.readText())
@@ -90,11 +94,12 @@ object HistoryStore {
         }.sortedByDescending { it.dateMillis }
     }
 
-    /** Eintrag inkl. JSON und Foto loeschen. */
+    /** Eintrag inkl. JSON und Foto loeschen. Löscht auch das Tagesfazit des Tages (veraltet). */
     fun delete(ctx: Context, entry: HistoryEntry) {
         val d = dir(ctx)
         File(d, "${entry.id}.json").delete()
         File(d, "${entry.id}.jpg").delete()
+        DayFazitStore.deleteForEntry(ctx, entry)
     }
 
     /** Foto downgesampelt (<1024px) speichern, JPEG-Qualitaet Schritt fuer Schritt bis < 100 KB. */
@@ -155,4 +160,95 @@ fun decodeThumb(file: File, target: Int = 200): Bitmap? {
     } catch (e: Exception) {
         null
     }
+}
+
+// ----------------------------------------------------------------- Tagesfazit
+
+/** Lokaler Tagesschlüssel (yyyyyyyyMMdd, Systemzeitzone) – Basis für Tagesgruppen und Fazit-Dateien. */
+private val DAY_KEY_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd")
+
+fun dayKeyOf(millis: Long): String =
+    Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).format(DAY_KEY_FORMAT)
+
+fun dayKeyOf(date: LocalDate): String = date.format(DAY_KEY_FORMAT)
+
+/** KI-generiertes Fazit eines Tages (Text-Ampel statt rechnerischem Tagesscore). */
+data class DayFazit(
+    val dayKey: String,
+    val ampel: String,              // "gruen" | "gelb" | "rot" (grau nur im Fehlerfall-Fallback)
+    val text: String,
+    val entryIds: List<Long>,       // Snapshot der zugrunde liegenden Einträge (= Veraltetscheck)
+    val createdAt: Long
+)
+
+/** Persistenz day_<tag>.json im selben Verzeichnis; entries() filtert diese Dateien via day_-Präfix. */
+object DayFazitStore {
+
+    private fun file(ctx: Context, dayKey: String) =
+        File(ctx.filesDir, "history/day_$dayKey.json")
+
+    fun load(ctx: Context, dayKey: String): DayFazit? {
+        val f = file(ctx, dayKey)
+        if (!f.exists()) return null
+        return try {
+            val o = JSONObject(f.readText())
+            val ids = mutableListOf<Long>()
+            o.optJSONArray("eintrage")?.let { arr ->
+                (0 until arr.length()).forEach { ids.add(arr.optLong(it)) }
+            }
+            DayFazit(
+                dayKey = o.optString("tag"),
+                ampel = o.optString("ampel"),
+                text = o.optString("text"),
+                entryIds = ids,
+                createdAt = o.optLong("erstellt", 0L)
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun loadAll(ctx: Context): List<DayFazit> {
+        val files = File(ctx.filesDir, "history")
+            .listFiles { f -> f.name.startsWith("day_") && f.extension == "json" } ?: return emptyList()
+        return files.mapNotNull { f ->
+            try {
+                val o = JSONObject(f.readText())
+                val ids = mutableListOf<Long>()
+                o.optJSONArray("eintrage")?.let { arr ->
+                    (0 until arr.length()).forEach { ids.add(arr.optLong(it)) }
+                }
+                DayFazit(
+                    dayKey = o.optString("tag"),
+                    ampel = o.optString("ampel"),
+                    text = o.optString("text"),
+                    entryIds = ids,
+                    createdAt = o.optLong("erstellt", 0L)
+                )
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    fun save(ctx: Context, fazit: DayFazit) {
+        val o = JSONObject().apply {
+            put("tag", fazit.dayKey)
+            put("ampel", fazit.ampel)
+            put("text", fazit.text)
+            put("erstellt", fazit.createdAt)
+           .put("eintrage", JSONArray().also { arr -> fazit.entryIds.forEach { arr.put(it) } })
+        }
+        file(ctx, fazit.dayKey).writeText(o.toString())
+    }
+
+    /** Fazit-Datei eines Tags löschen (z. B. weil ein Eintrag des Tages gelöscht wurde). */
+    fun deleteForEntry(ctx: Context, entry: HistoryEntry) {
+        file(ctx, dayKeyOf(entry.dateMillis)).delete()
+    }
+}
+
+/** In-Memory-Sitzungsguard: Auto-Bewertung „kein Fazit" max. 1× pro Tag und App-Session. */
+object DayFazitSession {
+    val attempted = mutableSetOf<String>()
 }
