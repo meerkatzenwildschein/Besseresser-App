@@ -88,7 +88,7 @@
     <!-- KI-Prompts (JSON-Schlüssel bleiben konstant, nur die Anweisungssprache ändert sich) -->
     <string name="prompt_eval_intro">Ich habe ein Foto meines Essens geschickt.\nBewerte dieses Essen im Hinblick auf jedes der folgenden Ziele:</string>
     <string name="prompt_eval_format">Antworte AUSSCHLIESSLICH mit einem JSON-Objekt (kein Text davor oder danach) in genau diesem Format:</string>
-    <string name="prompt_eval_recognized">Gib im Feld „erkannt" in einem kurzen Satz an, welches Essen bzw. welche Speisen du auf dem Foto erkennst (allgemein, z. B. Zutaten und Zubereitung); berücksichtige dabei die vorstehenden Nutzer-Anmerkungen und löse sie zu konkreten Speisen auf.</string>
+    <string name="prompt_eval_recognized">Gib im Feld „erkannt" in einem kurzen Satz an, welches Essen bzw. welche Speisen du auf dem Foto erkennst (allgemein, z. B. Zutaten und Zubereitung); berücksichtige dabei die vorstehenden Nutzer-Anmerkungen und löse sie zu konkreten Speisen auf. Verzichte dabei komplett auf Vorspann-Floskeln wie „Zu sehen sind", „Auf dem Foto ist …" oder „Man erkennt" – fange direkt mit dem Essen an.</string>
     <string name="prompt_eval_ampel_meaning">ampel bedeutet: gruen = für dieses Ziel unproblematisch/förderlich, gelb = akzeptabel mit Einschränkungen, rot = allgemein schlecht für dieses Ziel.</string>
     <string name="prompt_eval_exactly_one">Es muss genau eine Bewertung pro Ziel geben, mit dem exakten Zielwortlaut.</string>
     <string name="prompt_eval_language">Antworte in deutscher Sprache.</string>

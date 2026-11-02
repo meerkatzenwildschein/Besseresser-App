@@ -438,13 +438,51 @@ object ApiClient {
             }
         }
         val summary = obj.optString("zusatz", obj.optString("summary", ""))
-        val erkannt = obj.optString("erkannt", obj.optString("detected", obj.optString("food", obj.optString("meal", ""))))
+        val erkannt = stripErkanntIntro(
+            obj.optString("erkannt", obj.optString("detected", obj.optString("food", obj.optString("meal", ""))))
+        )
         return Evaluation(list, summary, erkannt)
     }
 
     private val AMP_KEYS = listOf("ampel", "ampelfarbe", "farbe", "color", "status", "rating", "trafficlight")
     private val ZIEL_KEYS = listOf("ziel", "goal", "zielname", "name", "thema", "title")
     private val BEG_KEYS = listOf("begruendung", "reason", "erklaerung", "beschreibung", "kommentar", "text", "note")
+
+    // Typische Vorspann-Floskeln im "erkannt"-Feld. Der Prompt verbietet sie bereits;
+    // der Stripper fängt Restmodelle ab, die sich trotzdem dran halten (de + en).
+    private val ERKANNT_INTRO_PATTERNS = listOf(
+        Regex("^zu sehen (sind|ist)\\b[:,\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^zu sehen\\b[:,\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^zu erkennen\\b[:,\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^erkennbar\\b[:,\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^auf dem (foto|bild) (ist|sind) (zu sehen|erkennbar|zu erkennen|erkennend)\\b[:,\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^auf dem (foto|bild) (ist|sind)\\b[:,\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^auf dem (foto|bild)\\b[:,:\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^man (sieht|erkenn[t])\\b[:,\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^das (foto|bild) zeigt\\b[:,\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^the (photo|image) shows\\b[:,\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^(on|in) the (photo|image)\\b[:,\\s]*(i can see|there (is|are|appears?)|visible)?[:,\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^(visible|recognizable) (on|in) the (photo|image)\\b[:,\\s]*", RegexOption.IGNORE_CASE),
+        Regex("^i (can )?(see|recognize)\\b[:,\\s]*", RegexOption.IGNORE_CASE)
+    )
+
+    /** Vorspann-Floskeln vor dem Essen-Text entfernen; Ergebnis kapitalisieren, aber nie leeren. */
+    private fun stripErkanntIntro(raw: String): String {
+        var t = raw.trim()
+        var changed = true
+        while (changed) {
+            changed = false
+            for (p in ERKANNT_INTRO_PATTERNS) {
+                val stripped = p.replaceFirst(t, "")
+                if (stripped.isNotBlank() && stripped != t) {
+                    t = stripped.trim()
+                    changed = true
+                }
+            }
+        }
+        if (t.isBlank()) return raw.trim()
+        return t.replaceFirstChar { it.uppercase() }
+    }
 
     /** Findet das Ergebnis-Array, auch bei anderer Verschachtelung/Feldnamen. */
     private fun findResultArray(node: Any?, depth: Int = 0): JSONArray {
