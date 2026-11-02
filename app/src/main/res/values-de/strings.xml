@@ -32,7 +32,7 @@
     <string name="main_rate_now">Essen bewerten</string>
     <string name="main_retake">Foto neu aufnehmen</string>
     <string name="review_title">Foto prüfen</string>
-    <string name="main_note_placeholder">Was ist zu sehen (optional)? z. B. Spaghetti Bolognese mit Parmesan, Restaurant, Zubereitung …</string>
+    <string name="main_note_placeholder">Was ist zu sehen (optional)? z. B. Spaghetti Bolognese mit Parmesan …</string>
     <string name="cam_permission_text">Zum direkten Fotografieren braucht die App die Kamera-Berechtigung.</string>
     <string name="cam_retry_permission">Berechtigung erteilen</string>
     <string name="cam_use_system">Systemkamera benutzen</string>
