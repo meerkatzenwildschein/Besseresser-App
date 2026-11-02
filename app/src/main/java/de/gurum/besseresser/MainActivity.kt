@@ -18,8 +18,11 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -529,6 +532,10 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                                     menuOpen = false
                                     onOpenProfile()
                                 },
+                                leadingIcon = {
+                                    // Standard-Tint (LocalContentColor) → passt im Hell/Dark von selbst
+                                    Icon(Icons.Filled.Person, contentDescription = null)
+                                },
                                 // Gesperrt bei ungespeichertem Durchlauf (s. Wisch-Sperre)
                                 enabled = !busy && !showCamera && !showReview &&
                                     !(lastGoaled && !savedToHistory)
@@ -538,6 +545,9 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                                 onClick = {
                                     menuOpen = false
                                     onOpenHistory()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Filled.DateRange, contentDescription = null)
                                 },
                                 // Gesperrt bei ungespeichertem Durchlauf (s. Wisch-Sperre)
                                 enabled = !busy && !showCamera && !showReview &&
@@ -549,6 +559,9 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                                 onClick = {
                                     menuOpen = false
                                     onEditSettings()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Filled.Settings, contentDescription = null)
                                 }
                             )
                         }
