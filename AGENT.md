@@ -28,6 +28,12 @@ Der Name ist sprachneutral (Markwort), `app_name` in beiden Locale-Dateien „Be
    mit Prompt, der die Ziele enthält und strikt JSON verlangt.
 3. **Ergebnis:** Pro Ziel eine Ampel-Zeile (grün/gelb/rot) + kurze Begründung, plus ein
    Gesamteindruck-Satz. „Nächste Mahlzeit fotografieren" setzt Evaluierung + Foto zurück.
+   **Frischer Durchlauf über den Foto-CTA:** Der fixierte Foto-CTA im Normalzustand verwirft beim
+   Öffnen der Kamera ALLES vom vorigen Durchlauf (Evaluierung, Foto, Anmerkung, Historie-Status,
+   Fehler) — Kamera-Note startet leer und die Ampeln stehen auf grau, wie beim Erststart, auch
+   wenn der vorige Bericht noch nicht gespeichert/weggeklickt war (Fix: alt-Note + alt-Ampel
+   schleppten sich sonst in den nächsten Durchlauf). „Foto neu aufnehmen" innerhalb derselben
+   Aufnahme behält weiterhin den getippten Text.
 
 ## KI-Antwortformat (Prompt-Kontrakt)
 
