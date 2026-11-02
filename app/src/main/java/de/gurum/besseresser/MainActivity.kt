@@ -529,7 +529,17 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
 
             // Fixierter Kamera-CTA unten
             Button(
-                onClick = { showCamera = true },
+                onClick = {
+                    // Frischer Durchlauf: alte Anmerkung + altes Ergebnis verwerfen,
+                    // damit Kamera-Note leer ist und die Ampeln grau wie beim Erststart sind
+                    evaluation = null
+                    lastGoaled = false
+                    photoPreview = null
+                    savedToHistory = false
+                    error = null
+                    note = ""
+                    showCamera = true
+                },
                 enabled = !busy,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
