@@ -137,6 +137,7 @@ fun GesundEssenApp() {
                         when (s) {
                             AppScreen.Main -> MainScreen(
                                 settings = settings,
+                                profile = profile,
                                 onEditSettings = { showSetup = true },
                                 onOpenProfile = { showProfile = true },
                                 onOpenHistory = {
@@ -148,13 +149,14 @@ fun GesundEssenApp() {
                                 initial = profile,
                                 onCancel = { showProfile = false },
                                 onSave = { p ->
-                                    ProfileStore.save(ctx, p.ageYears, p.weightKg, p.heightCm, p.notes)
+                                    ProfileStore.save(ctx, p.birthDate, p.weightKg, p.heightCm, p.notes)
                                     profile = p
                                     showProfile = false
                                 }
                             )
                             AppScreen.History -> HistoryScreen(
                                 settings = settings,
+                                profile = profile,
                                 onPick = { historyEntry = it },
                                 onBack = { showHistory = false }
                             )
@@ -182,7 +184,7 @@ fun GesundEssenApp() {
 // ----------------------------------------------------------------- Hauptbildschirm
 
 @Composable
-fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenProfile: () -> Unit, onOpenHistory: () -> Unit) {
+fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit, onOpenProfile: () -> Unit, onOpenHistory: () -> Unit) {
     val ctx = LocalContext.current
     var evaluation by remember { mutableStateOf<Evaluation?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -249,6 +251,8 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenProfile: ()
         }
         ApiClient.dayFazit(
             settings = settings,
+            goals = settings.goals,
+            promptContext = profileContextLine(ctx, profile),
             mealLines = lines,
             promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
             promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
@@ -530,13 +534,6 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenProfile: ()
                                     !(lastGoaled && !savedToHistory)
                             )
                             DropdownMenuItem(
-                                text = { Text(stringResource(R.string.menu_settings)) },
-                                onClick = {
-                                    menuOpen = false
-                                    onEditSettings()
-                                }
-                            )
-                            DropdownMenuItem(
                                 text = { Text(stringResource(R.string.menu_history)) },
                                 onClick = {
                                     menuOpen = false
@@ -545,6 +542,14 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenProfile: ()
                                 // Gesperrt bei ungespeichertem Durchlauf (s. Wisch-Sperre)
                                 enabled = !busy && !showCamera && !showReview &&
                                     !(lastGoaled && !savedToHistory)
+                            )
+                            // Einstellungen bewusst als LETZTES (dauerhafte Konfig, selten geändert)
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.menu_settings)) },
+                                onClick = {
+                                    menuOpen = false
+                                    onEditSettings()
+                                }
                             )
                         }
                     }

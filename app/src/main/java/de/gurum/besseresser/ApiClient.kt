@@ -156,10 +156,13 @@ object ApiClient {
         }
     }
 
-    /** Text-only Tagesfazit: Mahlzeiten-Zeilen (Zeit · Erkanntes mit Menge · Anmerkung) + Ziele
-     *  → JSON {ampel, text}. Kein Foto, kein Bilder-Modell nötig; benutzt denselben /chat/completions-Endpunkt. */
+    /** Text-only Tagesfazit: Ziele + optional Nutzerprofil-Kontext + Mahlzeiten-Zeilen
+     *  (Zeit · Erkanntes mit Menge · Anmerkung) → JSON {ampel, text}.
+     *  Kein Foto, kein Bilder-Modell nötig; benutzt denselben /chat/completions-Endpunkt. */
     fun dayFazit(
         settings: Settings,
+        goals: List<String>,
+        promptContext: String?,          // z. B. Nutzerprofil-Zeile (optional)
         mealLines: List<String>,
         promptIntro: String,
         promptRules: String,
@@ -171,6 +174,12 @@ object ApiClient {
             try {
                 val prompt = buildString {
                     appendLine(promptIntro)
+                    goals.forEachIndexed { i, g -> appendLine("${i + 1}. $g") }
+                    promptContext?.takeIf { it.isNotBlank() }?.let {
+                        appendLine("")
+                        appendLine(it)
+                    }
+                    appendLine("")
                     mealLines.forEach { appendLine(it) }
                     appendLine("")
                     appendLine(promptRules)

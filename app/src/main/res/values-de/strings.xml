@@ -52,13 +52,21 @@
     <string name="menu_profile">Profil</string>
     <string name="profile_title">Profil</string>
     <string name="profile_intro">Alle Angaben sind freiwillig – sie helfen der KI, Portionen und Bewertungen besser einzuschätzen.</string>
-    <string name="profile_age_label">Alter (Jahre)</string>
     <string name="profile_weight_label">Gewicht (kg)</string>
     <string name="profile_height_label">Körpergröße (cm)</string>
     <string name="profile_notes_label">Anmerkungen / Vorerkrankungen</string>
     <string name="profile_notes_hint">z. B. Diabetes, Medikamente, Ernährungswünsche …</string>
     <string name="profile_save">Speichern</string>
     <string name="profile_invalid_number">Bitte nur gültige Zahlen eingeben – oder das Feld leer lassen.</string>
+    <string name="profile_birth_label">Geburtsdatum</string>
+    <string name="profile_ok">OK</string>
+    <string name="profile_date_clear">Datum löschen</string>
+    <string name="profile_usage_hint">Diese Angaben werden bei der Tagesauswertung (Tagesfazit) an die KI gesendet.</string>
+    <string name="profile_ctx_header">Nutzerprofil: %1$s</string>
+    <string name="profile_ctx_age">%1$d Jahre</string>
+    <string name="profile_ctx_weight">%1$s kg</string>
+    <string name="profile_ctx_height">%1$d cm</string>
+    <string name="profile_ctx_notes">Anmerkungen: %1$s</string>
 
     <!-- Setup -->
     <string name="setup_welcome">Willkommen!</string>
