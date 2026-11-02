@@ -52,13 +52,21 @@
     <string name="menu_profile">Profile</string>
     <string name="profile_title">Profile</string>
     <string name="profile_intro">All entries are optional – they help the AI better estimate portions and rates.</string>
-    <string name="profile_age_label">Age (years)</string>
     <string name="profile_weight_label">Weight (kg)</string>
     <string name="profile_height_label">Height (cm)</string>
     <string name="profile_notes_label">Notes / pre-existing conditions</string>
     <string name="profile_notes_hint">e.g. diabetes, medication, dietary preferences …</string>
     <string name="profile_save">Save</string>
     <string name="profile_invalid_number">Please enter valid numbers only – or leave the field empty.</string>
+    <string name="profile_birth_label">Date of birth</string>
+    <string name="profile_ok">OK</string>
+    <string name="profile_date_clear">Clear date</string>
+    <string name="profile_usage_hint">These details are sent to the AI with the day assessment (day summary).</string>
+    <string name="profile_ctx_header">User profile: %1$s</string>
+    <string name="profile_ctx_age">%1$d years</string>
+    <string name="profile_ctx_weight">%1$s kg</string>
+    <string name="profile_ctx_height">%1$d cm</string>
+    <string name="profile_ctx_notes">Notes: %1$s</string>
 
     <!-- Setup -->
     <string name="setup_welcome">Welcome!</string>

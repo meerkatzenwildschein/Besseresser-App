@@ -34,22 +34,30 @@ object Store {
 
 // ----------------------------------------------------------------- Profil
 
-/** Nutzerprofil: alles optional (Alter/Gewicht/Größe + Freitext wie Vorerkrankungen). */
+/** Nutzerprofil: alles optional. Geburtsdatum (ISO yyyy-MM-dd, veraltet nicht) statt Alter. */
 data class Profile(
-    val ageYears: Int? = null,
+    val birthDate: String? = null,  // ISO yyyy-MM-dd
     val weightKg: Double? = null,
     val heightCm: Int? = null,
     val notes: String = ""
 ) {
+    /** Alter in Jahren – lokal aus dem Geburtsdatum berechnet (veraltet nie). */
+    val ageYears: Int?
+        get() = birthDate?.let {
+            runCatching {
+                java.time.Period.between(java.time.LocalDate.parse(it), java.time.LocalDate.now()).years
+            }.getOrNull()
+        }
+
     val isEmpty: Boolean
-        get() = ageYears == null && weightKg == null && heightCm == null && notes.isBlank()
+        get() = birthDate == null && weightKg == null && heightCm == null && notes.isBlank()
 }
 
 object ProfileStore {
     fun load(ctx: Context): Profile {
         val p: SharedPreferences = ctx.getSharedPreferences("besseresser_prefs", Context.MODE_PRIVATE)
         return Profile(
-            ageYears = p.getInt("profileAge", -1).takeIf { it > 0 },
+            birthDate = p.getString("birthDate", null)?.takeIf { it.isNotBlank() },
             weightKg = p.getString("profileWeight", null)
                 ?.replace(',', '.')?.toDoubleOrNull()?.takeIf { it > 0 },
             heightCm = p.getInt("profileHeight", -1).takeIf { it > 0 },
@@ -60,13 +68,13 @@ object ProfileStore {
     /** Leere Eingaben speichern als "nicht gesetzt" – das Profil darf komplett leer bleiben. */
     fun save(
         ctx: Context,
-        ageYears: Int?,
+        birthDateIso: String?,
         weightKg: Double?,
         heightCm: Int?,
         notes: String
     ) {
         ctx.getSharedPreferences("besseresser_prefs", Context.MODE_PRIVATE).edit()
-            .putInt("profileAge", ageYears ?: -1)
+            .putString("birthDate", birthDateIso?.takeIf { it.isNotBlank() })
             .putString("profileWeight", weightKg?.toString())
             .putInt("profileHeight", heightCm ?: -1)
             .putString("profileNotes", notes.trim())

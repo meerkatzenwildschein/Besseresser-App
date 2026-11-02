@@ -16,17 +16,26 @@ Der Name ist sprachneutral (Markwort), `app_name` in beiden Locale-Dateien „Be
    und Erst-Setup lassen Zurück = App beenden (Android-konform, kein BackHandler). Ein „Zurück
    beendet die App"-Bug existierte, weil gar keine BackHandlers gesetzt waren.
 
-0a. **Profil-Seite (`ProfileScreen.kt`, `ProfileStore` in Store.kt):** Alter, Gewicht (kg, Komma
-   erlaubt), Körpergröße (cm), Freitext (Anmerkungen/Vorerkrankungen) — **alles optional**, speichern
-   auch bei völig leerer Seite (dann „nicht gesetzt", Name-Platzhalter-Hinweis im Intro).
-   Erreichbar über Burger-Menü „Profil" (mit derselben Sperre wie Verlauf bei ungespeichertem
-   Durchlauf). Nach dem ERSTEN Erfassen der KI-Zugangsdaten wird das Profil einmalig automatisch
-   geöffnet (`onDone` → `firstRun`-Flag → `showProfile`). Persistiert in
-   denselben SharedPreferences (`profileAge/-Weight/-Height/-Notes`, -1/null = nicht gesetzt),
-   Range-Check hjälpsam (Alter 1–150, Gewicht 1–700 kg, Größe 30–280 cm) mit Fehler-Surface
-   (`profile_invalid_number`). AppScreen-Enum hat jetzt `Profile(1)` (Animations-Richtung).
-   **Bisher NICHT in Prompts eingehen** — vorgesehener nächster Schritt (z. B. in
-   eval-Prompt als Kontextzeile „Nutzerprofil: 45 Jahre, 80 kg, 175 cm, Diabetes").
+0a. **Profil-Seite (`ProfileScreen.kt`, `ProfileStore` in Store.kt):** **Geburtsdatum** (Material-
+   DatePickerDialog, gespeichert als ISO yyyy-MM-dd, Anzeige dd.MM.yyyy; Alter = lokal aus Datum
+   berechnet via `Profile.ageYears` – veraltet nie), Gewicht (kg, Komma erlaubt), Körpergröße (cm),
+   Freitext (Anmerkungen/Vorerkrankungen) — **alles optional**, speichern auch bei völlig leerer
+   Seite (dann „nicht gesetzt"). Erreichbar über Burger-Menü (Reihenfolge: **Profil, Verlauf,
+   Einstellungen** – Einstellungen bewusst als LETZTES; gleiches Sperr-Enabled wie Verlauf bei
+   ungespeichertem Durchlauf, alle drei Menü-Wechsel werfen sonst den MainScreen-State). Nach dem
+   ERSTEN Erfassen der KI-Zugangsdaten öffnet sich das Profil einmalig automatisch
+   (`onDone` → `firstRun`-Flag → `showProfile`). Persistiert in denselben SharedPreferences
+   (`birthDate` ISO-String / `profileWeight/-Height/-Notes`, null/-1 = nicht gesetzt), Range-Check
+   (Gewicht 1–700 kg, Größe 30–280 cm) mit Fehler-Surface (`profile_invalid_number`).
+   AppScreen-Enum: `Profile(1)` (Animations-Richtung).
+   **Profil fließt in die Tagesfazit-Prompts ein** (beide Calls: Verlauf-Auto/Chip UND „Dein Tag
+   bisher" nach dem Speichern): `profileContextLine(ctx, profile)` baut „Nutzerprofil: N Jahre ·
+   X kg · Y cm · Anmerkungen: …" (nur gesetzte Werte bei leerem Profil = keine Zeile), übergeben
+   als `promptContext` an `ApiClient.dayFazit` — der sendet jetzt auch die **Ziele nummeriert**
+   mit in den Prompt (Bugfix: fehlten dort komplett, obwohl intro sie ankündigt).
+   Hinweis auf der Profil-Seite: `profile_usage_hint` („Diese Angaben werden bei der
+   Tagesauswertung an die KI gesendet"). **Nicht** im Essens-Auswertungsprompt (eval) –
+   vorgesehener nächster Schritt.
 
 1. **Erster Start (Setup):**
    - Ziele als Freitext, **ein Ziel pro Zeile** (z. B. „Gesünder essen", „Weniger Zucker", „Blutdruck")

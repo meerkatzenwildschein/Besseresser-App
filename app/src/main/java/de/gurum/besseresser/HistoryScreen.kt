@@ -59,7 +59,7 @@ private fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
     .sortedByDescending { it.day }
 
 @Composable
-fun HistoryScreen(settings: Settings, onPick: (HistoryEntry) -> Unit, onBack: () -> Unit) {
+fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
     // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
     BackHandler(onBack = onBack)
@@ -88,6 +88,8 @@ fun HistoryScreen(settings: Settings, onPick: (HistoryEntry) -> Unit, onBack: ()
         }
         ApiClient.dayFazit(
             settings = settings,
+            goals = settings.goals,
+            promptContext = profileContextLine(ctx, profile),
             mealLines = lines,
             promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
             promptRules = ctx.getString(R.string.prompt_dayfazit_rules),

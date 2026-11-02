@@ -1,42 +1,69 @@
 package de.gurum.besseresser
 
+import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 // ----------------------------------------------------------------- Profil-Screen
 
+private val BIRTH_DISPLAY_FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+
+/** Kontextzeile für KI-Prompts (Tagesfazit) – null, wenn das Profil komplett leer ist. */
+fun profileContextLine(ctx: Context, profile: Profile): String? {
+    val parts = mutableListOf<String>()
+    profile.ageYears?.let { parts.add(ctx.getString(R.string.profile_ctx_age, it)) }
+    profile.weightKg?.let {
+        val shown = if (Math.abs(it % 1.0) < 0.001) "${it.toInt()}"
+                    else String.format(Locale.US, "%.1f", it)
+        parts.add(ctx.getString(R.string.profile_ctx_weight, shown))
+    }
+    profile.heightCm?.let { parts.add(ctx.getString(R.string.profile_ctx_height, it)) }
+    if (profile.notes.isNotBlank()) parts.add(ctx.getString(R.string.profile_ctx_notes, profile.notes.trim()))
+    if (parts.isEmpty()) return null
+    return ctx.getString(R.string.profile_ctx_header, parts.joinToString(" · "))
+}
+
 /**
- * Profil-Seite: Alter, Gewicht, Körpergröße, Freitext (Anmerkungen/Vorerkrankungen).
- * ALLES optional – man kann auch ohne irgendetwas speichern und weitergehen.
+ * Profil-Seite: Geburtsdatum (DatePicker, veraltet nie), Gewicht, Körpergröße, Freitext
+ * (Anmerkungen/Vorerkrankungen). ALLES optional – man kann auch ohne Angabe speichern.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> Unit) {
     val ctx = LocalContext.current
     // Android-Zurück-Button schließt das Profil (wie der TopBar-Pfeil)
     BackHandler(onBack = onCancel)
 
-    var ageText by remember { mutableStateOf(initial.ageYears?.toString() ?: "") }
+    var birthDateIso by remember { mutableStateOf(initial.birthDate) }
     var weightText by remember {
         mutableStateOf(initial.weightKg?.toString()?.replace('.', ',') ?: "")
     }
     var heightText by remember { mutableStateOf(initial.heightCm?.toString() ?: "") }
     var notesText by remember { mutableStateOf(initial.notes) }
     var error by remember { mutableStateOf<String?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val dateInteractionSource = remember { MutableInteractionSource() }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -53,6 +80,11 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            Text(
+                stringResource(R.string.profile_usage_hint),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
             error?.let { msg ->
                 Surface(
@@ -65,13 +97,25 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
                 }
             }
 
+            // Geburtsdatum: Material-DatePicker (System-lokalisiert), Anzeige dd.MM.yyyy
             OutlinedTextField(
-                value = ageText,
-                onValueChange = { ageText = it },
-                label = { Text(stringResource(R.string.profile_age_label)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                value = birthDateIso?.let {
+                    LocalDate.parse(it).format(BIRTH_DISPLAY_FORMAT)
+                } ?: "",
+                onValueChange = { },
+                readOnly = true,
+                label = { Text(stringResource(R.string.profile_birth_label)) },
+                trailingIcon = {
+                    Icon(Icons.Filled.DateRange, contentDescription = null)
+                },
+                interactionSource = dateInteractionSource,
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        interactionSource = dateInteractionSource,
+                        indication = null
+                    ) { showDatePicker = true }
             )
 
             OutlinedTextField(
@@ -109,18 +153,17 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
         // Fixierter Speichern-CTA unten (wie im Setup)
         Button(
             onClick = {
-                val age = ageText.trim().takeIf { it.isNotBlank() }?.toIntOrNull()
                 val weight = weightText.trim().replace(',', '.')
                     .takeIf { it.isNotBlank() }?.toDoubleOrNull()
                 val height = heightText.trim().takeIf { it.isNotBlank() }?.toIntOrNull()
 
-                val plausible = (age == null || age in 1..150) &&
+                val plausible =
                     (weight == null || weight in 1.0..700.0) &&
                     (height == null || height in 30..280)
                 if (!plausible) {
                     error = ctx.getString(R.string.profile_invalid_number)
                 } else {
-                    onSave(Profile(age, weight, height, notesText.trim()))
+                    onSave(Profile(birthDateIso, weight, height, notesText.trim()))
                 }
             },
             modifier = Modifier
@@ -130,6 +173,32 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
                 .height(56.dp)
         ) {
             Text(stringResource(R.string.profile_save), fontSize = 17.sp)
+        }
+    }
+
+    if (showDatePicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = birthDateIso
+                ?.let { try { LocalDate.parse(it).toEpochDay() * 86_400_000 } catch (e: Exception) { null } }
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { ms ->
+                        birthDateIso = LocalDate.ofEpochDay(ms / 86_400_000).toString()
+                    }
+                    showDatePicker = false
+                }) { Text(stringResource(R.string.profile_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    birthDateIso = null
+                    showDatePicker = false
+                }) { Text(stringResource(R.string.profile_date_clear)) }
+            }
+        ) {
+            DatePicker(state = pickerState)
         }
     }
 }
