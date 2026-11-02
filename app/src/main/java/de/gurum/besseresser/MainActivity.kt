@@ -53,7 +53,7 @@ import java.util.Locale
 // ----------------------------------------------------------------- Activity & Navigation
 
 /** Reihenfolge für Animationsrichtung: vor = nach rechts tiefer, zurück = nach links höher. */
-enum class AppScreen(val order: Int) { Main(0), History(1), Detail(2) }
+enum class AppScreen(val order: Int) { Main(0), Profile(1), History(1), Detail(2) }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,9 +76,12 @@ fun GesundEssenApp() {
             var settings by remember { mutableStateOf(Settings("", "", "", emptyList())) }
             var showHistory by remember { mutableStateOf(false) }
             var historyEntry by remember { mutableStateOf<HistoryEntry?>(null) }
+            var showProfile by remember { mutableStateOf(false) }
+            var profile by remember { mutableStateOf(Profile()) }
 
             LaunchedEffect(Unit) {
                 settings = Store.load(ctx)
+                profile = ProfileStore.load(ctx)
                 showSetup = !settings.isComplete
                 loaded = true
             }
@@ -101,14 +104,18 @@ fun GesundEssenApp() {
                         else (ctx as? android.app.Activity)?.finish()
                     },
                     onDone = { neu ->
+                        val firstRun = !settings.isComplete
                         Store.save(ctx, neu)
                         settings = neu
                         showSetup = false
+                        // Nach dem ERSTEN Erfassen der KI-Zugangsdaten einmalig das Profil öffnen
+                        if (firstRun) showProfile = true
                     }
                 )
                 else -> {
                     val target = when {
                         historyEntry != null -> AppScreen.Detail
+                        showProfile -> AppScreen.Profile
                         showHistory -> AppScreen.History
                         else -> AppScreen.Main
                     }
@@ -131,9 +138,19 @@ fun GesundEssenApp() {
                             AppScreen.Main -> MainScreen(
                                 settings = settings,
                                 onEditSettings = { showSetup = true },
+                                onOpenProfile = { showProfile = true },
                                 onOpenHistory = {
                                     showHistory = true
                                     historyEntry = null
+                                }
+                            )
+                            AppScreen.Profile -> ProfileScreen(
+                                initial = profile,
+                                onCancel = { showProfile = false },
+                                onSave = { p ->
+                                    ProfileStore.save(ctx, p.ageYears, p.weightKg, p.heightCm, p.notes)
+                                    profile = p
+                                    showProfile = false
                                 }
                             )
                             AppScreen.History -> HistoryScreen(
@@ -165,7 +182,7 @@ fun GesundEssenApp() {
 // ----------------------------------------------------------------- Hauptbildschirm
 
 @Composable
-fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: () -> Unit) {
+fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenProfile: () -> Unit, onOpenHistory: () -> Unit) {
     val ctx = LocalContext.current
     var evaluation by remember { mutableStateOf<Evaluation?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -502,6 +519,16 @@ fun MainScreen(settings: Settings, onEditSettings: () -> Unit, onOpenHistory: ()
                             expanded = menuOpen,
                             onDismissRequest = { menuOpen = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.menu_profile)) },
+                                onClick = {
+                                    menuOpen = false
+                                    onOpenProfile()
+                                },
+                                // Gesperrt bei ungespeichertem Durchlauf (s. Wisch-Sperre)
+                                enabled = !busy && !showCamera && !showReview &&
+                                    !(lastGoaled && !savedToHistory)
+                            )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.menu_settings)) },
                                 onClick = {

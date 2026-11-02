@@ -48,6 +48,18 @@
     <string name="main_new_photo">Take a new photo</string>
     <string name="nav_blocked_hint">Please save or discard the rating first.</string>
 
+    <!-- Profile -->
+    <string name="menu_profile">Profile</string>
+    <string name="profile_title">Profile</string>
+    <string name="profile_intro">All entries are optional – they help the AI better estimate portions and rates.</string>
+    <string name="profile_age_label">Age (years)</string>
+    <string name="profile_weight_label">Weight (kg)</string>
+    <string name="profile_height_label">Height (cm)</string>
+    <string name="profile_notes_label">Notes / pre-existing conditions</string>
+    <string name="profile_notes_hint">e.g. diabetes, medication, dietary preferences …</string>
+    <string name="profile_save">Save</string>
+    <string name="profile_invalid_number">Please enter valid numbers only – or leave the field empty.</string>
+
     <!-- Setup -->
     <string name="setup_welcome">Welcome!</string>
     <string name="setup_welcome_text">Set up once – afterwards you can photograph your food and get a traffic light for each goal.</string>
