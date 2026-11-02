@@ -182,8 +182,13 @@ object ApiClient {
                 val body = JSONObject().apply {
                     put("model", settings.model)
                     put("temperature", 0.3)
-                    put("max_tokens", 800)
+                    // Budget großzügig: Reasoning-Modelle „denken" vom selben Konto —
+                    // zu knapp → finish=length mit LEEREM content (klassischer Stiller Fehler)
+                    put("max_tokens", 3000)
                     if (settings.baseUrl.contains("openrouter", true)) {
+                        put("reasoning", JSONObject().put("exclude", true))
+                    }
+                    if (settings.baseUrl.contains("deepseek", true)) {
                         put("reasoning", JSONObject().put("exclude", true))
                     }
                     put("messages", JSONArray().put(
@@ -207,9 +212,23 @@ object ApiClient {
                 val respText = stream?.bufferedReader()?.use { it.readText() } ?: ""
                 if (code !in 200..299) throw IllegalStateException("HTTP $code: ${respText.take(300)}")
 
-                val rawContent = extractContent(JSONObject(respText))
+                val respObj = JSONObject(respText)
+                val rawContent = extractContent(respObj)
                 if (rawContent.isNullOrBlank()) {
-                    throw IllegalStateException("Die KI hat keinen Text geliefert. Roh: ${respText.take(200)}")
+                    // Diagnose statt Rate: Modell + finish_reason + Rohauszug in den Fehler,
+                    // damit der Toast sagt, WARUM leer kam (length / content_filter / ...)
+                    val finish = try {
+                        respObj.optJSONArray("choices")?.optJSONObject(0)?.optString("finish_reason")
+                    } catch (e: Exception) { null }
+                    val modelName = try { respObj.optString("model").takeIf { it.isNotBlank() } ?: "?" } catch (e: Exception) { "?" }
+                    val hint = when (finish) {
+                        "length" -> "Das Token-Budget wurde verbraucht, bevor ein Antworttext kam – Modell erneut versuchen."
+                        "content_filter" -> "Der Anbieter hat die Antwort gefiltert (Inhalt blockiert). Versuch es erneut oder mit anderem Modell."
+                        else -> "Antwortformat unbekannt für dieses Modell."
+                    }
+                    throw IllegalStateException(
+                        "Die KI hat keinen Text geliefert (Modell: $modelName, finish: $finish). $hint Roh: ${respText.take(300)}"
+                    )
                 }
 
                 // tolerantes JSON-Parsing (Code-Fences, closeJson)
