@@ -287,6 +287,10 @@ fun CameraCaptureScreen(
                         value = note,
                         onValueChange = onNoteChange,
                         placeholder = { Text(stringResource(R.string.main_note_placeholder)) },
+                        trailingIcon = {
+                            // Letzte 5 Eingaben: Auswahl rückt nach oben (MRU)
+                            RecentNotesButton(onPick = onNoteChange)
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 1,
                         maxLines = 4

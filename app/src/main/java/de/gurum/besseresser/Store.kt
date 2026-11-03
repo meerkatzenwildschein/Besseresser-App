@@ -2,6 +2,7 @@ package de.gurum.besseresser
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.json.JSONArray
 
 /** Eine gemeinsame Prefs-Datei für Einstellungen UND Profil (lokal auf dem Gerät). */
 internal const val BETTERESSER_PREFS = "besseresser_prefs"
@@ -68,7 +69,7 @@ object ProfileStore {
         )
     }
 
-    /** Leere Eingaben speichern als "nicht gesetzt" – das Profil darf komplett leer bleiben. */
+/** Leere Eingaben speichern als "nicht gesetzt" – das Profil darf komplett leer bleiben. */
     fun save(
         ctx: Context,
         birthDateIso: String?,
@@ -81,6 +82,33 @@ object ProfileStore {
             .putString("profileWeight", weightKg?.toString())
             .putInt("profileHeight", heightCm ?: -1)
             .putString("profileNotes", notes.trim())
+            .apply()
+    }
+}
+
+/** Die letzten (max. 5) Anmerkungen aus dem Foto-Notizfeld – Schnellauswahl im Feld. */
+object RecentNotesStore {
+    private const val KEY = "recentNotes"
+    private const val MAX = 5
+
+    fun load(ctx: Context): List<String> = runCatching {
+        val raw = ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
+            .getString(KEY, null) ?: return emptyList()
+        val arr = JSONArray(raw)
+        (0 until arr.length()).mapNotNull { arr.optString(it).takeIf { s -> s.isNotBlank() } }
+    }.getOrDefault(emptyList())
+
+    /** Nach vorne stellen (Dedup), ältere Einträge rutschen nach unten und ab dem 5. raus. */
+    fun push(ctx: Context, note: String) {
+        val t = note.trim()
+        if (t.isBlank()) return
+        val others = load(ctx).filter { it != t }.take(MAX - 1)
+        val arr = JSONArray().apply {
+            put(t)
+            others.forEach { put(it) }
+        }
+        ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY, arr.toString())
             .apply()
     }
 }

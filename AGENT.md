@@ -62,10 +62,16 @@ bewusst erst einmal als frisch (kein false-stale nach Update).
 **erkannt-Korrektur (Pencil-Feature):** Am 🍽️-Text im `CollapsibleSummaryBlock` sitzt ein Stift-Button
 (`Icons.Filled.Create`, optionaler Callback `onEditErkannt`) → `ErkanntEditDialog` (AlertDialog mit
 Textfeld, Strings `erkannt_edit_*`). EIN Dialog für beide Orte: Auswertung (nur `evaluation.copy`
-im Speicher; wenn bereits SAVED, zusätzlich `HistoryStore.updateErkannt(ctx, savedEntryId, text)` +
-`fazitEpoch++` → „Dein Tag bisher" wird neu generiert) und Historie-Detail (lokal `current`-State,
+im Speicher; wenn bereits SAVED, zusätzlich `HistoryStore.updateErkannt(ctx, savedEntryId, text)` –
+das Tagesfazit wird dabei NICHT neu gerufen, es veraltet per Fingerprint und regeneriert im Verlauf)
+und Historie-Detail (lokal `current`-State,
 persistiert via `updateErkannt`). Nach Detail-Korrektur lädt die Liste frisch → Fingerprint-Mismatch
 → veraltet bzw. Auto-Regeneration für die 2 neuesten Gruppen. Pencil nur bei nicht-leerem erkannt.
+**Notiz-Schnellauswahl (MRU, `RecentNotesButton` in CommonUi.kt + `RecentNotesStore` in Store.kt):**
+Trailing-Icon (Liste, 18dp) an beiden Notiz-Feldern (Kamera-Overlay & Foto-Review-Fallback); Dropdown
+mit den letzten 5 Eingaben (persist. JSON-Array `recentNotes` in BETTERESSER_PREFS), Auswahl setzt den
+Text und rückt den Eintrag an die Spitze; neue benutzte Notizen (beim „Essen bewerten"-Absenden, beide
+Analyze-Stellen) werden ebenso nach oben geschoben; Einträge >5 fallen raus. String `recent_notes_desc`.
 **Prompt (`ApiClient.dayFazit`, text-only, kein Foto nötig):** Zeilen „HH:mm · erkannt mit Menge · Anmerkung" des Tages
 + Ziele → JSON {ampel, text}; Bausteine `prompt_dayfazit_*` (beide strings.xml); Kernregel: kleine Genuss-Snacks werden
 in Kontext gewichtet – ein Bonbon macht einen sonst vollwertigen Tag nicht rot. Rechnerischer „Tagesscore" (Kreis +
@@ -75,8 +81,14 @@ Tageschlüssel); `HistoryStore.entries` filtert `day_*`-Dateien; Eintrag-Lösche
 (`HistoryStore.delete` → `DayFazitStore.deleteForEntry`). **Auto-Logik (NUR die beiden neuesten Tagesgruppen):**
 kein Fazit → 1× pro Tag & App-Session automatisch (Guard `DayFazitSession.attempted`); veraltet → erneut automatisch;
 ältere Gruppen nur per Chip-Tap. Debounce 1,2 s nach entries-Änderung (Mehrfach-Löschen = 1 Call).
-**Hauptbildschirm:** nach dem Speichern erscheint unter dem Banner „Dein Tag bisher" (Spinner/ampel-Dot + Fazittext);
-dieser Call persistiert das Fazit für heute → Verlauf sieht es als frisch. Im Eintrag steht nur noch die Uhrzeit
+**KEIN Tagesfazit beim Speichern** (bewusst entfernt nach User-Feedback „lästig"): Der Hauptbildschirm ruft
+beim „In den Verlauf speichern" KEINE KI auf und zeigt keine Fazit-Karte („Dein Tag bisher" gestrichen, incl.
+`savedEntryId`-Statement des ehemaligen fazitEpoch-Nachschubs). Das Fazit entsteht AUSSCHLIESSLICH in der
+Verlaufs-Liste (Auto für die 2 neuesten Gruppen / Chip-Tipp) – eine erkannt-Korrektur macht es dort per
+Fingerprint veraltet bzw. regeneriert es. **Zum-Verlauf-Sprung:** statt des Speichern-Banners zeigt der
+Results-Screen nach dem Speichern einen Inline-Button „Zum Verlauf" (`main_open_history`, 44dp Outlined,
+`onOpenHistory`).
+Im Eintrag steht nur noch die Uhrzeit
 (HH:mm) – das Datum gehört in die Gruppenkopfzeile. Implementierung: `LazyColumn` mit `item(key="day-<dayKey>")`
 zwischen je-Entry-`item(key=id)`; java.time (minSdk 26), Systemzeitzone.
 2. **Hauptbildschirm:** **Fixierter Foto-CTA unten** (Box mit scrollendem Inhalt darüber, 100dp-Endplatzhalter) – „Essen fotografieren"/„Essen bewerten"/„KI bewertet …" je nach Zustand, immer im Daumen-Ereich. **Ausgeblendet, solange ein Bericht mit Ergebnissen angezeigt wird** (`reportShown`), dann sind die Inline-Aktionen (Speichern/Verwerfen bzw. „Neues Foto aufnehmen") die einzigen nächsten Schritte, Endplatzhalter nur 24dp; **während „KI bewertet …" bleibt der CTA sichtbar und zeigt Material-Muster „indeterminierter Spinner im Button"** (CircularProgressIndicator 20dp in `onPrimary` + Label, disabled) UND **über dem Normalzustand erscheint zentriert eine „KI denkt"-Karte** (Surface, 52dp-Spinner + `main_ai_working` + Subzeile `main_ai_working_sub` „Das kann einige Sekunden dauern.") – nur wenn `busy && evaluation == null` (frischer Durchlauf; Play-Protect-Optik). System-Kamera via `TakePicture` + `FileProvider`.

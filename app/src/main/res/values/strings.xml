@@ -44,7 +44,8 @@
     <string name="main_save_to_history">Save to history</string>
     <string name="main_saving">Saving …</string>
     <string name="main_discard">Discard without saving</string>
-    <string name="main_saved_banner">✓ Saved to history (menu → history)</string>
+    <string name="main_open_history">Go to history</string>
+    <string name="recent_notes_desc">Recent notes</string>
     <string name="main_new_photo">Take a new photo</string>
     <string name="nav_blocked_hint">Please save or discard the rating first.</string>
 
@@ -136,7 +137,6 @@
     <string name="dayfazit_chip_label">Day summary</string>
     <string name="dayfazit_chip_stale">⟳ Re-evaluate day</string>
     <string name="dayfazit_loading_line">AI is summarizing the day …</string>
-    <string name="dayfazit_today_title">Your day so far</string>
     <string name="dayfazit_error_prefix">Day summary failed: %1$s</string>
     <string name="erkannt_edit_desc">Edit recognized food</string>
     <string name="erkannt_edit_title">Correct recognized food</string>

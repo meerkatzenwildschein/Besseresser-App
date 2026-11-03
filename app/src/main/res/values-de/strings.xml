@@ -44,7 +44,8 @@
     <string name="main_save_to_history">In den Verlauf speichern</string>
     <string name="main_saving">Speichere …</string>
     <string name="main_discard">Ohne Speichern verwerfen</string>
-    <string name="main_saved_banner">✓ Im Verlauf gespeichert (Menü → Verlauf)</string>
+    <string name="main_open_history">Zum Verlauf</string>
+    <string name="recent_notes_desc">Letzte Eingaben</string>
     <string name="main_new_photo">Neues Foto aufnehmen</string>
     <string name="nav_blocked_hint">Bitte speichere oder verwerfe die Bewertung erst.</string>
 
@@ -136,7 +137,6 @@
     <string name="dayfazit_chip_label">Tagesfazit</string>
     <string name="dayfazit_chip_stale">⟳ Neu bewerten</string>
     <string name="dayfazit_loading_line">KI bewertet den Tag …</string>
-    <string name="dayfazit_today_title">Dein Tag bisher</string>
     <string name="dayfazit_error_prefix">Tagesfazit fehlgeschlagen: %1$s</string>
     <string name="erkannt_edit_desc">Erkanntes Essen bearbeiten</string>
     <string name="erkannt_edit_title">Erkanntes Essen korrigieren</string>
