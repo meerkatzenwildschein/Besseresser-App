@@ -19,6 +19,8 @@ Der Name ist sprachneutral (Markwort), `app_name` in beiden Locale-Dateien „Be
 0a. **Profil-Seite (`ProfileScreen.kt`, `ProfileStore` in Store.kt):** **Geburtsdatum** (Material-
    DatePickerDialog, gespeichert als ISO yyyy-MM-dd, Anzeige dd.MM.yyyy; Alter = lokal aus Datum
    berechnet via `Profile.ageYears` – veraltet nie), Gewicht (kg, Komma erlaubt), Körpergröße (cm),
+   **Geschlecht** (Chip-Reihe `profile_gender_*`, Werte „male"/„female"/„diverse", nochmal antippen =
+   wieder leer; erscheint in `profileContextLine` als „Geschlecht: …" im Tagesfazit-Prompt),
    Freitext (Anmerkungen/Vorerkrankungen) — **alles optional**, speichern auch bei völlig leerer
    Seite (dann „nicht gesetzt"). Erreichbar über Burger-Menü (Reihenfolge: **Profil, Verlauf,
    Einstellungen** – Einstellungen bewusst als LETZTES; gleiches Sperr-Enabled wie Verlauf bei
@@ -81,6 +83,8 @@ Tageschlüssel); `HistoryStore.entries` filtert `day_*`-Dateien; Eintrag-Lösche
 (`HistoryStore.delete` → `DayFazitStore.deleteForEntry`). **Auto-Logik (NUR die beiden neuesten Tagesgruppen):**
 kein Fazit → 1× pro Tag & App-Session automatisch (Guard `DayFazitSession.attempted`); veraltet → erneut automatisch;
 ältere Gruppen nur per Chip-Tap. Debounce 1,2 s nach entries-Änderung (Mehrfach-Löschen = 1 Call).
+**Auto erst ab 18 Uhr** (Konstante `FAZIT_AUTO_HOUR = 18`, `LocalTime.now().hour >= 18`): davor kein Auto-Call
+(Frühstücks-Fazit vermeiden) – Chip-Tipp geht MANUELL zu jeder Zeit.
 **KEIN Tagesfazit beim Speichern** (bewusst entfernt nach User-Feedback „lästig"): Der Hauptbildschirm ruft
 beim „In den Verlauf speichern" KEINE KI auf und zeigt keine Fazit-Karte („Dein Tag bisher" gestrichen, incl.
 `savedEntryId`-Statement des ehemaligen fazitEpoch-Nachschubs). Das Fazit entsteht AUSSCHLIESSLICH in der
