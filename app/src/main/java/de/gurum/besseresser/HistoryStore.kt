@@ -66,7 +66,9 @@ object HistoryStore {
     }
 
     fun entries(ctx: Context): List<HistoryEntry> {
-        val files = dir(ctx).listFiles { f -> f.extension == "json" && !f.name.startsWith("day_") } ?: return emptyList()
+        val files = dir(ctx).listFiles {
+            f -> f.extension == "json" && !f.name.startsWith("day_") && !f.name.startsWith("week_")
+        } ?: return emptyList()
         return files.mapNotNull { f ->
             try {
                 val o = JSONObject(f.readText())
@@ -94,12 +96,13 @@ object HistoryStore {
         }.sortedByDescending { it.dateMillis }
     }
 
-    /** Eintrag inkl. JSON und Foto loeschen. Löscht auch das Tagesfazit des Tages (veraltet). */
+    /** Eintrag inkl. JSON und Foto loeschen. Löscht Tages-/Wochenfazit des Tages gleich mit. */
     fun delete(ctx: Context, entry: HistoryEntry) {
         val d = dir(ctx)
         File(d, "${entry.id}.json").delete()
         File(d, "${entry.id}.jpg").delete()
         DayFazitStore.deleteForEntry(ctx, entry)
+        WeekFazitStore.deleteForEntry(ctx, entry)
     }
 
     /** erkannt-Text eines gespeicherten Eintrags userkorrigieren (JSON neu schreiben).
@@ -186,6 +189,13 @@ fun dayKeyOf(millis: Long): String =
 
 fun dayKeyOf(date: LocalDate): String = date.format(DAY_KEY_FORMAT)
 
+/** Wochen-Key = ISO-Montag der Woche, in der das Datum liegt (Format yyyyMMdd). */
+fun weekKeyOf(millis: Long): String {
+    val day = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+    val monday = day.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+    return monday.format(DAY_KEY_FORMAT)
+}
+
 /** KI-generiertes Fazit eines Tages (Text-Ampel statt rechnerischem Tagesscore). */
 data class DayFazit(
     val dayKey: String,
@@ -206,8 +216,7 @@ object DayFazitStore {
         val f = file(ctx, dayKey)
         if (!f.exists()) return null
         return try {
-            val o = JSONObject(f.readText())
-            readFrom(o)
+            dayFazitFromJson(JSONObject(f.readText()))
         } catch (e: Exception) {
             null
         }
@@ -218,26 +227,11 @@ object DayFazitStore {
             .listFiles { f -> f.name.startsWith("day_") && f.extension == "json" } ?: return emptyList()
         return files.mapNotNull { f ->
             try {
-                readFrom(JSONObject(f.readText()))
+                dayFazitFromJson(JSONObject(f.readText()))
             } catch (e: Exception) {
                 null
             }
         }
-    }
-
-    private fun readFrom(o: JSONObject): DayFazit {
-        val ids = mutableListOf<Long>()
-        o.optJSONArray("eintrage")?.let { arr ->
-            (0 until arr.length()).forEach { ids.add(arr.optLong(it)) }
-        }
-        return DayFazit(
-            dayKey = o.optString("tag"),
-            ampel = o.optString("ampel"),
-            text = o.optString("text"),
-            entryIds = ids,
-            createdAt = o.optLong("erstellt", 0L),
-            fingerprint = o.optString("fp")
-        )
     }
 
     fun save(ctx: Context, fazit: DayFazit) {
@@ -261,9 +255,65 @@ object DayFazitStore {
     }
 }
 
+/** Gemeinsamer JSON-Reader für Tages- und Wochen-Fazit-Dateien. */
+private fun dayFazitFromJson(o: JSONObject): DayFazit {
+    val ids = mutableListOf<Long>()
+    o.optJSONArray("eintrage")?.let { arr ->
+        (0 until arr.length()).forEach { ids.add(arr.optLong(it)) }
+    }
+    return DayFazit(
+        dayKey = o.optString("tag"),
+        ampel = o.optString("ampel"),
+        text = o.optString("text"),
+        entryIds = ids,
+        createdAt = o.optLong("erstellt", 0L),
+        fingerprint = o.optString("fp")
+    )
+}
+
+/** Fazit-Speicher für die WOCHE (file-Prefix week_, Typ & Struktur wie das Tagesfazit).
+ *  Invaldierung: Bei jeder Änderung der Wochen-Einträge (Fingerprint) wird die Datei GELÖSCHT –
+ *  kein veraltet-Dimmen wie beim Tagesfazit (Req: „gelöscht … erneut anfordern"). */
+object WeekFazitStore {
+    private fun file(ctx: Context, weekKey: String) =
+        File(ctx.filesDir, "history/week_$weekKey.json")
+
+    fun load(ctx: Context, weekKey: String): DayFazit? {
+        val f = file(ctx, weekKey)
+        if (!f.exists()) return null
+        return try {
+            dayFazitFromJson(JSONObject(f.readText()))
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun save(ctx: Context, fazit: DayFazit) {
+        val o = JSONObject().apply {
+            put("tag", fazit.dayKey)
+            put("ampel", fazit.ampel)
+            put("text", fazit.text)
+            put("erstellt", fazit.createdAt)
+            put("fp", fazit.fingerprint)
+            put("eintrage", JSONArray().also { arr -> fazit.entryIds.forEach { arr.put(it) } })
+        }
+        file(ctx, fazit.dayKey).writeText(o.toString())
+    }
+
+    /** Wochen-Fazit löschen (nachträglicher Eintrag in derselben Woche). */
+    fun deleteForEntry(ctx: Context, entry: HistoryEntry) {
+        file(ctx, weekKeyOf(entry.dateMillis)).delete()
+    }
+
+    fun delete(ctx: Context, weekKey: String) {
+        file(ctx, weekKey).delete()
+    }
+}
+
 /** In-Memory-Sitzungsguard: Auto-Bewertung „kein Fazit" max. 1× pro Tag und App-Session. */
 object DayFazitSession {
     val attempted = mutableSetOf<String>()
+    val attemptedWeekly = mutableSetOf<String>()
 }
 
 /** „Quellen-Fingerprint" eines Tages: ID+erkannt je Eintrag. Bearbeitete erkannt-Texte

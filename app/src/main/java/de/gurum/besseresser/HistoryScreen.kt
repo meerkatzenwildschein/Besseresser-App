@@ -86,7 +86,22 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
     val loadingFazits = remember { mutableStateListOf<String>() }
     var expandedFazits = remember { mutableStateListOf<String>() }
 
-    LaunchedEffect(entries) { fazitMap = DayFazitStore.loadAll(ctx).associateBy { it.dayKey } }
+    var weekFazit by remember { mutableStateOf<DayFazit?>(null) }
+    var loadingWeek by remember { mutableStateOf(false) }
+    var expandedWeek by remember { mutableStateOf(false) }
+
+    LaunchedEffect(entries) {
+        fazitMap = DayFazitStore.loadAll(ctx).associateBy { it.dayKey }
+        // Wochenfazit: vorhanden? Bei geänderten Wochen-Einträgen (Fingerprint) LÖSCHEN
+        val wk = weekKeyOf(System.currentTimeMillis())
+        val wf = WeekFazitStore.load(ctx, wk)
+        if (wf != null && wf.fingerprint != dayFingerprint(entries.filter { dayKeyOf(it.dateMillis) == wk })) {
+            WeekFazitStore.delete(ctx, wk)
+            weekFazit = null
+        } else {
+            weekFazit = wf
+        }
+    }
 
     fun generateFazit(day: LocalDate, entriesOfDay: List<HistoryEntry>) {
         val key = dayKeyOf(day)
@@ -120,6 +135,39 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
         )
     }
 
+    fun generateWeekFazit() {
+        if (loadingWeek) return
+        val wk = weekKeyOf(System.currentTimeMillis())
+        val entriesOfWeek = entries.filter { dayKeyOf(it.dateMillis) == wk }
+        if (entriesOfWeek.isEmpty()) return
+        loadingWeek = true
+        expandedWeek = true
+        ApiClient.dayFazit(
+            settings = settings,
+            goals = settings.goals,
+            promptContext = profileContextLine(ctx, profile),
+            mealLines = dayFazitMealLines(ctx, entriesOfWeek),
+            promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
+            promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+            promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+            onOk = { ampel, text ->
+                WeekFazitStore.save(
+                    ctx,
+                    DayFazit(
+                        wk, ampel, text, entriesOfWeek.map { it.id },
+                        System.currentTimeMillis(), dayFingerprint(entriesOfWeek)
+                    )
+                )
+                loadingWeek = false
+                weekFazit = WeekFazitStore.load(ctx, wk)
+            },
+            onError = { msg ->
+                Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_SHORT).show()
+                loadingWeek = false
+            }
+        )
+    }
+
     // Auto-Logik (nur die beiden neuesten Tagesgruppen):
     //  • kein Fazit     → 1× pro Tag & App-Session automatisch (Ersatztext „KI bewertet den Tag …")
     //  • Fazit veraltet → automatisch neu bewerten (veraltet = Entry-IDs/Fingerprint weichen ab)
@@ -145,6 +193,17 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                     )
             ) {
                 generateFazit(group.day, group.entries)
+            }
+        }
+        // Wochenfazit: auto NUR Sonntag ≥ 18 Uhr, 1× pro Woche & Session (sonst Chip-Tipp)
+        val today = LocalDate.now()
+        if (autoFazitTime && today.dayOfWeek == java.time.DayOfWeek.SUNDAY && weekFazit == null) {
+            if (!loadingWeek) {
+                val wk = weekKeyOf(System.currentTimeMillis())
+                if (wk !in DayFazitSession.attemptedWeekly) {
+                    DayFazitSession.attemptedWeekly.add(wk)
+                    generateWeekFazit()
+                }
             }
         }
     }
@@ -283,13 +342,126 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                         }
                     }
                 }
+
+                // Wochenfazit-Zeile: NUR am Sonntag ab 18 Uhr sichtbar (gleiche Chip-Sprache
+                // wie die Tagesfazit-Köpfe); bei Wochen-Änderungen wird das Fazit gelöscht
+                if (LocalDate.now().dayOfWeek == java.time.DayOfWeek.SUNDAY &&
+                    LocalTime.now().hour >= FAZIT_AUTO_HOUR
+                ) {
+                    item(key = "week") {
+                        WeekFazitRow(
+                            fazit = weekFazit,
+                            loading = loadingWeek,
+                            expanded = expandedWeek,
+                            onToggleExpand = { expandedWeek = !expandedWeek },
+                            onGenerate = { generateWeekFazit() }
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-/** Kopfzeile einer Tagesgruppe: Datum links, Tagesfazit-Chip rechts (Zustandsmaschine). */
+/** Wochenfazit-Zeile: Label links, Chip rechts (idle/loading/ready-farbig); kein „veraltet"-
+ *  Zustand – Wochen-Änderungen löschen das Fazit stattdessen (Chip → idle). */
 @Composable
+private fun WeekFazitRow(
+    fazit: DayFazit?,
+    loading: Boolean,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onGenerate: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                stringResource(R.string.weekfazit_row_label),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            when {
+                loading -> Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            stringResource(R.string.weekfazit_chip_loading),
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                fazit == null -> Surface(
+                    onClick = onGenerate,
+                    shape = RoundedCornerShape(18.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        stringResource(R.string.weekfazit_chip_idle),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+                else -> Surface(
+                    onClick = onToggleExpand,
+                    shape = RoundedCornerShape(18.dp),
+                    color = ampelColor(fazit.ampel)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Box(Modifier.size(9.dp).clip(CircleShape).background(Color.White))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            stringResource(R.string.weekfazit_chip_label),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp).rotate(if (expanded) 180f else 0f)
+                        )
+                    }
+                }
+            }
+        }
+        when {
+            loading -> Text(
+                stringResource(R.string.weekfazit_loading_line),
+                fontSize = 11.sp,
+                fontStyle = FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+            fazit != null && expanded -> Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(fazit.text, fontSize = 12.sp, modifier = Modifier.padding(10.dp))
+            }
+        }
+    }
+}
+
+/** Kopfzeile einer Tagesgruppe: Datum links, Tagesfazit-Chip rechts (Zustandsmaschine). */@Composable
 private fun DayGroupHeader(
     date: LocalDate,
     fazit: DayFazit?,

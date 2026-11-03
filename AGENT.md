@@ -85,6 +85,15 @@ kein Fazit → 1× pro Tag & App-Session automatisch (Guard `DayFazitSession.att
 ältere Gruppen nur per Chip-Tap. Debounce 1,2 s nach entries-Änderung (Mehrfach-Löschen = 1 Call).
 **Auto erst ab 18 Uhr** (Konstante `FAZIT_AUTO_HOUR = 18`, `LocalTime.now().hour >= 18`): davor kein Auto-Call
 (Frühstücks-Fazit vermeiden) – Chip-Tipp geht MANUELL zu jeder Zeit.
+**Wochenfazit (nur SONTAG ≥ 18 Uhr):** Zusatz-Zeile am unteren Ende der Verlaufs-Liste (nur dann sichtbar):
+Label „Wochenfazit" + Chip (idle „✨ Wochenfazit ermitteln" / Spinner „Wochenfazit …" + „KI bewertet die Woche …" /
+farbig ready, Tap klappt Fazit-Text aus). Basis: ALLE Einträge der laufenden Woche Montag–Sonntag
+(`weekKeyOf` = ISO-Montag, HistoryStore.kt), Prompt = derselbe dayFazit-Call mit `prompt_weekfazit_intro`
+(„Bewerte die Woche als GANZES…"), Regeln & Kontext (Profil) identisch. **Invalidierung = LÖSCHEN** (kein
+veraltet-Dimmen): Jede Wochen-Eintrags-Änderung (add/delete/erkannt-Korrektur → `dayFingerprint`-Mismatch)
+löscht `week_<key>.json` (WeekFazitStore, file-Prefix week_; entries() filtert week_-Dateien;
+`HistoryStore.delete` löscht Wochen-Fazit gleich mit) → Chip auf idle, manuell neu anforderbar.
+Auto: Sonntag ≥18 automáticamente 1× pro Woche & Session (`DayFazitSession.attemptedWeekly`).
 **KEIN Tagesfazit beim Speichern** (bewusst entfernt nach User-Feedback „lästig"): Der Hauptbildschirm ruft
 beim „In den Verlauf speichern" KEINE KI auf und zeigt keine Fazit-Karte („Dein Tag bisher" gestrichen, incl.
 `savedEntryId`-Statement des ehemaligen fazitEpoch-Nachschubs). Das Fazit entsteht AUSSCHLIESSLICH in der
