@@ -137,6 +137,11 @@
     <string name="history_delete_action">🗑 Delete</string>
     <string name="history_no_goals">No goals captured</string>
     <string name="score_caption">Traffic-light average</string>
+    <string name="weekfazit_row_label">Week summary</string>
+    <string name="weekfazit_chip_idle">✨ Create week summary</string>
+    <string name="weekfazit_chip_loading">Week summary …</string>
+    <string name="weekfazit_chip_label">Week summary</string>
+    <string name="weekfazit_loading_line">AI is summarizing the week …</string>
     <string name="dayfazit_chip_idle">✨ Create day summary</string>
     <string name="dayfazit_chip_loading">Day summary …</string>
     <string name="dayfazit_chip_label">Day summary</string>
@@ -148,6 +153,7 @@
     <string name="dayfazit_line_none">no recognition recorded</string>
     <string name="dayfazit_line_note">Note: %1$s</string>
     <string name="prompt_dayfazit_intro">Here are all meals of one day (format: time · recognized food with estimated quantity · user note). Rate the day as a WHOLE with respect to these goals:</string>
+    <string name="prompt_weekfazit_intro">Here are all meals of ONE week (format: time · recognized food with estimated quantity · user note), Monday through Sunday chronologically. Rate the week as a WHOLE with respect to these goals:</string>
     <string name="prompt_dayfazit_rules">Weigh small pleasure snacks in their context: a single candy should not disproportionately downgrade a day that is otherwise wholesome. The rating reflects the overall balance across all meals of the day.</string>
     <string name="prompt_dayfazit_language">Answer in English.</string>
     <string name="score_tooltip_ok">Average of the rated goals: 🟢 100 · 🟡 50 · 🔴 0</string>
