@@ -284,15 +284,10 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(start = 4.dp)
                             )
-                            staleFazit && fazit != null -> Text(
-                                fazit.text,   // alte Fassung, gedimmt angedeutet
-                                fontSize = 12.sp,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
-                            fazit != null && dayKey in expandedFazits -> Surface(
+                            // Veraltet: bewusst KEINE gedimmte Alt-Fassung mehr zeigen
+                            // (nicht verständlich, warum sie noch da steht) – nur der
+                            // „⟳ Neu bewerten"-Chip macht den Zustand kenntlich
+                            fazit != null && !staleFazit && dayKey in expandedFazits -> Surface(
                                 shape = RoundedCornerShape(10.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant,
                                 modifier = Modifier.fillMaxWidth()
