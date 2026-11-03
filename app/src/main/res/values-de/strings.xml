@@ -121,6 +121,7 @@
     <string name="prompt_eval_language">Antworte in deutscher Sprache.</string>
     <string name="prompt_split_intro">Teile den folgenden Freitext mit Gesundheitszielen in einzelne, eigenständige Ziele auf.</string>
     <string name="prompt_split_rules">Regeln: jedes Ziel ein eigener Punkt, prägnant (maximal 8 Worte), ohne Nummerierung.</string>
+    <string name="prompt_honesty">Sei ehrlich: Erfinde nichts. Wenn du etwas nicht klar erkennen oder einschätzen kannst, sage das offen, statt zu raten.</string>
 
     <!-- Default goals -->
     <string-array name="default_goals">

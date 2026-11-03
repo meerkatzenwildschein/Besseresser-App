@@ -191,6 +191,7 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                         exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
                         responseLanguage = ctx.getString(R.string.prompt_eval_language),
                         recognized = ctx.getString(R.string.prompt_eval_recognized),
+                        honesty = ctx.getString(R.string.prompt_honesty),
                         noteHeader = if (note.isNotBlank())
                             ctx.getString(R.string.prompt_note_header, note)
                         else ""
@@ -288,6 +289,7 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                             exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
                             responseLanguage = ctx.getString(R.string.prompt_eval_language),
                             recognized = ctx.getString(R.string.prompt_eval_recognized),
+                        honesty = ctx.getString(R.string.prompt_honesty),
                             noteHeader = if (note.isNotBlank())
                                 ctx.getString(R.string.prompt_note_header, note.trim())
                             else ""

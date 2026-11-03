@@ -117,6 +117,7 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
             promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
             promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
             promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+            promptHonesty = ctx.getString(R.string.prompt_honesty),
             onOk = { ampel, text ->
                 DayFazitStore.save(
                     ctx,
@@ -150,6 +151,7 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
             promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
             promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
             promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+            promptHonesty = ctx.getString(R.string.prompt_honesty),
             onOk = { ampel, text ->
                 WeekFazitStore.save(
                     ctx,

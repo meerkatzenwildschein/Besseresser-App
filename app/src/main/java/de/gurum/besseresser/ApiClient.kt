@@ -24,7 +24,9 @@ data class PromptBundle(
     // Formatierte Nutzer-Anmerkung (leer = keine); wird nur bei nicht-leerem Text in den Prompt übernommen
     val noteHeader: String = "",
     // Anweisungs-Satz für das "erkannt"-Feld (was ist auf dem Foto zu sehen)
-    val recognized: String = ""
+    val recognized: String = "",
+    // „Sei ehrlich"-Zeile gegen Halluzination
+    val honesty: String = ""
 )
 
 /** Kommunikation mit der OpenAI-kompatiblen API: Foto-Bewertung, Modell-Liste, Ziele-Aufteilung. */
@@ -126,6 +128,7 @@ object ApiClient {
                     appendLine(promptBundle.ampelMeaning)
                     appendLine(promptBundle.exactlyOne)
                     if (promptBundle.recognized.isNotBlank()) appendLine(promptBundle.recognized)
+                    if (promptBundle.honesty.isNotBlank()) appendLine(promptBundle.honesty)
                     appendLine(promptBundle.responseLanguage)
                 }
 
@@ -198,6 +201,7 @@ object ApiClient {
         promptIntro: String,
         promptRules: String,
         promptLanguage: String,
+        promptHonesty: String = "",
         onOk: (ampel: String, text: String) -> Unit,
         onError: (String) -> Unit
     ) {
@@ -214,6 +218,7 @@ object ApiClient {
                     mealLines.forEach { appendLine(it) }
                     appendLine("")
                     appendLine(promptRules)
+                    if (promptHonesty.isNotBlank()) appendLine(promptHonesty)
                     appendLine("")
                     // JSON-Schluessel (ampel/text) fest verdrahtet, Sprache via promptLanguage
                     appendLine("""{"ampel":"gruen|gelb|rot","text":"<2-3 sentences: day summary in the app language, directly to the point>"}""")
