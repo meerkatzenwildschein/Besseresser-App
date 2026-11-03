@@ -38,6 +38,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Date
@@ -63,8 +64,10 @@ fun dayFazitMealLines(ctx: android.content.Context, entriesOfDay: List<HistoryEn
         line
     }
 
-/** Nach Kalendertag gruppieren (absteigend); Einträge bleiben innerhalb der Gruppe absteigend. */
-private fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
+/** Auto-Fazits starten erst ab dieser Uhrzeit (Stunde, lokal) – davor nur manueller Chip. */
+private const val FAZIT_AUTO_HOUR = 18
+
+/** Nach Kalendertag gruppieren (absteigend); Einträge bleiben innerhalb der Gruppe absteigend. */private fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
     entries.groupBy {
         Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate()
     }.map { (day, list) -> DayGroup(day = day, entries = list) }
@@ -119,21 +122,28 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
 
     // Auto-Logik (nur die beiden neuesten Tagesgruppen):
     //  • kein Fazit     → 1× pro Tag & App-Session automatisch (Ersatztext „KI bewertet den Tag …")
-    //  • Fazit veraltet → automatisch neu bewerten (veraltet = Entry-IDs weichen vom Snapshot ab)
+    //  • Fazit veraltet → automatisch neu bewerten (veraltet = Entry-IDs/Fingerprint weichen ab)
     //  • ältere Gruppen nur manuell per Chip-Tap
+    //  • AUTO erst ab 18 Uhr (`FAZIT_AUTO_HOUR`): verhindert Frühstücks-Fazits; manuell (Chip)
+    //    geht zu JEDER Zeit
     LaunchedEffect(entries, fazitMap) {
         if (entries.isEmpty()) return@LaunchedEffect
         delay(1200)   // Debounce: schnelles Löschen mehrerer Einträge löst nur einen Call aus
+        val autoFazitTime = LocalTime.now().hour >= FAZIT_AUTO_HOUR
         groupByDay(entries).take(2).forEach { group ->
             val key = dayKeyOf(group.day)
             if (key in loadingFazits) return@forEach
             val fazit = fazitMap[key]
             if (fazit == null) {
-                if (key !in DayFazitSession.attempted) {
+                if (autoFazitTime && key !in DayFazitSession.attempted) {
                     DayFazitSession.attempted.add(key)
                     generateFazit(group.day, group.entries)
                 }
-            } else if (fazit.entryIds.toSet() != group.entries.map { it.id }.toSet()) {
+            } else if (autoFazitTime && (
+                    fazit.entryIds.toSet() != group.entries.map { it.id }.toSet() ||
+                        (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(group.entries))
+                    )
+            ) {
                 generateFazit(group.day, group.entries)
             }
         }

@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,6 +41,16 @@ fun profileContextLine(ctx: Context, profile: Profile): String? {
         parts.add(ctx.getString(R.string.profile_ctx_weight, shown))
     }
     profile.heightCm?.let { parts.add(ctx.getString(R.string.profile_ctx_height, it)) }
+    if (profile.gender.isNotBlank()) {
+        val word = ctx.getString(
+            when (profile.gender) {
+                "male" -> R.string.profile_gender_male
+                "female" -> R.string.profile_gender_female
+                else -> R.string.profile_gender_diverse
+            }
+        )
+        parts.add(ctx.getString(R.string.profile_ctx_gender, word))
+    }
     if (profile.notes.isNotBlank()) parts.add(ctx.getString(R.string.profile_ctx_notes, profile.notes.trim()))
     if (parts.isEmpty()) return null
     return ctx.getString(R.string.profile_ctx_header, parts.joinToString(" · "))
@@ -62,6 +73,7 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
     }
     var heightText by remember { mutableStateOf(initial.heightCm?.toString() ?: "") }
     var notesText by remember { mutableStateOf(initial.notes) }
+    var gender by remember { mutableStateOf(initial.gender) }
     var error by remember { mutableStateOf<String?>(null) }
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -129,6 +141,30 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
                 )
             }
 
+            // Geschlecht (optional): drei FilterChips, nochmal antippen = wieder leer
+            Text(
+                stringResource(R.string.profile_gender_label),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = gender == "male",
+                    onClick = { gender = if (gender == "male") "" else "male" },
+                    label = { Text(stringResource(R.string.profile_gender_male), fontSize = 12.sp) }
+                )
+                FilterChip(
+                    selected = gender == "female",
+                    onClick = { gender = if (gender == "female") "" else "female" },
+                    label = { Text(stringResource(R.string.profile_gender_female), fontSize = 12.sp) }
+                )
+                FilterChip(
+                    selected = gender == "diverse",
+                    onClick = { gender = if (gender == "diverse") "" else "diverse" },
+                    label = { Text(stringResource(R.string.profile_gender_diverse), fontSize = 12.sp) }
+                )
+            }
+
             OutlinedTextField(
                 value = weightText,
                 onValueChange = { weightText = it },
@@ -174,7 +210,7 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
                 if (!plausible) {
                     error = ctx.getString(R.string.profile_invalid_number)
                 } else {
-                    onSave(Profile(birthDateIso, weight, height, notesText.trim()))
+                    onSave(Profile(birthDateIso, weight, height, notesText.trim(), gender))
                 }
             },
             modifier = Modifier

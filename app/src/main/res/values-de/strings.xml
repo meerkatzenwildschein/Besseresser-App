@@ -55,6 +55,11 @@
     <string name="profile_intro">Alle Angaben sind freiwillig – sie helfen der KI, Portionen und Bewertungen besser einzuschätzen.</string>
     <string name="profile_weight_label">Gewicht (kg)</string>
     <string name="profile_height_label">Körpergröße (cm)</string>
+    <string name="profile_gender_label">Geschlecht (optional)</string>
+    <string name="profile_gender_male">Männlich</string>
+    <string name="profile_gender_female">Weiblich</string>
+    <string name="profile_gender_diverse">Divers</string>
+    <string name="profile_ctx_gender">Geschlecht: %1$s</string>
     <string name="profile_notes_label">Anmerkungen / Vorerkrankungen</string>
     <string name="profile_notes_hint">z. B. Diabetes, Medikamente, Ernährungswünsche …</string>
     <string name="profile_save">Speichern</string>

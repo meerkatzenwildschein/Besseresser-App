@@ -43,7 +43,8 @@ data class Profile(
     val birthDate: String? = null,  // ISO yyyy-MM-dd
     val weightKg: Double? = null,
     val heightCm: Int? = null,
-    val notes: String = ""
+    val notes: String = "",
+    val gender: String = ""         // "" = keine Angabe; "male" | "female" | "diverse"
 ) {
     /** Alter in Jahren – lokal aus dem Geburtsdatum berechnet (veraltet nie). */
     val ageYears: Int?
@@ -54,7 +55,7 @@ data class Profile(
         }
 
     val isEmpty: Boolean
-        get() = birthDate == null && weightKg == null && heightCm == null && notes.isBlank()
+        get() = birthDate == null && weightKg == null && heightCm == null && notes.isBlank() && gender.isBlank()
 }
 
 object ProfileStore {
@@ -65,7 +66,8 @@ object ProfileStore {
             weightKg = p.getString("profileWeight", null)
                 ?.replace(',', '.')?.toDoubleOrNull()?.takeIf { it > 0 },
             heightCm = p.getInt("profileHeight", -1).takeIf { it > 0 },
-            notes = p.getString("profileNotes", "") ?: ""
+            notes = p.getString("profileNotes", "") ?: "",
+            gender = p.getString("profileGender", "") ?: ""
         )
     }
 
@@ -75,13 +77,15 @@ object ProfileStore {
         birthDateIso: String?,
         weightKg: Double?,
         heightCm: Int?,
-        notes: String
+        notes: String,
+        gender: String = ""
     ) {
         ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
             .putString("birthDate", birthDateIso?.takeIf { it.isNotBlank() })
             .putString("profileWeight", weightKg?.toString())
             .putInt("profileHeight", heightCm ?: -1)
             .putString("profileNotes", notes.trim())
+            .putString("profileGender", gender.takeIf { it in setOf("male", "female", "diverse") } ?: "")
             .apply()
     }
 }

@@ -153,7 +153,7 @@ fun GesundEssenApp() {
                                 initial = profile,
                                 onCancel = { showProfile = false },
                                 onSave = { p ->
-                                    ProfileStore.save(ctx, p.birthDate, p.weightKg, p.heightCm, p.notes)
+                                    ProfileStore.save(ctx, p.birthDate, p.weightKg, p.heightCm, p.notes, p.gender)
                                     profile = p
                                     showProfile = false
                                 }
