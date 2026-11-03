@@ -75,7 +75,6 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
     var showCamera by remember { mutableStateOf(false) }   // Eigene Kamera (CameraX)
     var showErkanntEdit by remember { mutableStateOf(false) }
     var savedEntryId by remember { mutableStateOf<Long?>(null) }
-    var fazitEpoch by remember { mutableStateOf(0) }  // Re-Trigger der „Dein Tag bisher"-Bewertung
 
     val photoFile = remember {
         File(ctx.cacheDir, "photos").also { it.mkdirs() }
@@ -119,43 +118,6 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
         photoPreview = null
         note = ""
         error = null
-    }
-
-    // ------------------------------------------------- KI-Tagesfazit für „Dein Tag bisher"
-    var dayFazit by remember { mutableStateOf<DayFazit?>(null) }
-    var dayFazitBusy by remember { mutableStateOf(false) }
-
-    // Beim Speichern in den Verlauf: Tagesfazit für HEUTE ermitteln (Text-Call)
-    // und persistieren – die Verlaufs-Liste sieht es dann als frisches Fazit.
-    LaunchedEffect(savedToHistory, fazitEpoch) {
-        if (!savedToHistory) return@LaunchedEffect
-        dayFazitBusy = true
-        dayFazit = null
-        val todayKey = dayKeyOf(System.currentTimeMillis())
-        val todayEntries = HistoryStore.entries(ctx).filter { dayKeyOf(it.dateMillis) == todayKey }
-        val lines = dayFazitMealLines(ctx, todayEntries)
-        ApiClient.dayFazit(
-            settings = settings,
-            goals = settings.goals,
-            promptContext = profileContextLine(ctx, profile),
-            mealLines = lines,
-            promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
-            promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
-            promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
-            onOk = { ampel, text ->
-                val f = DayFazit(
-                    todayKey, ampel, text, todayEntries.map { it.id },
-                    System.currentTimeMillis(), dayFingerprint(todayEntries)
-                )
-                DayFazitStore.save(ctx, f)
-                dayFazit = f
-                dayFazitBusy = false
-            },
-            onError = { msg ->
-                Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_SHORT).show()
-                dayFazitBusy = false
-            }
-        )
     }
     BackHandler(enabled = showReview) {
         showReview = false
@@ -218,6 +180,7 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                 onConfirm = {
                     showCamera = false
                     note = note.trim()
+                    RecentNotesStore.push(ctx, note)   // Notiz in den „Letzte 5"-Schaukasten
                     photoPreview = photoUri
                     busy = true
                     error = null
@@ -293,6 +256,10 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                     value = note,
                     onValueChange = { note = it },
                     placeholder = { Text(stringResource(R.string.main_note_placeholder)) },
+                    trailingIcon = {
+                        // Letzte 5 Eingaben (Müsli-morgens-Komfort): Auswahl rückt nach oben
+                        RecentNotesButton(onPick = { note = it })
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 1,
                     maxLines = 4
@@ -325,6 +292,7 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                                 ctx.getString(R.string.prompt_note_header, note.trim())
                             else ""
                         )
+                        RecentNotesStore.push(ctx, note.trim())   // Notiz in den „Letzte 5"-Schaukasten
                         ApiClient.analyze(
                             ctx = ctx,
                             photoUri = photoUri,
@@ -519,62 +487,15 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                     ) { Text(stringResource(R.string.main_discard)) }
                 }
                 if (lastGoaled && savedToHistory) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            stringResource(R.string.main_saved_banner),
-                            modifier = Modifier.padding(12.dp),
-                            fontSize = 13.sp
-                        )
-                    }
-                    // „Dein Tag bisher": KI-Tagesfazit (wird beim Speichern angestoßen)
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (dayFazitBusy) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(14.dp),
-                                        strokeWidth = 2.dp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                } else if (dayFazit != null) {
-                                    Box(
-                                        Modifier
-                                            .size(11.dp)
-                                            .clip(CircleShape)
-                                            .background(ampelColor(dayFazit!!.ampel))
-                                    )
-                                }
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    stringResource(R.string.dayfazit_today_title),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            if (dayFazitBusy) {
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    stringResource(R.string.dayfazit_loading_line),
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            dayFazit?.let { f ->
-                                Spacer(Modifier.height(4.dp))
-                                Text(f.text, fontSize = 13.sp)
-                            }
-                        }
-                    }
+                    // „Zum Verlauf" (statt Banner): Direkter Sprung zur Tagesübersicht
+                    OutlinedButton(
+                        onClick = { onOpenHistory() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                    ) { Text(stringResource(R.string.main_open_history)) }
                     // Der eigentliche „Neues Foto aufnehmen"-CTA steht fixiert unten
-                    // (gleiche Optik/Position wie der Start-CTA) – hier nur der Banner
+                    // (gleiche Optik/Position wie der Start-CTA) – hier nur der Verlauf-Sprung
                 }
 
                 // Platzhalter, damit nichts unter dem fixierten Foto-Button versteckt wird
@@ -673,7 +594,8 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
             }
 
             // Erkannt-Essens-Korrektur: Dialog; bei gespeichertem Durchlauf persistieren
-            // (Store + Tagesfazit-Regeneration via fazitEpoch)
+            // (Store-Update; das Tagesfazit des Tages wird im Verlauf als veraltet erkannt
+            // und dort ggf. automatisch neu bewertet)
             if (showErkanntEdit && evaluation != null) {
                 ErkanntEditDialog(
                     initialText = evaluation?.erkannt.orEmpty(),
@@ -682,7 +604,6 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
                         showErkanntEdit = false
                         if (savedToHistory && savedEntryId != null) {
                             HistoryStore.updateErkannt(ctx, savedEntryId!!, newText)
-                            fazitEpoch++   // „Dein Tag bisher" mit dem korrigierten Text neu bewerten
                         }
                     },
                     onDismiss = { showErkanntEdit = false }

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
@@ -44,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -224,6 +226,52 @@ fun ErkanntEditDialog(initialText: String, onOk: (String) -> Unit, onDismiss: ()
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
+}
+
+/** Kleines trailing-Icon im Anmerkungsfeld: Liste der letzten 5 Eingaben.
+ *  Auswahl setzt den Text und verschiebt den Eintrag an die Spitze (MRU). */
+@Composable
+fun RecentNotesButton(onPick: (String) -> Unit) {
+    val ctx = LocalContext.current
+    var recent by remember { mutableStateOf(RecentNotesStore.load(ctx)) }
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = {
+                recent = RecentNotesStore.load(ctx)
+                open = true
+            },
+            enabled = recent.isNotEmpty(),
+            modifier = Modifier.size(24.dp)
+        ) {
+            Icon(
+                Icons.Filled.List,
+                contentDescription = stringResource(R.string.recent_notes_desc),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            recent.forEach { n ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            n,
+                            fontSize = 12.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    onClick = {
+                        open = false
+                        RecentNotesStore.push(ctx, n)   // Auswahl rutscht nach oben
+                        recent = RecentNotesStore.load(ctx)
+                        onPick(n)
+                    }
+                )
+            }
+        }
+    }
 }
 
 @Composable
