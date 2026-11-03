@@ -55,7 +55,7 @@
     <string name="profile_intro">All entries are optional – they help the AI better estimate portions and rates.</string>
     <string name="profile_weight_label">Weight (kg)</string>
     <string name="profile_height_label">Height (cm)</string>
-    <string name="profile_gender_label">Gender (optional)</string>
+    <string name="profile_gender_label">Gender</string>
     <string name="profile_gender_male">Male</string>
     <string name="profile_gender_female">Female</string>
     <string name="profile_gender_diverse">Diverse</string>
