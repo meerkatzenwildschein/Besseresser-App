@@ -121,7 +121,7 @@
     <string name="prompt_eval_language">Answer in English.</string>
     <string name="prompt_split_intro">Split the following free text containing health goals into individual, self-contained goals.</string>
     <string name="prompt_split_rules">Rules: one goal per item, concise (max. 8 words), no numbering.</string>
-    <string name="prompt_honesty">Be honest: do not invent anything. If you cannot clearly recognize or estimate something, say so openly instead of guessing.</string>
+    <string name="prompt_honesty">Be honest: don\'t invent anything – if unsure, it\'s better to leave something out.</string>
 
     <!-- Default goals -->
     <string-array name="default_goals">
