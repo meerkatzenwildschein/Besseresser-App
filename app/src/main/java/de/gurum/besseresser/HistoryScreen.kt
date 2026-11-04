@@ -740,6 +740,8 @@ private fun AddMealReviewScreen(
             enabled = !busy,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                // Mit der Tastatur mitfahren (Notiz feld + fixierter Button kollidieren sonst)
+                .imePadding()
                 .padding(16.dp)
                 .fillMaxWidth()
                 .height(56.dp)
@@ -801,6 +803,9 @@ private fun AddMealNoPhotoScreen(
             enabled = !busy && note.isNotBlank(),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                // Fahrt mit der Tastatur mit: Der Button bleibt immer sichtbar/ tappbar,
+                // statt hinter dem Input-Panel zu verschwinden
+                .imePadding()
                 .padding(16.dp)
                 .fillMaxWidth()
                 .height(56.dp)
