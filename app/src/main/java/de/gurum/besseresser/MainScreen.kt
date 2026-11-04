@@ -274,6 +274,8 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    // Review-Fluss: fixierte Buttons fahren mit der Tastatur mit
+                    .imePadding()
                     .padding(16.dp)
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
