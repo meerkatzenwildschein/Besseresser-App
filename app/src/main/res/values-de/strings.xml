@@ -133,6 +133,7 @@
     <string name="nacherfassen_label">nachträglich erfasst</string>
     <string name="nacherfassen_send">An die KI senden</string>
     <string name="nacherfassen_empty_hint">Ohne Foto ist die Beschreibung Pflicht.</string>
+    <string name="nacherfassen_block_hint">Eine Erfassung läuft – bitte zuerst abschließen (fertigstellen oder abbrechen).</string>
     <string name="reeval_progress">KI bewertet die Korrektur neu …</string>
 
     <!-- Default goals -->

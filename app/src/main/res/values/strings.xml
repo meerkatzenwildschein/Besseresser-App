@@ -133,6 +133,7 @@
     <string name="nacherfassen_label">added retroactively</string>
     <string name="nacherfassen_send">Send to AI</string>
     <string name="nacherfassen_empty_hint">The description is required without a photo.</string>
+    <string name="nacherfassen_block_hint">A capture is in progress – dispose it first (finish or cancel).</string>
     <string name="reeval_progress">AI is re-evaluating the correction …</string>
 
     <!-- Default goals -->

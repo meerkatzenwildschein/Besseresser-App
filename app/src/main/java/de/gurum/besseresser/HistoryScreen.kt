@@ -270,24 +270,42 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
         }
     }
 
+    // Root als Box: Die Nacherfassen-Overlays (Kamera/Review/Text) liegen als Geschwister
+    // ÜBER der Liste — Gesten & Scroll der Liste können sie nicht durchdringen.
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
-                // Nach rechts wischen → zurück zum Hauptbildschirm
+                // Nach rechts wischen → zurück zum Hauptbildschirm (SPERRE während
+                // der Nachtrage-Erfassung — Wisch-Eingaben werden ignoriert, Toast-Hinweis)
                 var acc = 0f
+                var hintShown = false
                 detectHorizontalDragGestures(
-                    onDragEnd = { acc = 0f },
-                    onDragCancel = { acc = 0f }
+                    onDragEnd = { acc = 0f; hintShown = false },
+                    onDragCancel = { acc = 0f; hintShown = false }
                 ) { _, dragAmount ->
-                    if (dragAmount > 0) {
+                    val overlayOpen = showAddCamera || showAddReview || showAddText || showAddBusyCard
+                    if (dragAmount != 0f) {
                         acc += dragAmount
-                        if (acc > 160f) {
-                            acc = 0f
-                            onBack()
+                        if (kotlin.math.abs(acc) > 160f) {
+                            if (overlayOpen) {
+                                if (!hintShown) {
+                                    Toast.makeText(
+                                        ctx,
+                                        ctx.getString(R.string.nacherfassen_block_hint),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    hintShown = true
+                                }
+                                acc = 0f
+                            } else if (dragAmount > 0) {
+                                acc = 0f
+                                onBack()
+                            } else {
+                                acc = 0f
+                            }
                         }
-                    } else {
-                        acc = 0f
                     }
                 }
             }
@@ -301,7 +319,7 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
             icon = Icons.Filled.DateRange
         )
 
-        if (entries.isEmpty() && !showAddCamera && !showAddReview && !showAddText) {
+        if (entries.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     stringResource(R.string.history_empty),
@@ -309,111 +327,6 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-        } else if (showAddCamera) {
-            // Nacherfassen MIT Foto: gleicher Capture-Screen wie beim „Essen fotografieren“
-            CameraCaptureScreen(
-                outputFile = addPhotoFile,
-                note = addNote,
-                onNoteChange = { addNote = it },
-                onCancel = { showAddCamera = false },
-                onFallbackSystemCamera = {
-                    showAddCamera = false
-                    addSystemCameraLauncher.launch(addPhotoUri)
-                },
-                onConfirm = {
-                    showAddCamera = false
-                    showAddBusyCard = true
-                    val prompts = PromptBundle(
-                        intro = ctx.getString(R.string.prompt_eval_intro),
-                        formatIntro = ctx.getString(R.string.prompt_eval_format),
-                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                        recognized = ctx.getString(R.string.prompt_eval_recognized),
-                        honesty = ctx.getString(R.string.prompt_honesty),
-                        noteHeader = if (addNote.isNotBlank())
-                            ctx.getString(R.string.prompt_note_header, addNote)
-                        else ""
-                    )
-                    ApiClient.analyze(
-                        ctx = ctx,
-                        photoUri = addPhotoUri,
-                        settings = settings,
-                        promptBundle = prompts,
-                        onResult = {
-                            showAddBusyCard = false
-                            saveBackdatedEntry(it, addPhotoUri)
-                        },
-                        onError = { msg ->
-                            showAddBusyCard = false
-                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
-                        }
-                    )
-                }
-            )
-        } else if (showAddReview) {
-            // Fallback-Zweig: Foto per Systemkamera → prüfen + Anmerkung → bewerten
-            AddMealReviewScreen(
-                photoUri = addPhotoUri,
-                note = addNote,
-                onNoteChange = { addNote = it },
-                onBack = { showAddReview = false },
-                busy = showAddBusyCard,
-                onRate = {
-                    showAddBusyCard = true
-                    val prompts = PromptBundle(
-                        intro = ctx.getString(R.string.prompt_eval_intro),
-                        formatIntro = ctx.getString(R.string.prompt_eval_format),
-                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                        recognized = ctx.getString(R.string.prompt_eval_recognized),
-                        honesty = ctx.getString(R.string.prompt_honesty),
-                        noteHeader = if (addNote.isNotBlank())
-                            ctx.getString(R.string.prompt_note_header, addNote.trim())
-                        else ""
-                    )
-                    ApiClient.analyze(
-                        ctx = ctx,
-                        photoUri = addPhotoUri,
-                        settings = settings,
-                        promptBundle = prompts,
-                        onResult = {
-                            showAddBusyCard = false
-                            saveBackdatedEntry(it, addPhotoUri)
-                        },
-                        onError = { msg ->
-                            showAddBusyCard = false
-                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
-                        }
-                    )
-                }
-            )
-        } else if (showAddText) {
-            // Nacherfassen OHNE Foto: Beschreibung ist Pflicht; Text-only-KI-Aufruf
-            AddMealNoPhotoScreen(
-                day = addTargetDay,
-                note = addNote,
-                onNoteChange = { addNote = it },
-                onBack = { showAddText = false },
-                busy = showAddBusyCard,
-                onSend = {
-                    showAddBusyCard = true
-                    ApiClient.analyzeText(
-                        ctx = ctx,
-                        settings = settings,
-                        userDescription = addNote.trim(),
-                        onResult = {
-                            showAddBusyCard = false
-                            saveBackdatedEntry(it, null)
-                        },
-                        onError = { msg ->
-                            showAddBusyCard = false
-                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
-                        }
-                    )
-                }
-            )
         } else {
             Text(
                 stringResource(R.string.history_list_hint, entries.size),
@@ -588,6 +501,117 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
             )
         }
     }
+
+    // ---------------------------------------------------------------- Nacherfassen-Overlays
+    // Als Geschwister ÜBER der Liste (Box-Root): Die Wisch-Gesten des Listen-Layouts können
+    // die Erfassungsscreens nicht mehr durchdringen (Fix: nach links wischen während
+    // „Mit Foto"/„Ohne Foto" warf den Nutzer ungewollt zurück in die Liste).
+    if (showAddCamera) {
+        CameraCaptureScreen(
+            outputFile = addPhotoFile,
+            note = addNote,
+            onNoteChange = { addNote = it },
+            onCancel = { showAddCamera = false },
+            onFallbackSystemCamera = {
+                showAddCamera = false
+                addSystemCameraLauncher.launch(addPhotoUri)
+            },
+            onConfirm = {
+                showAddCamera = false
+                showAddBusyCard = true
+                val prompts = PromptBundle(
+                    intro = ctx.getString(R.string.prompt_eval_intro),
+                    formatIntro = ctx.getString(R.string.prompt_eval_format),
+                    ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                    exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                    responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                    recognized = ctx.getString(R.string.prompt_eval_recognized),
+                    honesty = ctx.getString(R.string.prompt_honesty),
+                    noteHeader = if (addNote.isNotBlank())
+                        ctx.getString(R.string.prompt_note_header, addNote)
+                    else ""
+                )
+                ApiClient.analyze(
+                    ctx = ctx,
+                    photoUri = addPhotoUri,
+                    settings = settings,
+                    promptBundle = prompts,
+                    onResult = {
+                        showAddBusyCard = false
+                        saveBackdatedEntry(it, addPhotoUri)
+                    },
+                    onError = { msg ->
+                        showAddBusyCard = false
+                        Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+        )
+    }
+    if (showAddReview) {
+        AddMealReviewScreen(
+            photoUri = addPhotoUri,
+            note = addNote,
+            onNoteChange = { addNote = it },
+            onBack = { showAddReview = false },
+            busy = showAddBusyCard,
+            onRate = {
+                showAddBusyCard = true
+                val prompts = PromptBundle(
+                    intro = ctx.getString(R.string.prompt_eval_intro),
+                    formatIntro = ctx.getString(R.string.prompt_eval_format),
+                    ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                    exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                    responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                    recognized = ctx.getString(R.string.prompt_eval_recognized),
+                    honesty = ctx.getString(R.string.prompt_honesty),
+                    noteHeader = if (addNote.isNotBlank())
+                        ctx.getString(R.string.prompt_note_header, addNote.trim())
+                    else ""
+                )
+                ApiClient.analyze(
+                    ctx = ctx,
+                    photoUri = addPhotoUri,
+                    settings = settings,
+                    promptBundle = prompts,
+                    onResult = {
+                        showAddBusyCard = false
+                        saveBackdatedEntry(it, addPhotoUri)
+                    },
+                    onError = { msg ->
+                        showAddBusyCard = false
+                        Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+        )
+    }
+    if (showAddText) {
+        AddMealNoPhotoScreen(
+            day = addTargetDay,
+            note = addNote,
+            onNoteChange = { addNote = it },
+            onBack = { showAddText = false },
+            busy = showAddBusyCard,
+            onSend = {
+                showAddBusyCard = true
+                ApiClient.analyzeText(
+                    ctx = ctx,
+                    settings = settings,
+                    userDescription = addNote.trim(),
+                    onResult = {
+                        showAddBusyCard = false
+                        saveBackdatedEntry(it, null)
+                    },
+                    onError = { msg ->
+                        showAddBusyCard = false
+                        Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                    }
+                )
+            }
+        )
+    }
+    }   // Box-Root
 }
 
 /** Wochenfazit-Zeile: Label links, Chip rechts (idle/loading/ready-farbig); kein „veraltet"-
@@ -612,61 +636,35 @@ private fun WeekFazitRow(
                 modifier = Modifier.weight(1f)
             )
             when {
-                loading -> Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        CircularProgressIndicator(modifier = Modifier.size(12.dp), strokeWidth = 1.5.dp)
-                        Spacer(Modifier.width(5.dp))
-                        Text(
-                            stringResource(R.string.weekfazit_chip_loading),
-                            fontSize = 11.sp,
+                loading -> HeadChip(
+                    label = stringResource(R.string.weekfazit_chip_loading),
+                    onClick = null,
+                    leading = {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-                fazit == null -> Surface(
-                    onClick = onGenerate,
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Text(
-                        stringResource(R.string.weekfazit_chip_idle),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
-                }
-                else -> Surface(
+                )
+                fazit == null -> HeadChip(
+                    label = stringResource(R.string.weekfazit_chip_idle),
+                    onClick = onGenerate
+                )
+                else -> HeadChip(
+                    label = stringResource(R.string.weekfazit_chip_label),
                     onClick = onToggleExpand,
-                    shape = RoundedCornerShape(18.dp),
-                    color = ampelColor(fazit.ampel)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Box(Modifier.size(9.dp).clip(CircleShape).background(Color.White))
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            stringResource(R.string.weekfazit_chip_label),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                    accent = ampelColor(fazit.ampel),
+                    leading = { Box(Modifier.size(10.dp).clip(CircleShape).background(Color.White)) },
+                    trailing = {
                         Icon(
                             Icons.Filled.KeyboardArrowDown,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(14.dp).rotate(if (expanded) 180f else 0f)
+                            modifier = Modifier.size(16.dp).rotate(if (expanded) 180f else 0f)
                         )
                     }
-                }
+                )
             }
         }
         when {
@@ -685,6 +683,51 @@ private fun WeekFazitRow(
                 Text(fazit.text, fontSize = 12.sp, modifier = Modifier.padding(10.dp))
             }
         }
+    }
+}
+
+/** Kopf-Chip (Tages-/Wochenfazit): 40dp hoch — exakt so hoch wie der „+“-Button —,
+ *  zentrierter Inhalt, größere Schrift (13sp). accent != null → farbiger Ampel-Chip
+ *  mit weißem Inhalt; sonst grau. onClick = null → nicht tappbar (Loading). */
+@Composable
+private fun HeadChip(
+    label: String,
+    onClick: (() -> Unit)?,
+    accent: Color? = null,
+    leading: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    val shape = RoundedCornerShape(20.dp)
+    val content: @Composable () -> Unit = {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .height(40.dp)
+                .padding(horizontal = 14.dp)
+        ) {
+            leading?.invoke()
+            if (leading != null) Spacer(Modifier.width(6.dp))
+            Text(
+                label,
+                fontSize = 13.sp,
+                fontWeight = if (accent != null) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (accent != null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (trailing != null) Spacer(Modifier.width(4.dp))
+            trailing?.invoke()
+        }
+    }
+    Surface(
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
+        shape = shape,
+        color = accent ?: MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.height(40.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxHeight(),
+            contentAlignment = Alignment.Center
+        ) { content() }
     }
 }
 
@@ -861,88 +904,47 @@ private fun DayGroupHeader(
             Spacer(Modifier.width(6.dp))
         }
         when {
-            loading -> Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
+            loading -> HeadChip(
+                label = stringResource(R.string.dayfazit_chip_loading),
+                onClick = null,
+                leading = {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(12.dp),
-                        strokeWidth = 1.5.dp
-                    )
-                    Spacer(Modifier.width(5.dp))
-                    Text(
-                        stringResource(R.string.dayfazit_chip_loading),
-                        fontSize = 11.sp,
+                        modifier = Modifier.size(14.dp),
+                        strokeWidth = 2.dp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            }
-            fazit == null -> Surface(
+            )
+            fazit == null -> HeadChip(
+                label = stringResource(R.string.dayfazit_chip_idle),
+                onClick = onGenerate
+            )
+            stale -> HeadChip(
+                label = stringResource(R.string.dayfazit_chip_stale),
                 onClick = onGenerate,
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Text(
-                    stringResource(R.string.dayfazit_chip_idle),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                )
-            }
-            stale -> Surface(
-                onClick = onGenerate,
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
+                leading = {
                     Icon(
                         Icons.Filled.Refresh,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(13.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        stringResource(R.string.dayfazit_chip_stale),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        modifier = Modifier.size(15.dp)
                     )
                 }
-            }
-            else -> Surface(
+            )
+            else -> HeadChip(
+                label = stringResource(R.string.dayfazit_chip_label),
                 onClick = onToggleExpand,
-                shape = RoundedCornerShape(18.dp),
-                color = ampelColor(fazit.ampel)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Box(Modifier.size(9.dp).clip(CircleShape).background(Color.White))
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        stringResource(R.string.dayfazit_chip_label),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                accent = ampelColor(fazit.ampel),
+                leading = { Box(Modifier.size(10.dp).clip(CircleShape).background(Color.White)) },
+                trailing = {
                     Icon(
                         Icons.Filled.KeyboardArrowDown,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(14.dp).rotate(if (expanded) 180f else 0f)
+                        modifier = Modifier.size(16.dp).rotate(if (expanded) 180f else 0f)
                     )
                 }
-            }
+            )
         }
     }
 }
