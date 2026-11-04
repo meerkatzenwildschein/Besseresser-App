@@ -312,31 +312,34 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        TopBarRow(
-            title = stringResource(R.string.history_title),
-            onBack = onBack,
-            trailing = { },
-            icon = Icons.Filled.DateRange
-        )
+        // Verlauf-Liste nur zeigen, wenn KEIN Nachtrage-Overlay aktiv ist — sonst dieser
+        // Screen + Leiste unter dem Overlay durchscheinen (Doppelverter „Verlauf“ oben)
+        if (!showAddCamera && !showAddReview && !showAddText) {
+            TopBarRow(
+                title = stringResource(R.string.history_title),
+                onBack = onBack,
+                trailing = { },
+                icon = Icons.Filled.DateRange
+            )
 
-        if (entries.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (entries.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        stringResource(R.string.history_empty),
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
                 Text(
-                    stringResource(R.string.history_empty),
-                    textAlign = TextAlign.Center,
+                    stringResource(R.string.history_list_hint, entries.size),
+                    fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-        } else {
-            Text(
-                stringResource(R.string.history_list_hint, entries.size),
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                groupByDay(entries).forEach { group ->
-                    val dayKey = dayKeyOf(group.day)
-                    val fazit = fazitMap[dayKey]
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    groupByDay(entries).forEach { group ->
+                        val dayKey = dayKeyOf(group.day)
+                        val fazit = fazitMap[dayKey]
                     val loadingFazit = dayKey in loadingFazits
                     val staleFazit = fazit != null && (
                         fazit.entryIds.toSet() != group.entries.map { it.id }.toSet() ||
@@ -435,6 +438,7 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                     }
                 }
             }
+            }   // if (!overlayOpen) — Verlauf-Liste nur ohne Overlay
         }
 
         // „KI denkt"-Karte während der Nachtrage-Bewertung (identische Optik wie der
@@ -732,7 +736,8 @@ private fun HeadChip(
 }
 
 /** Nachtrage-Zweig MIT Foto (Systemkamera-Fallback): Foto prüfen + Anmerkung → bewerten.
- *  Kein Abschluss-/Speichern-Screen: das Ergebnis geht direkt ins Tagesdatum. */
+ *  Kein Abschluss-/Speichern-Screen: das Ergebnis geht direkt ins Tagesdatum.
+ *  OPAKER Hintergrund, damit die Verlaufs-Liste darunter nicht durchscheint. */
 @Composable
 private fun AddMealReviewScreen(
     photoUri: Uri,
@@ -742,7 +747,11 @@ private fun AddMealReviewScreen(
     busy: Boolean,
     onRate: () -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -804,7 +813,11 @@ private fun AddMealNoPhotoScreen(
     busy: Boolean,
     onSend: () -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
