@@ -366,7 +366,7 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                                 fontSize = 11.sp,
                                 fontStyle = FontStyle.Italic,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 4.dp)
+                                modifier = Modifier.padding(top = 8.dp, start = 4.dp)
                             )
                             // Veraltet: bewusst KEINE gedimmte Alt-Fassung mehr zeigen
                             // (nicht verständlich, warum sie noch da steht) – nur der
@@ -374,12 +374,15 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                             fazit != null && !staleFazit && dayKey in expandedFazits -> Surface(
                                 shape = RoundedCornerShape(10.dp),
                                 color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 10.dp, bottom = 2.dp)
                             ) {
                                 Text(
                                     fazit.text,
                                     fontSize = 12.sp,
-                                    modifier = Modifier.padding(10.dp)
+                                    lineHeight = 17.sp,
+                                    modifier = Modifier.padding(12.dp)
                                 )
                             }
                         }
@@ -677,14 +680,16 @@ private fun WeekFazitRow(
                 fontSize = 11.sp,
                 fontStyle = FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp)
+                modifier = Modifier.padding(top = 8.dp, start = 4.dp)
             )
             fazit != null && expanded -> Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp, bottom = 2.dp)
             ) {
-                Text(fazit.text, fontSize = 12.sp, modifier = Modifier.padding(10.dp))
+                Text(fazit.text, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(12.dp))
             }
         }
     }
