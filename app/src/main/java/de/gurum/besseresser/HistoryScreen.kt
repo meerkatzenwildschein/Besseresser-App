@@ -807,14 +807,19 @@ private fun DayGroupHeader(
             modifier = Modifier.weight(1f)
         )
         if (onAddMeal != null) {
-            IconButton(onClick = onAddMeal, modifier = Modifier.size(28.dp)) {
+            // Markanter als das alte 28dp-Bare-Icon: tonal gefüllter Kreis-Button (40dp-Tappfläche,
+            // primärer + Glyph) mit klarem Abstand zum Fazit-Chip – kein Fehl-Tapp aufs Pendant
+            FilledTonalIconButton(
+                onClick = onAddMeal,
+                modifier = Modifier.size(40.dp)
+            ) {
                 Icon(
                     Icons.Filled.Add,
                     contentDescription = stringResource(R.string.nacherfassen_title),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
+            Spacer(Modifier.width(6.dp))
         }
         when {
             loading -> Surface(
