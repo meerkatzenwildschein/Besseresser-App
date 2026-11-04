@@ -269,6 +269,60 @@ object ApiClient {
         }
     }
 
+    /** Text-only Analyse (Nacherfassung OHNE Foto): Beschreibung der Mahlzeit statt Foto.
+     *  Gleicher JSON-Kontrakt wie analyze, aber ohne Bild */
+    fun analyzeText(
+        ctx: Context,
+        settings: Settings,
+        userDescription: String,
+        onResult: (Evaluation) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        executor.execute {
+            try {
+                val prompt = buildString {
+                    appendLine(ctx.getString(R.string.prompt_eval_intro_textonly))
+                    settings.goals.forEachIndexed { i, g -> appendLine("${i + 1}. $g") }
+                    appendLine("")
+                    appendLine(ctx.getString(R.string.prompt_textonly_context, userDescription.trim()))
+                    appendLine("")
+                    appendLine(ctx.getString(R.string.prompt_eval_format))
+                    appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","begruendung":"<short reason>"}],"zusatz":"<one-sentence overall impression>","erkannt":"<one short sentence: what the description says the meal was, with quantities>"}""")
+                    appendLine(ctx.getString(R.string.prompt_eval_ampel_meaning))
+                    appendLine(ctx.getString(R.string.prompt_eval_exactly_one))
+                    appendLine(ctx.getString(R.string.prompt_honesty))
+                    appendLine(ctx.getString(R.string.prompt_eval_language))
+                }
+                val body = chatBody(
+                    model = settings.model,
+                    baseUrl = settings.baseUrl,
+                    temperature = 0.3,
+                    maxTokens = 4096,
+                    messages = JSONArray().put(
+                        JSONObject().put("role", "user").put("content", prompt)
+                    )
+                )
+                val url = settings.baseUrl.trim().trimEnd('/') + "/chat/completions"
+                val text = postChat(url, settings.apiKey, body)
+                val resp = JSONObject(text)
+                val rawContent = extractContent(resp)
+                if (rawContent.isNullOrBlank()) {
+                    val finish = try {
+                        resp.optJSONArray("choices")?.optJSONObject(0)?.optString("finish_reason")
+                    } catch (e: Exception) { null }
+                    val modelName = try { resp.optString("model").takeIf { it.isNotBlank() } ?: "?" } catch (e: Exception) { "?" }
+                    throw IllegalStateException(
+                        "Die KI hat keinen Text geliefert (Modell: $modelName, finish: $finish). Roh: ${text.take(300)}"
+                    )
+                }
+                val results = parseEvaluation(rawContent, settings.goals)
+                main.post { onResult(results) }
+            } catch (e: Exception) {
+                main.post { onError("${e.message ?: e.javaClass.simpleName}") }
+            }
+        }
+    }
+
     /** Ziele-Freitext von der KI in einzelne prägnante Ziele zerlegen lassen.
      *  onError bekommt einen mehrzeiligen Debug-Report inkl. Rohantwort. */
     fun splitGoals(

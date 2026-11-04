@@ -46,6 +46,7 @@
     <string name="main_discard">Discard without saving</string>
     <string name="main_open_history">Go to history</string>
     <string name="recent_notes_desc">Recent notes</string>
+    <string name="recent_notes_star_desc">Mark as favorite</string>
     <string name="main_new_photo">Take a new photo</string>
     <string name="nav_blocked_hint">Please save or discard the rating first.</string>
 
@@ -122,6 +123,17 @@
     <string name="prompt_split_intro">Split the following free text containing health goals into individual, self-contained goals.</string>
     <string name="prompt_split_rules">Rules: one goal per item, concise (max. 8 words), no numbering.</string>
     <string name="prompt_honesty">Be honest: don\'t invent anything – if unsure, it\'s better to leave something out.</string>
+    <string name="prompt_eval_intro_textonly">I sent my meal description as TEXT ONLY (no photo). Assess this meal with respect to each of the following goals:</string>
+    <string name="prompt_textonly_context">Meal description (no photo available):\n%1$s</string>
+    <string name="prompt_reeval_header">The user manually corrected the food recognition. Use this corrected description of the meal:\n%1$s</string>
+    <string name="nacherfassen_title">Add a meal</string>
+    <string name="nacherfassen_text">Retroactively record a meal for this day. How do you want to capture it?</string>
+    <string name="nacherfassen_with_photo">With photo</string>
+    <string name="nacherfassen_without_photo">Without photo</string>
+    <string name="nacherfassen_label">added retroactively</string>
+    <string name="nacherfassen_send">Send to AI</string>
+    <string name="nacherfassen_empty_hint">The description is required without a photo.</string>
+    <string name="reeval_progress">AI is re-evaluating the correction …</string>
 
     <!-- Default goals -->
     <string-array name="default_goals">

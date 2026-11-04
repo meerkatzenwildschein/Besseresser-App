@@ -3,6 +3,7 @@ package de.gurum.besseresser
 import android.content.Context
 import android.content.SharedPreferences
 import org.json.JSONArray
+import org.json.JSONObject
 
 /** Eine gemeinsame Prefs-Datei für Einstellungen UND Profil (lokal auf dem Gerät). */
 internal const val BETTERESSER_PREFS = "besseresser_prefs"
@@ -71,7 +72,7 @@ object ProfileStore {
         )
     }
 
-/** Leere Eingaben speichern als "nicht gesetzt" – das Profil darf komplett leer bleiben. */
+    /** Leere Eingaben speichern als "nicht gesetzt" – das Profil darf komplett leer bleiben. */
     fun save(
         ctx: Context,
         birthDateIso: String?,
@@ -90,26 +91,73 @@ object ProfileStore {
     }
 }
 
-/** Die letzten (max. 5) Anmerkungen aus dem Foto-Notizfeld – Schnellauswahl im Feld. */
+// ----------------------------------------------------------------- Notiz-Schnellauswahl (MRU + Favoriten)
+
+/** Eintrag der Schnellauswahl-Liste: Text + Favoriten-Sternchen.
+ *  Sternchen = dauerhaft in der Liste (bis abgewählt); ohne Stern rotieren max. 5 nach MRU. */
+data class RecentNote(val text: String, val starred: Boolean = false)
+
 object RecentNotesStore {
     private const val KEY = "recentNotes"
-    private const val MAX = 5
+    private const val MAX_UNSTARRED = 5
+    private const val MAX_TOTAL = 40
 
-    fun load(ctx: Context): List<String> = runCatching {
+    /** Liest die Liste: Display-Reihenfolge = Sternchen zuerst, dann unmarkierte MRU absteigend. */
+    fun load(ctx: Context): List<RecentNote> = runCatching {
         val raw = ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
             .getString(KEY, null) ?: return emptyList()
         val arr = JSONArray(raw)
-        (0 until arr.length()).mapNotNull { arr.optString(it).takeIf { s -> s.isNotBlank() } }
+        (0 until arr.length()).mapNotNull { i ->
+            val o = arr.opt(i)
+            when (o) {
+                is String -> RecentNote(o, false)   // Alt-Format ohne Sternchen
+                is JSONObject -> {
+                    val t = o.optString("t")
+                    if (t.isNotBlank()) RecentNote(t, o.optBoolean("s", false)) else null
+                }
+                else -> null
+            }
+        }
     }.getOrDefault(emptyList())
 
-    /** Nach vorne stellen (Dedup), ältere Einträge rutschen nach unten und ab dem 5. raus. */
+    /** Nach vorne stellen (Dedup); unmarkierte rotieren max. 5 nach MRU, älteste fliegt raus.
+     *  Sternchen-Einträge bleiben immer erhalten (bis abgewählt). */
     fun push(ctx: Context, note: String) {
         val t = note.trim()
         if (t.isBlank()) return
-        val others = load(ctx).filter { it != t }.take(MAX - 1)
+        val all = load(ctx)
+        val starred = all.filter { it.starred && it.text != t }
+        val unstarred = listOf(RecentNote(t, false)) + all.filter { !it.starred && it.text != t }
+        write(ctx, starred + unstarred.take(MAX_UNSTARRED))
+    }
+
+    /** Sternchen umschalten (beim Antippen des Sterns im Dropdown).
+     *  Nach dem ABWÄHLEN gilt die 5er-MRU-Regel: der frisch freigestellte Eintrag ist
+     *  der neueste, die ÄLTESTE unmarkierte fliegt raus. */
+    fun toggleStar(ctx: Context, noteText: String) {
+        val t = noteText.trim()
+        if (t.isBlank()) return
+        val all = load(ctx)
+        val nowStarred = !(all.firstOrNull { it.text == t }?.starred ?: false)
+        val rest = all.filter { it.text != t }
+        val list = if (nowStarred) {
+            listOf(RecentNote(t, true)) + rest
+        } else {
+            val starred = rest.filter { it.starred }
+            val unstarred = listOf(RecentNote(t, false)) + rest.filter { !it.starred }
+            starred + unstarred.take(MAX_UNSTARRED)
+        }
+        write(ctx, list)
+    }
+
+    private fun write(ctx: Context, notes: List<RecentNote>) {
         val arr = JSONArray().apply {
-            put(t)
-            others.forEach { put(it) }
+            notes.distinctBy { it.text }.take(MAX_TOTAL).forEach { n ->
+                put(JSONObject().apply {
+                    put("t", n.text)
+                    put("s", n.starred)
+                })
+            }
         }
         ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY, arr.toString())

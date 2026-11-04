@@ -46,6 +46,7 @@
     <string name="main_discard">Ohne Speichern verwerfen</string>
     <string name="main_open_history">Zum Verlauf</string>
     <string name="recent_notes_desc">Letzte Eingaben</string>
+    <string name="recent_notes_star_desc">Als Favorit markieren</string>
     <string name="main_new_photo">Neues Foto aufnehmen</string>
     <string name="nav_blocked_hint">Bitte speichere oder verwerfe die Bewertung erst.</string>
 
@@ -122,6 +123,17 @@
     <string name="prompt_split_intro">Teile den folgenden Freitext mit Gesundheitszielen in einzelne, eigenständige Ziele auf.</string>
     <string name="prompt_split_rules">Regeln: jedes Ziel ein eigener Punkt, prägnant (maximal 8 Worte), ohne Nummerierung.</string>
     <string name="prompt_honesty">Sei ehrlich, erfinde nichts sondern lasse lieber etwas weg.</string>
+    <string name="prompt_eval_intro_textonly">Ich habe meine Mahlzeit als NUR TEXT (kein Foto) beschrieben. Bewerte diese Mahlzeit im Hinblick auf jedes der folgenden Ziele:</string>
+    <string name="prompt_textonly_context">Beschreibung der Mahlzeit (kein Foto vorhanden):\n%1$s</string>
+    <string name="prompt_reeval_header">Der Nutzer hat die Erkennung manuell korrigiert. Arbeite mit dieser korrekten Beschreibung des Essens:\n%1$s</string>
+    <string name="nacherfassen_title">Essen nachtragen</string>
+    <string name="nacherfassen_text">Für diesen Tag ein weiteres Essen nachträglich erfassen. Wie möchtest du erfassen?</string>
+    <string name="nacherfassen_with_photo">Mit Foto</string>
+    <string name="nacherfassen_without_photo">Ohne Foto</string>
+    <string name="nacherfassen_label">nachträglich erfasst</string>
+    <string name="nacherfassen_send">An die KI senden</string>
+    <string name="nacherfassen_empty_hint">Ohne Foto ist die Beschreibung Pflicht.</string>
+    <string name="reeval_progress">KI bewertet die Korrektur neu …</string>
 
     <!-- Default goals -->
     <string-array name="default_goals">

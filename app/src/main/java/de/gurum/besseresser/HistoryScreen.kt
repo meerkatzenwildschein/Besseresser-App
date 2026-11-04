@@ -1,7 +1,11 @@
 package de.gurum.besseresser
 
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -13,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -53,10 +58,14 @@ private data class DayGroup(
     val entries: List<HistoryEntry>
 )
 
-/** Mahlzeiten-Zeilen für den Tagesfazit-Prompt: „HH:mm · Erkanntes mit Menge · Anmerkung“. */
+/** Mahlzeiten-Zeilen für den Tagesfazit-Prompt: „HH:mm · Erkanntes mit Menge · Anmerkung“;
+ *  nachgetragene Einträge ohne echte Uhrzeit → Label „nachträglich erfasst“. */
 fun dayFazitMealLines(ctx: android.content.Context, entriesOfDay: List<HistoryEntry>): List<String> =
     entriesOfDay.sortedBy { it.dateMillis }.map { e ->
-        val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(e.dateMillis))
+        val time = if (e.backdated)
+            ctx.getString(R.string.nacherfassen_label)
+        else
+            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(e.dateMillis))
         val recog = e.erkannt.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
         var line = "$time · $recog"
         e.note.takeIf { it.isNotBlank() }
@@ -101,6 +110,57 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
         } else {
             weekFazit = wf
         }
+    }
+
+    // ------------------------------------------------- Nacherfassen (Essen nachtragen für einen Tag)
+    var addDialogForDay by remember { mutableStateOf<LocalDate?>(null) }
+    var addCaptureWithPhoto by remember { mutableStateOf(false) }   // false = nur Text (Pflichtfeld)
+    var showAddCamera by remember { mutableStateOf(false) }
+    var showAddReview by remember { mutableStateOf(false) }         // Foto-Prüfen-Zweig (Fallback + eigener Fluss)
+    var showAddText by remember { mutableStateOf(false) }           // Ohne-Foto-Zweig
+    var showAddBusyCard by remember { mutableStateOf(false) }
+    var addNote by remember { mutableStateOf("") }
+    var addTargetDay by remember { mutableStateOf<LocalDate?>(null) }
+
+    val addPhotoFile = remember {
+        File(ctx.cacheDir, "photos").also { it.mkdirs() }
+            .let { d -> File(d, "essen_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg") }
+    }
+    val addPhotoUri: Uri = remember {
+        androidx.core.content.FileProvider.getUriForFile(ctx, "de.gurum.besseresser.fileprovider", addPhotoFile)
+    }
+    val addSystemCameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { ok ->
+        if (ok) {
+            showAddReview = true
+        }
+    }
+    BackHandler(enabled = showAddCamera) { showAddCamera = false }
+    BackHandler(enabled = showAddReview) { showAddReview = false }
+    BackHandler(enabled = showAddText) { showAddText = false }
+
+    /** Speichern eines nachgetragenen Essens: Tagesfazit + Wochenfazit werden VERWORFEN
+     *  (dort neu nur manuell per Chip bzw. Auto-Regel ab 18 Uhr), Eintrag → Detailansicht. */
+    fun saveBackdatedEntry(ev: Evaluation, photoUriIn: Uri?) {
+        val day = addTargetDay ?: return
+        val millis = day.atTime(23, 59).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val entry = HistoryStore.add(
+            ctx = ctx, photoUri = photoUriIn, ev = ev,
+            note = addNote.trim(), dateOverride = millis, backdated = true
+        )
+        DayFazitStore.deleteForEntry(ctx, entry)   // Tagesfazit KOMPLETT verworfen (nicht „veraltet“)
+        WeekFazitStore.deleteForEntry(ctx, entry)  // 3.2: Wochenfazit ebenfalls verworfen
+        RecentNotesStore.push(ctx, addNote.trim())
+        entries = HistoryStore.entries(ctx)
+        // Overlay-Zustände schließen
+        showAddCamera = false
+        showAddReview = false
+        showAddText = false
+        showAddBusyCard = false
+        addNote = ""
+        addTargetDay = null
+        onPick(entry)   // Detailansicht des neu erfassten Essens (Zurück → Liste → Hauptbildschirm)
     }
 
     fun generateFazit(day: LocalDate, entriesOfDay: List<HistoryEntry>) {
@@ -241,7 +301,7 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
             icon = Icons.Filled.DateRange
         )
 
-        if (entries.isEmpty()) {
+        if (entries.isEmpty() && !showAddCamera && !showAddReview && !showAddText) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     stringResource(R.string.history_empty),
@@ -249,6 +309,111 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        } else if (showAddCamera) {
+            // Nacherfassen MIT Foto: gleicher Capture-Screen wie beim „Essen fotografieren“
+            CameraCaptureScreen(
+                outputFile = addPhotoFile,
+                note = addNote,
+                onNoteChange = { addNote = it },
+                onCancel = { showAddCamera = false },
+                onFallbackSystemCamera = {
+                    showAddCamera = false
+                    addSystemCameraLauncher.launch(addPhotoUri)
+                },
+                onConfirm = {
+                    showAddCamera = false
+                    showAddBusyCard = true
+                    val prompts = PromptBundle(
+                        intro = ctx.getString(R.string.prompt_eval_intro),
+                        formatIntro = ctx.getString(R.string.prompt_eval_format),
+                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                        recognized = ctx.getString(R.string.prompt_eval_recognized),
+                        honesty = ctx.getString(R.string.prompt_honesty),
+                        noteHeader = if (addNote.isNotBlank())
+                            ctx.getString(R.string.prompt_note_header, addNote)
+                        else ""
+                    )
+                    ApiClient.analyze(
+                        ctx = ctx,
+                        photoUri = addPhotoUri,
+                        settings = settings,
+                        promptBundle = prompts,
+                        onResult = {
+                            showAddBusyCard = false
+                            saveBackdatedEntry(it, addPhotoUri)
+                        },
+                        onError = { msg ->
+                            showAddBusyCard = false
+                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                        }
+                    )
+                }
+            )
+        } else if (showAddReview) {
+            // Fallback-Zweig: Foto per Systemkamera → prüfen + Anmerkung → bewerten
+            AddMealReviewScreen(
+                photoUri = addPhotoUri,
+                note = addNote,
+                onNoteChange = { addNote = it },
+                onBack = { showAddReview = false },
+                busy = showAddBusyCard,
+                onRate = {
+                    showAddBusyCard = true
+                    val prompts = PromptBundle(
+                        intro = ctx.getString(R.string.prompt_eval_intro),
+                        formatIntro = ctx.getString(R.string.prompt_eval_format),
+                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                        recognized = ctx.getString(R.string.prompt_eval_recognized),
+                        honesty = ctx.getString(R.string.prompt_honesty),
+                        noteHeader = if (addNote.isNotBlank())
+                            ctx.getString(R.string.prompt_note_header, addNote.trim())
+                        else ""
+                    )
+                    ApiClient.analyze(
+                        ctx = ctx,
+                        photoUri = addPhotoUri,
+                        settings = settings,
+                        promptBundle = prompts,
+                        onResult = {
+                            showAddBusyCard = false
+                            saveBackdatedEntry(it, addPhotoUri)
+                        },
+                        onError = { msg ->
+                            showAddBusyCard = false
+                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                        }
+                    )
+                }
+            )
+        } else if (showAddText) {
+            // Nacherfassen OHNE Foto: Beschreibung ist Pflicht; Text-only-KI-Aufruf
+            AddMealNoPhotoScreen(
+                day = addTargetDay,
+                note = addNote,
+                onNoteChange = { addNote = it },
+                onBack = { showAddText = false },
+                busy = showAddBusyCard,
+                onSend = {
+                    showAddBusyCard = true
+                    ApiClient.analyzeText(
+                        ctx = ctx,
+                        settings = settings,
+                        userDescription = addNote.trim(),
+                        onResult = {
+                            showAddBusyCard = false
+                            saveBackdatedEntry(it, null)
+                        },
+                        onError = { msg ->
+                            showAddBusyCard = false
+                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                        }
+                    )
+                }
+            )
         } else {
             Text(
                 stringResource(R.string.history_list_hint, entries.size),
@@ -276,7 +441,8 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                                 if (dayKey in expandedFazits) expandedFazits.remove(dayKey)
                                 else expandedFazits.add(dayKey)
                             },
-                            onGenerate = { generateFazit(group.day, group.entries) }
+                            onGenerate = { generateFazit(group.day, group.entries) },
+                            onAddMeal = { addDialogForDay = group.day }
                         )
                         when {
                             loadingFazit -> Text(
@@ -356,6 +522,36 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                     }
                 }
             }
+        }
+
+        // Nachtrage-Dialog: Mit Foto / Ohne Foto (für die + Taste je Tagesleiste)
+        addDialogForDay?.let { day ->
+            AlertDialog(
+                onDismissRequest = { addDialogForDay = null },
+                title = { Text(stringResource(R.string.nacherfassen_title)) },
+                text = {
+                    Text(
+                        stringResource(R.string.nacherfassen_text) + "\n" +
+                            day.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        addTargetDay = day
+                        addDialogForDay = null
+                        addNote = ""
+                        showAddCamera = true
+                    }) { Text(stringResource(R.string.nacherfassen_with_photo)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        addTargetDay = day
+                        addDialogForDay = null
+                        addNote = ""
+                        showAddText = true
+                    }) { Text(stringResource(R.string.nacherfassen_without_photo)) }
+                }
+            )
         }
     }
 }
@@ -458,7 +654,136 @@ private fun WeekFazitRow(
     }
 }
 
-/** Kopfzeile einer Tagesgruppe: Datum links, Tagesfazit-Chip rechts (Zustandsmaschine). */@Composable
+/** Nachtrage-Zweig MIT Foto (Systemkamera-Fallback): Foto prüfen + Anmerkung → bewerten.
+ *  Kein Abschluss-/Speichern-Screen: das Ergebnis geht direkt ins Tagesdatum. */
+@Composable
+private fun AddMealReviewScreen(
+    photoUri: Uri,
+    note: String,
+    onNoteChange: (String) -> Unit,
+    onBack: () -> Unit,
+    busy: Boolean,
+    onRate: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            TopBarRow(title = stringResource(R.string.review_title), onBack = onBack, trailing = { })
+            val reviewCtx = LocalContext.current
+            val bmp = remember(photoUri) {
+                try {
+                    BitmapFactory.decodeStream(reviewCtx.contentResolver.openInputStream(photoUri))
+                } catch (e: Exception) { null }
+            }
+            if (bmp != null) {
+                Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                    Image(
+                        bitmap = bmp.asImageBitmap(),
+                        contentDescription = stringResource(R.string.photo_of_meal),
+                        modifier = Modifier.fillMaxWidth().height(280.dp)
+                    )
+                }
+            }
+            if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(
+                value = note,
+                onValueChange = onNoteChange,
+                placeholder = { Text(stringResource(R.string.main_note_placeholder)) },
+                trailingIcon = { RecentNotesButton(onPick = onNoteChange) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 1,
+                maxLines = 4
+            )
+            Spacer(Modifier.height(100.dp))
+        }
+        Button(
+            onClick = onRate,
+            enabled = !busy,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+                .fillMaxWidth()
+                .height(56.dp)
+        ) {
+            Text(stringResource(if (busy) R.string.main_ai_working else R.string.main_rate_now), fontSize = 17.sp)
+        }
+    }
+}
+
+/** Nachtrage-Zweig OHNE Foto: Beschreibung ist PFLICHT (deshalb Button erst mit Text), Text-only KI. */
+@Composable
+private fun AddMealNoPhotoScreen(
+    day: LocalDate?,
+    note: String,
+    onNoteChange: (String) -> Unit,
+    onBack: () -> Unit,
+    busy: Boolean,
+    onSend: () -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            TopBarRow(
+                title = stringResource(R.string.nacherfassen_title),
+                onBack = onBack,
+                trailing = { },
+                icon = Icons.Filled.Add
+            )
+            Text(
+                (day?.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")) ?: "") +
+                    " · " + stringResource(R.string.nacherfassen_without_photo),
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                stringResource(R.string.nacherfassen_empty_hint),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            OutlinedTextField(
+                value = note,
+                onValueChange = onNoteChange,
+                placeholder = { Text(stringResource(R.string.main_note_placeholder)) },
+                trailingIcon = { RecentNotesButton(onPick = onNoteChange) },
+                minLines = 3,
+                maxLines = 6,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(100.dp))
+        }
+        Button(
+            onClick = onSend,
+            enabled = !busy && note.isNotBlank(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+                .fillMaxWidth()
+                .height(56.dp)
+        ) {
+            Text(
+                stringResource(
+                    if (busy) R.string.main_ai_working else R.string.nacherfassen_send
+                ),
+                fontSize = 17.sp
+            )
+        }
+    }
+}
+
+/** Kopfzeile einer Tagesgruppe: Datum links, Tagesfazit-Chip rechts (Zustandsmaschine);
+ *  „+"-Taste zum Nachtragen eines Essens für genau diesen Tag. */
+@Composable
 private fun DayGroupHeader(
     date: LocalDate,
     fazit: DayFazit?,
@@ -466,7 +791,8 @@ private fun DayGroupHeader(
     stale: Boolean,
     expanded: Boolean,
     onToggleExpand: () -> Unit,
-    onGenerate: () -> Unit
+    onGenerate: () -> Unit,
+    onAddMeal: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -480,6 +806,16 @@ private fun DayGroupHeader(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
         )
+        if (onAddMeal != null) {
+            IconButton(onClick = onAddMeal, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.nacherfassen_title),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
         when {
             loading -> Surface(
                 shape = RoundedCornerShape(18.dp),
@@ -604,10 +940,14 @@ private fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    SimpleDateFormat("HH:mm", Locale.getDefault())
-                        .format(Date(entry.dateMillis)),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold
+                    if (entry.backdated)
+                        stringResource(R.string.nacherfassen_label)   // keine echte Uhrzeit bekannt
+                    else
+                        SimpleDateFormat("HH:mm", Locale.getDefault())
+                            .format(Date(entry.dateMillis)),
+                    fontSize = if (entry.backdated) 12.sp else 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontStyle = if (entry.backdated) FontStyle.Italic else FontStyle.Normal
                 )
                 if (entry.erkannt.isNotBlank()) {
                     Text(
@@ -696,15 +1036,64 @@ fun ScoreBadge(entry: HistoryEntry) {
 // ----------------------------------------------------------------- Detail-Screen
 
 @Composable
-fun HistoryDetailScreen(entry: HistoryEntry, onBack: () -> Unit) {
+fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> Unit) {
     val ctx = LocalContext.current
     // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
     BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf(false) }
     var showErkanntEdit by remember { mutableStateOf(false) }
+    var reEvalBusy by remember { mutableStateOf(false) }
     var current by remember { mutableStateOf(entry) }
     val thumb = remember(entry.id) {
         HistoryStore.photoFileOf(ctx, entry)?.let { decodeThumb(it, target = 1280) }
+    }
+
+    /** Re-Bewertung nach erkannt-Korrektur: Mit Foto wenn vorhanden, sonst text-only.
+     *  Ziele + Gesamteindruck werden 1:1 ersetzt; Tages-/Wochenfazit werden verworfen. */
+    fun reEvaluate(correctedText: String) {
+        val photoFile = HistoryStore.photoFileOf(ctx, current)
+        val photoUri = photoFile?.let {
+            androidx.core.content.FileProvider.getUriForFile(ctx, "de.gurum.besseresser.fileprovider", it)
+        }
+        reEvalBusy = true
+        val onDone: (Evaluation) -> Unit = { ev ->
+            HistoryStore.updateEvaluation(ctx, current.id, ev.goalResults, ev.summary)
+            current = current.copy(goalResults = ev.goalResults, summary = ev.summary)
+            DayFazitStore.deleteForEntry(ctx, current)
+            WeekFazitStore.deleteForEntry(ctx, current)
+            reEvalBusy = false
+        }
+        val onFail: (String) -> Unit = { msg ->
+            Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_LONG).show()
+            reEvalBusy = false
+        }
+        if (photoUri != null) {
+            ApiClient.analyze(
+                ctx = ctx,
+                photoUri = photoUri,
+                settings = settings,
+                promptBundle = PromptBundle(   // korrigierte Erkennung als Nutzer-Information in den Prompt
+                    intro = ctx.getString(R.string.prompt_eval_intro),
+                    formatIntro = ctx.getString(R.string.prompt_eval_format),
+                    ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                    exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                    responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                    recognized = ctx.getString(R.string.prompt_eval_recognized),
+                    honesty = ctx.getString(R.string.prompt_honesty),
+                    noteHeader = ctx.getString(R.string.prompt_reeval_header, correctedText)
+                ),
+                onResult = onDone,
+                onError = onFail
+            )
+        } else {
+            ApiClient.analyzeText(
+                ctx = ctx,
+                settings = settings,
+                userDescription = correctedText,
+                onResult = onDone,
+                onError = onFail
+            )
+        }
     }
 
     Column(
@@ -715,7 +1104,11 @@ fun HistoryDetailScreen(entry: HistoryEntry, onBack: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         TopBarRow(
-            title = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(entry.dateMillis)),
+            title = if (current.backdated)
+                SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(current.dateMillis)) +
+                    " · " + stringResource(R.string.nacherfassen_label)
+            else
+                SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(current.dateMillis)),
             onBack = onBack,
             trailing = {
                 IconButton(onClick = { confirmDelete = true }) {
@@ -736,6 +1129,21 @@ fun HistoryDetailScreen(entry: HistoryEntry, onBack: () -> Unit) {
                         .fillMaxWidth()
                         .height(230.dp)
                 )
+            }
+        }
+
+        if (reEvalBusy) {
+            // Re-Bewertung durch KI läuft (nach erkannt-Korrektur)
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Text(stringResource(R.string.reeval_progress), fontSize = 13.sp)
+                }
             }
         }
 
@@ -763,6 +1171,7 @@ fun HistoryDetailScreen(entry: HistoryEntry, onBack: () -> Unit) {
                 HistoryStore.updateErkannt(ctx, current.id, newText)
                 current = current.copy(erkannt = newText)
                 showErkanntEdit = false
+                if (newText.isNotBlank() && !reEvalBusy) reEvaluate(newText)   // 1: KI bewertet Korrektur erneut
             },
             onDismiss = { showErkanntEdit = false }
         )

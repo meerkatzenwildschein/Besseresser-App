@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -254,9 +255,26 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             recent.forEach { n ->
                 DropdownMenuItem(
+                    leadingIcon = {
+                        // Sternchen = Favorit: ausgefüllt/umrissen; Toggle schließt das Menü NICHT
+                        IconButton(onClick = {
+                            RecentNotesStore.toggleStar(ctx, n.text)
+                            recent = RecentNotesStore.load(ctx)
+                        }, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Filled.Star,
+                                contentDescription = stringResource(R.string.recent_notes_star_desc),
+                                // Core-Library kennt nur den gefüllten Stern: Favorit = primary-farbig,
+                                // unmarkiert = deselect-dimmed grau statt Umriss
+                                tint = if (n.starred) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    },
                     text = {
                         Text(
-                            n,
+                            n.text,
                             fontSize = 12.sp,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
@@ -264,9 +282,9 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
                     },
                     onClick = {
                         open = false
-                        RecentNotesStore.push(ctx, n)   // Auswahl rutscht nach oben
+                        RecentNotesStore.push(ctx, n.text)   // Auswahl rutscht nach oben (MRU)
                         recent = RecentNotesStore.load(ctx)
-                        onPick(n)
+                        onPick(n.text)
                     }
                 )
             }
