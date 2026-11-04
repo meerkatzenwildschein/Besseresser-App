@@ -260,10 +260,14 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
                     leadingIcon = {
                         // Sternchen = Favorit: ausgefüllt/umrissen; Toggle schließt das Menü NICHT
                         IconButton(onClick = {
-                            // WICHTIG: unsortiertes Nachladen (Positionsreihenfolge) —
-                            // der Stern darf den Eintrag NICHT sofort nach oben springen lassen
-                            RecentNotesStore.toggleStar(ctx, n.text)
-                            recent = RecentNotesStore.load(ctx, sortStarredFirst = false)
+                            // Eintrag vesconcem in der SICHTBAREN Liste kippen und genau diese
+                            // Reihenfolge persistieren — kein Laden/Sortieren zwischendurch,
+                            // sonst springt der Eintrag (unds dass sortierende load() lagern lässt)
+                            val updated = recent.map {
+                                if (it.text == n.text) RecentNote(it.text, !it.starred) else it
+                            }
+                            RecentNotesStore.save(ctx, updated)
+                            recent = updated
                         }, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 Icons.Filled.Star,

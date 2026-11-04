@@ -158,6 +158,11 @@ object RecentNotesStore {
         write(ctx, list)
     }
 
+    /** Sichtbaren Zustand persistieren (vom UI geführt, damit Klicks nichts umsortieren). */
+    fun save(ctx: Context, notes: List<RecentNote>) {
+        write(ctx, notes)
+    }
+
     private fun write(ctx: Context, notes: List<RecentNote>) {
         val arr = JSONArray().apply {
             notes.distinctBy { it.text }.take(MAX_TOTAL).forEach { n ->
