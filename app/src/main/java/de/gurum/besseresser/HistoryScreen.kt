@@ -1052,9 +1052,10 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
      *  Ziele + Gesamteindruck werden 1:1 ersetzt; Tages-/Wochenfazit werden verworfen. */
     fun reEvaluate(correctedText: String) {
         val photoFile = HistoryStore.photoFileOf(ctx, current)
-        val photoUri = photoFile?.let {
-            androidx.core.content.FileProvider.getUriForFile(ctx, "de.gurum.besseresser.fileprovider", it)
-        }
+        // Acht-Pitfall: KEIN FileProvider für gespeicherte Fotos! Dessen file_paths.xml mappt
+        // nur cache-path/photos – getUriForFile auf filesDir/history wirft IllegalArgumentException
+        // (Crash nach Pencil-OK). analyzer liest intern via openInputStream: file://-Uri reicht.
+        val photoUri = photoFile?.let { Uri.fromFile(it) }
         reEvalBusy = true
         val onDone: (Evaluation) -> Unit = { ev ->
             HistoryStore.updateEvaluation(ctx, current.id, ev.goalResults, ev.summary)
