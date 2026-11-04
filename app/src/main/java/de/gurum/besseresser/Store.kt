@@ -102,9 +102,10 @@ object RecentNotesStore {
     private const val MAX_UNSTARRED = 5
     private const val MAX_TOTAL = 40
 
-    /** Liest die Liste: Sternchen zuerst, dann unmarkierte (MRU, auf max. 5 gekürzt –
-     *  die ältesten unmarkierten fallen still heraus). */
-    fun load(ctx: Context): List<RecentNote> = runCatching {
+    /** Liest die Liste. sortStarredFirst = true (Standard): Sternchen zuerst, dann unmarkierte
+     *  (MRU-Anzeige beim Öffnen). false = exakt die gespeicherte Reihenfolge — für den
+     *  Stern-Klick inPlace (kein Hüpfen beim Markieren). Unmarkierte immer max. 5. */
+    fun load(ctx: Context, sortStarredFirst: Boolean = true): List<RecentNote> = runCatching {
         val raw = ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
             .getString(KEY, null) ?: return emptyList()
         val arr = JSONArray(raw)
@@ -119,9 +120,16 @@ object RecentNotesStore {
                 else -> null
             }
         }
-        val starred = parsed.filter { it.starred }
-        val unstarred = parsed.filter { !it.starred }.take(MAX_UNSTARRED)
-        starred + unstarred
+        if (sortStarredFirst) {
+            val starred = parsed.filter { it.starred }
+            val unstarred = parsed.filter { !it.starred }.take(MAX_UNSTARRED)
+            starred + unstarred
+        } else {
+            val capped = parsed.partition { it.starred }
+            // Positionen BLIEBEN; die 5er-Grenze für unmarkierte greift trotzdem
+            val keepLast = capped.second.take(MAX_UNSTARRED)
+            capped.first + keepLast
+        }
     }.getOrDefault(emptyList())
 
     /** Nach vorne stellen (Dedup); unmarkierte rotieren max. 5 nach MRU, älteste fliegt raus.

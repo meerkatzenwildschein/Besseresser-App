@@ -260,8 +260,10 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
                     leadingIcon = {
                         // Sternchen = Favorit: ausgefüllt/umrissen; Toggle schließt das Menü NICHT
                         IconButton(onClick = {
+                            // WICHTIG: unsortiertes Nachladen (Positionsreihenfolge) —
+                            // der Stern darf den Eintrag NICHT sofort nach oben springen lassen
                             RecentNotesStore.toggleStar(ctx, n.text)
-                            recent = RecentNotesStore.load(ctx)
+                            recent = RecentNotesStore.load(ctx, sortStarredFirst = false)
                         }, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 Icons.Filled.Star,
