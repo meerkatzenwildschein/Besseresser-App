@@ -110,21 +110,9 @@ fun MainScreen(settings: Settings, profile: Profile, onEditSettings: () -> Unit,
     }
 
     // Android-Zurück-Button: Overlay-Ebenen der Aufnahme schließen, statt die App zu beenden.
-    // Gleiche Wirkung wie die On-Screen-Zurückpfeile: Kamera ohne Bewerten verlassen; Review
-    // verwirft Foto + Anmerkung + Fehler.
+    // (Die definitive Version lebt in den Screens selbst: CameraCaptureScreen + Review-Flows
+    // registrieren ihre Handler in der inneren Composition → sie gewinnen zuverlässig.)
     BackHandler(enabled = showCamera) { showCamera = false }
-    BackHandler(enabled = showReview) {
-        showReview = false
-        photoPreview = null
-        note = ""
-        error = null
-    }
-    BackHandler(enabled = showReview) {
-        showReview = false
-        photoPreview = null
-        note = ""
-        error = null
-    }
 
     Box(
         modifier = Modifier
