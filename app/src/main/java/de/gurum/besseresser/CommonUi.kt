@@ -239,7 +239,9 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
     Box {
         IconButton(
             onClick = {
-                recent = RecentNotesStore.load(ctx)
+                // Anzeigereihenfolge NUR beim Öffnen: Sternchen nach oben (in-place-Toggling
+                // darf nicht hüpfen), unmarkierte behalten ihre MRU-Reihenfolge
+                recent = RecentNotesStore.load(ctx).sortedByDescending { it.starred }
                 open = true
             },
             enabled = recent.isNotEmpty(),

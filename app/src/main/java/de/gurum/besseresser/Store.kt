@@ -102,12 +102,13 @@ object RecentNotesStore {
     private const val MAX_UNSTARRED = 5
     private const val MAX_TOTAL = 40
 
-    /** Liest die Liste: Display-Reihenfolge = Sternchen zuerst, dann unmarkierte MRU absteigend. */
+    /** Liest die Liste: Sternchen zuerst, dann unmarkierte (MRU, auf max. 5 gekürzt –
+     *  die ältesten unmarkierten fallen still heraus). */
     fun load(ctx: Context): List<RecentNote> = runCatching {
         val raw = ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
             .getString(KEY, null) ?: return emptyList()
         val arr = JSONArray(raw)
-        (0 until arr.length()).mapNotNull { i ->
+        val parsed = (0 until arr.length()).mapNotNull { i ->
             val o = arr.opt(i)
             when (o) {
                 is String -> RecentNote(o, false)   // Alt-Format ohne Sternchen
@@ -118,6 +119,9 @@ object RecentNotesStore {
                 else -> null
             }
         }
+        val starred = parsed.filter { it.starred }
+        val unstarred = parsed.filter { !it.starred }.take(MAX_UNSTARRED)
+        starred + unstarred
     }.getOrDefault(emptyList())
 
     /** Nach vorne stellen (Dedup); unmarkierte rotieren max. 5 nach MRU, älteste fliegt raus.
@@ -131,22 +135,18 @@ object RecentNotesStore {
         write(ctx, starred + unstarred.take(MAX_UNSTARRED))
     }
 
-    /** Sternchen umschalten (beim Antippen des Sterns im Dropdown).
-     *  Nach dem ABWÄHLEN gilt die 5er-MRU-Regel: der frisch freigestellte Eintrag ist
-     *  der neueste, die ÄLTESTE unmarkierte fliegt raus. */
+    /** Sternchen umschalten (beim Antippen des Sterns im Dropdown) — OHNE Neusortierung:
+     *  der Eintrag bleibt an seiner Stelle stehen; die Anzeige sortiert (Sternchen oben)
+     *  erst beim nächsten Öffnen der Liste. Persistenz folgt der neuen Markierung. */
     fun toggleStar(ctx: Context, noteText: String) {
         val t = noteText.trim()
         if (t.isBlank()) return
-        val all = load(ctx)
-        val nowStarred = !(all.firstOrNull { it.text == t }?.starred ?: false)
-        val rest = all.filter { it.text != t }
-        val list = if (nowStarred) {
-            listOf(RecentNote(t, true)) + rest
-        } else {
-            val starred = rest.filter { it.starred }
-            val unstarred = listOf(RecentNote(t, false)) + rest.filter { !it.starred }
-            starred + unstarred.take(MAX_UNSTARRED)
+        val list = load(ctx).map {
+            if (it.text == t) RecentNote(it.text, !it.starred) else it
         }
+        // Beim ABWÄHLEN gilt die 5er-MRU-Regel: der frisch freigestellte Eintrag ist der
+        // neueste an seiner Position – die ÄLTESTE unmarkierte fliegt (erst beim nächsten
+        // Öffnen sichtbar) raus.
         write(ctx, list)
     }
 
