@@ -20,7 +20,8 @@ data class HistoryEntry(
     val goalResults: List<GoalResult>,
     val summary: String,
     val note: String = "",          // Nutzer-Anmerkung zum Foto (WhatsApp-Stil)
-    val erkannt: String = ""        // Was die KI auf dem Foto erkannt zu haben meint
+    val erkannt: String = "",       // Was die KI auf dem Foto erkannt zu haben meint
+    val backdated: Boolean = false  // nachträglich erfasst (keine echte Uhrzeit bekannt)
 ) {
     /** Ampel-Score 0..100 (gruen=100, gelb=50, rot=0, grau ausgeschlossen); -1 = nicht bewertbar. */
     val score: Int
@@ -49,18 +50,34 @@ object HistoryStore {
             ?.let { File(dir(ctx), it) }
             ?.takeIf { it.exists() }
 
-    /** Speichert Bewertung + verkleinertes Foto (typisch < 100 KB). Foto-Verarbeitung darf scheitern (dann ohne Thumbnail). */
-    fun add(ctx: Context, photoUri: Uri, ev: Evaluation, note: String = ""): HistoryEntry {
+    /** Speichert Bewertung + verkleinertes Foto (typisch < 100 KB). Foto-Verarbeitung darf scheitern (dann ohne Thumbnail).
+     *  photoUri = null → Eintrag OHNE Foto (Nacherfassung „ohne Foto“).
+     *  dateOverride + backdated: nachträgliche Erfassung für ein bestimmtes Tagesdatum. */
+    fun add(
+        ctx: Context,
+        photoUri: Uri?,
+        ev: Evaluation,
+        note: String = "",
+        dateOverride: Long? = null,
+        backdated: Boolean = false
+    ): HistoryEntry {
         val id = System.currentTimeMillis()
+        val date = dateOverride ?: id
         var photoFile = ""
-        try {
-            val f = File(dir(ctx), "$id.jpg")
-            saveScaledJpeg(ctx, photoUri, f)
-            photoFile = if (f.exists() && f.length() > 0) f.name else ""
-        } catch (e: Exception) {
-            photoFile = ""
+        if (photoUri != null) {
+            try {
+                val f = File(dir(ctx), "$id.jpg")
+                saveScaledJpeg(ctx, photoUri, f)
+                photoFile = if (f.exists() && f.length() > 0) f.name else ""
+            } catch (e: Exception) {
+                photoFile = ""
+            }
         }
-        val entry = HistoryEntry(id, id, photoFile, ev.goalResults, ev.summary, note, ev.erkannt)
+        val entry = HistoryEntry(
+            id = id, dateMillis = date, photoFile = photoFile,
+            goalResults = ev.goalResults, summary = ev.summary,
+            note = note, erkannt = ev.erkannt, backdated = backdated
+        )
         File(dir(ctx), "$id.json").writeText(toJson(entry).toString())
         return entry
     }
@@ -88,7 +105,8 @@ object HistoryStore {
                     goalResults = goals,
                     summary = o.optString("zusatz"),
                     note = o.optString("anmerkung"),
-                    erkannt = o.optString("erkannt")
+                    erkannt = o.optString("erkannt"),
+                    backdated = o.optBoolean("nacherfasst", false)
                 )
             } catch (e: Exception) {
                 null
@@ -116,6 +134,31 @@ object HistoryStore {
             f.writeText(o.toString())
         } catch (e: Exception) {
             // Snapshot unverändert lassen, wenn das Umschreiben scheitert
+        }
+    }
+
+    /** Ziele + Gesamteindruck eines Eintrags neu schreiben (KI-Re-Bewertung nach Korrektur). */
+    fun updateEvaluation(ctx: Context, id: Long, goalResults: List<GoalResult>, summary: String) {
+        val f = File(dir(ctx), "$id.json")
+        if (!f.exists()) return
+        try {
+            val o = JSONObject(f.readText())
+            o.put(
+                "ziele",
+                JSONArray().also { arr ->
+                    goalResults.forEach { g ->
+                        arr.put(JSONObject().apply {
+                            put("ziel", g.goal)
+                            put("ampel", g.ampel)
+                            put("begruendung", g.begruendung)
+                        })
+                    }
+                }
+            )
+            o.put("zusatz", summary)
+            f.writeText(o.toString())
+        } catch (e: Exception) {
+            // bei Fehler bleibt der alte Stand bestehen
         }
     }
 
@@ -147,6 +190,7 @@ object HistoryStore {
         put("foto", e.photoFile)
         put("zusatz", e.summary)
         put("anmerkung", e.note)
+        put("nacherfasst", e.backdated)
         put("erkannt", e.erkannt)
         put(
             "ziele",

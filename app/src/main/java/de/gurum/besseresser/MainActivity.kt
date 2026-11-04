@@ -173,6 +173,7 @@ fun GesundEssenApp() {
                                 if (entry != null) {
                                     HistoryDetailScreen(
                                         entry = entry,
+                                        settings = settings,
                                         onBack = { historyEntry = null }
                                     )
                                 }

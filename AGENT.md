@@ -69,11 +69,31 @@ das Tagesfazit wird dabei NICHT neu gerufen, es veraltet per Fingerprint und reg
 und Historie-Detail (lokal `current`-State,
 persistiert via `updateErkannt`). Nach Detail-Korrektur lädt die Liste frisch → Fingerprint-Mismatch
 → veraltet bzw. Auto-Regeneration für die 2 neuesten Gruppen. Pencil nur bei nicht-leerem erkannt.
-**Notiz-Schnellauswahl (MRU, `RecentNotesButton` in CommonUi.kt + `RecentNotesStore` in Store.kt):**
-Trailing-Icon (Liste, 18dp) an beiden Notiz-Feldern (Kamera-Overlay & Foto-Review-Fallback); Dropdown
-mit den letzten 5 Eingaben (persist. JSON-Array `recentNotes` in BETTERESSER_PREFS), Auswahl setzt den
-Text und rückt den Eintrag an die Spitze; neue benutzte Notizen (beim „Essen bewerten"-Absenden, beide
-Analyze-Stellen) werden ebenso nach oben geschoben; Einträge >5 fallen raus. String `recent_notes_desc`.
+**Notiz-Schnellauswahl (MRU + Favoriten, `RecentNotesButton` CommonUi.kt + `RecentNotesStore` Store.kt):**
+Trailing-Icon (Liste, 18dp) an ALLEN drei Notiz-Feldern (Kamera-Overlay, Foto-Review-Fallback,
+Nacherfassen-Ohne-Foto). Dropdown: Liste der letzten Eingaben — **Sternchen links pro Eintrag**
+(`Icons.Filled.Star`; Favorit = primary-Tint, unmarkiert = ausgegraut determinierter 35%-alpha
+Core-Lib kennt nur den gefüllten Stern); Stern-Toggle schließt das Menü NICHT und klemmt den Eintrag
+persistent (bis abgewählt); unmarkierte rotieren wie gehabt nach MRU max. 5 → die ÄLTESTE fällt raus.
+Persistenz JSON-Array [{t, s}] in BETTERESSER_PREFS (Altformat-Strings → kompiliert als unmarkiert).
+Auswahl setzt Text + push → rückt an die Spitze.
+**Nacherfassen (+ in der Tages⋖-Kopf-Liste):** Plus-Icon rechts vor dem Fazit-Chip jeder Tagesleiste
+(`DayGroupHeader.onAddMeal`) → AlertDialog „Essen nachtragen" mit „Mit Foto"/„Ohne Foto".
+- MIT Foto: gleicher Capture-Flow wie „Essen fotografieren" (CameraCaptureScreen ohne Abschluss-Screen)
+  Systemkamera-Fallback via eigenen TakePicture-Launcher; nach Bewerten wird DIREKT gespeichert.
+- OHNE Foto: `AddMealNoPhotoScreen`, Beschreibung = PFLICHT (Button disabled ohne Text),
+  ApiClient.analyzeText = Text-only Call (prompt_eval_intro_textonly, prompt_textonly_context).
+- Beide: `saveBackdatedEntry` speichert `HistoryStore.add(dateOverride = Tag 23:59, backdated = true)`
+  — **Keine Uhrzeit** in der Anzeige (Liste zeigt transport „nachträglich erfasst", Detailtitel „Datum ·
+  nachträglich erfasst"; meal-Zeile im Tagesfazit-Prompt ebenfalls „nachträglich erfasst").
+  Tagesfazit KOMPLETT verworfen (delete, nicht veraltet und auf Manual) + Wochenfazit verworfen
+  (Req 3.1/3.2), RecentNotes.push, entries reload → `onPick(entry)` öffnet die Detailansicht des
+  neuen Eintrags (Back → Liste → Hauptbildschirm). Overlays mit eigenen BackHandlers.
+**erkannt-Korrektur mit Re-Bewertung (Detailansicht):** Pencil → `ErkanntEditDialog` → OK speichert
+Text UND stößt `reEvaluate(newText)` an: mit Foto → analyze (korrigierter Text via
+`prompt_reeval_header` als Nutzer-Info im Prompt), ohne Foto → analyzeText; onResult:
+`HistoryStore.updateEvaluation` (Ziele + zusatz ersetzt, erkannt bleibt), Tages- + Wochenfazit-GORO
+KENNTUs verworfen; Fortschritts-Karte „KI bewertet die Korrektur neu …" (`reeval_progress`).
 **Prompt (`ApiClient.dayFazit`, text-only, kein Foto nötig):** Zeilen „HH:mm · erkannt mit Menge · Anmerkung" des Tages
 + Ziele → JSON {ampel, text}; Bausteine `prompt_dayfazit_*` (beide strings.xml); Kernregel: kleine Genuss-Snacks werden
 in Kontext gewichtet – ein Bonbon macht einen sonst vollwertigen Tag nicht rot. Rechnerischer „Tagesscore" (Kreis +
