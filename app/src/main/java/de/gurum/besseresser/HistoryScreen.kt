@@ -524,6 +524,40 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
             }
         }
 
+        // „KI denkt"-Karte während der Nachtrage-Bewertung (identische Optik wie der
+        // Hauptpfad): zentrierter Dialog-Kardiroller mit großem Spinner, NICHT schließbar
+        if (showAddBusyCard) {
+            androidx.compose.ui.window.Dialog(onDismissRequest = { /* läuft, nicht abbrechen */ }) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(52.dp),
+                            strokeWidth = 4.dp
+                        )
+                        Text(
+                            stringResource(R.string.main_ai_working),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            stringResource(R.string.main_ai_working_sub),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+
         // Nachtrage-Dialog: Mit Foto / Ohne Foto (für die + Taste je Tagesleiste)
         addDialogForDay?.let { day ->
             AlertDialog(
