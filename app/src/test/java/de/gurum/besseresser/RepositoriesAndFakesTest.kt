@@ -403,5 +403,69 @@ class RepositoriesAndFakesTest {
         val savedDayFazit = histRepo.loadDayFazit("20261106")
         assertNotNull(savedDayFazit)
         assertEquals(TrafficLight.GREEN, savedDayFazit?.ampel)
+
+        // Backdated meal capture flow
+        val targetDay = LocalDate.of(2026, 11, 5)
+        vm.setAddTargetDay(targetDay)
+        vm.setAddNote("150 g Skyr mit Beeren")
+        vm.setShowAddText(true)
+
+        var pickedBackdated: HistoryEntry? = null
+        val backdatedEval = Evaluation(
+            goalResults = listOf(GoalResult("Z", TrafficLight.GREEN, "Proteinreich")),
+            summary = "Top Snack",
+            erkannt = "150 g Skyr mit Beeren"
+        )
+        vm.saveBackdatedEntry(ev = backdatedEval, photoUriIn = null) { pickedBackdated = it }
+        advanceUntilIdle()
+
+        assertNotNull(pickedBackdated)
+        assertTrue(pickedBackdated!!.backdated)
+        assertEquals("150 g Skyr mit Beeren", pickedBackdated!!.erkannt)
+        assertFalse(vm.uiState.value.showAddText)
+        assertEquals("", vm.uiState.value.addNote)
+        assertNull(vm.uiState.value.addTargetDay)
+        // Note was also pushed to recent notes
+        assertEquals("150 g Skyr mit Beeren", setRepo.loadRecentNotes().firstOrNull()?.text)
+    }
+
+    @Test
+    fun testSetupViewModelSplitFailureFallback() = runTest(testDispatcher) {
+        val api = FakeApiService(
+            splitResult = Result.failure(ApiException("HTTP 401", "Debug: Unauthorized"))
+        )
+        val vm = SetupViewModel(apiService = api, settingsRepository = FakeSettingsRepository())
+
+        vm.startSplitGoals(rawGoals = "Weniger Salz, mehr Gemüse")
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.splitting)
+        assertTrue(vm.uiState.value.showSplit)
+        assertEquals("Weniger Salz, mehr Gemüse", vm.uiState.value.splitEdited)
+        assertEquals("Debug: Unauthorized", vm.uiState.value.splitDebug)
+    }
+
+    @Test
+    fun testProfileViewModelCommaDecimalAndEmptyFields() {
+        val profileRepo = FakeProfileRepository()
+        val vm = ProfileViewModel(profileRepository = profileRepo)
+
+        // Comma decimal weight ("74,5")
+        vm.setWeightText("74,5")
+        vm.setHeightText("180")
+        vm.setNotesText("  Kein Zucker  ")
+        assertTrue(vm.save())
+        assertEquals(74.5, profileRepo.load().weightKg ?: 0.0, 0.001)
+        assertEquals(180, profileRepo.load().heightCm)
+        assertEquals("Kein Zucker", profileRepo.load().notes)
+
+        // Clearing all optional fields is valid
+        vm.setWeightText("")
+        vm.setHeightText("")
+        vm.setBirthDate(null)
+        vm.setNotesText("")
+        vm.setGender(Gender.NONE)
+        assertTrue(vm.save())
+        assertTrue(profileRepo.load().isEmpty)
     }
 }

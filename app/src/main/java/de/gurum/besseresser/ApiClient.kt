@@ -391,7 +391,7 @@ object ApiClient : BesseresserApiService {
         }
     }
 
-    private fun parseModelsArray(body: String): JsonArray {
+    internal fun parseModelsArray(body: String): JsonArray {
         val trimmed = body.trim()
         return when {
             trimmed.startsWith("[") -> try { AppJson.parseToJsonElement(trimmed).jsonArray } catch (e: Exception) { JsonArray(emptyList()) }
@@ -406,7 +406,7 @@ object ApiClient : BesseresserApiService {
         }
     }
 
-    private fun parseModelEntries(arr: JsonArray): List<Pair<String, Boolean>> =
+    internal fun parseModelEntries(arr: JsonArray): List<Pair<String, Boolean>> =
         arr.mapNotNull { element ->
             val obj = element as? JsonObject ?: return@mapNotNull null
             val id = obj["id"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
@@ -419,7 +419,7 @@ object ApiClient : BesseresserApiService {
             id to supportsImage
         }
 
-    private fun filterVisionModels(entries: List<Pair<String, Boolean>>): ModelsResult {
+    internal fun filterVisionModels(entries: List<Pair<String, Boolean>>): ModelsResult {
         val all = entries.map { it.first }.sorted()
         val flagged = entries.filter { it.second }.map { it.first }.sorted()
         if (flagged.isNotEmpty()) return ModelsResult(flagged, all)
@@ -430,7 +430,7 @@ object ApiClient : BesseresserApiService {
 
     // ---------------------------------------------------------------- Evaluation Parsing-Helfer
 
-    private fun parseEvaluation(content: String, goals: List<String>): Evaluation {
+    internal fun parseEvaluation(content: String, goals: List<String>): Evaluation {
         val obj = OpenAiChatClient.tolerantJson(content)
         val arr = findResultArray(obj)
         val list = mutableListOf<GoalResult>()
@@ -475,7 +475,7 @@ object ApiClient : BesseresserApiService {
         Regex("^i (can )?(see|recognize)\\b[:,\\s]*", RegexOption.IGNORE_CASE)
     )
 
-    private fun stripErkanntIntro(raw: String): String {
+    internal fun stripErkanntIntro(raw: String): String {
         var t = raw.trim()
         var changed = true
         while (changed) {

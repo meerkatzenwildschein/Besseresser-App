@@ -199,4 +199,119 @@ class DomainLogicAndFingerprintTest {
         ))
         assertEquals(100, entryGreenUnknown.score)
     }
+
+    @Test
+    fun testGroupByDayDescendingOrder() {
+        val day1Millis = LocalDate.of(2026, 11, 4).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val day2MillisA = LocalDate.of(2026, 11, 6).atTime(18, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val day2MillisB = LocalDate.of(2026, 11, 6).atTime(8, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+        val e1 = HistoryEntry(id = 1L, dateMillis = day1Millis, erkannt = "Suppe")
+        val e2a = HistoryEntry(id = 2L, dateMillis = day2MillisA, erkannt = "Abendbrot")
+        val e2b = HistoryEntry(id = 3L, dateMillis = day2MillisB, erkannt = "Frühstück")
+
+        val groups = groupByDay(listOf(e1, e2a, e2b))
+        assertEquals(2, groups.size)
+        assertEquals(LocalDate.of(2026, 11, 6), groups[0].day)
+        assertEquals(2, groups[0].entries.size)
+        assertEquals(LocalDate.of(2026, 11, 4), groups[1].day)
+        assertEquals(1, groups[1].entries.size)
+    }
+
+    @Test
+    fun testZielePreviewFormatting() {
+        val emptyEntry = HistoryEntry(goalResults = emptyList())
+        assertEquals("Keine Ziele", zielePreview(emptyEntry, "Keine Ziele", "+0"))
+
+        val oneGoal = HistoryEntry(goalResults = listOf(GoalResult("Blutdruck senken", TrafficLight.GREEN, "")))
+        assertEquals("Blutdruck senken", zielePreview(oneGoal, "Keine Ziele", "+0"))
+
+        val twoGoals = HistoryEntry(goalResults = listOf(
+            GoalResult("Blutdruck senken", TrafficLight.GREEN, ""),
+            GoalResult("Weniger Zucker", TrafficLight.YELLOW, "")
+        ))
+        assertEquals("Blutdruck senken, Weniger Zucker", zielePreview(twoGoals, "Keine Ziele", "+0"))
+
+        val fourGoals = HistoryEntry(goalResults = listOf(
+            GoalResult("Blutdruck senken", TrafficLight.GREEN, ""),
+            GoalResult("Weniger Zucker", TrafficLight.YELLOW, ""),
+            GoalResult("Gewicht verlieren", TrafficLight.GREEN, ""),
+            GoalResult("Gesünder ernähren", TrafficLight.RED, "")
+        ))
+        assertEquals("Blutdruck senken, Weniger Zucker +2", zielePreview(fourGoals, "Keine Ziele", "+2"))
+    }
+
+    @Test
+    fun testScoreColorThresholds() {
+        assertEquals(TrafficLight.UNKNOWN.color(), scoreColor(-1))
+        assertEquals(TrafficLight.RED.color(), scoreColor(0))
+        assertEquals(TrafficLight.RED.color(), scoreColor(49))
+        assertEquals(TrafficLight.YELLOW.color(), scoreColor(50))
+        assertEquals(TrafficLight.YELLOW.color(), scoreColor(79))
+        assertEquals(TrafficLight.GREEN.color(), scoreColor(80))
+        assertEquals(TrafficLight.GREEN.color(), scoreColor(100))
+    }
+
+    @Test
+    fun testHandleAutoDayFazitTriggerLogic() {
+        DayFazitSession.attempted.clear()
+        val date = LocalDate.of(2026, 11, 5)
+        val key = dayKeyOf(date)
+        val entry = HistoryEntry(id = 10L, erkannt = "Salat")
+        val group = DayGroup(day = date, entries = listOf(entry))
+
+        var triggeredCount = 0
+
+        // 1. Before 18:00 (autoFazitTime = false) -> does NOT trigger
+        handleAutoDayFazit(
+            group = group,
+            fazitMap = emptyMap(),
+            loadingFazits = emptyList(),
+            autoFazitTime = false,
+            onGenerateFazit = { _, _ -> triggeredCount++ }
+        )
+        assertEquals(0, triggeredCount)
+
+        // 2. While already loading -> does NOT trigger
+        handleAutoDayFazit(
+            group = group,
+            fazitMap = emptyMap(),
+            loadingFazits = listOf(key),
+            autoFazitTime = true,
+            onGenerateFazit = { _, _ -> triggeredCount++ }
+        )
+        assertEquals(0, triggeredCount)
+
+        // 3. First time after 18:00 with missing fazit -> triggers once and records in session
+        handleAutoDayFazit(
+            group = group,
+            fazitMap = emptyMap(),
+            loadingFazits = emptyList(),
+            autoFazitTime = true,
+            onGenerateFazit = { _, _ -> triggeredCount++ }
+        )
+        assertEquals(1, triggeredCount)
+        assertTrue(key in DayFazitSession.attempted)
+
+        // 4. Second call in same session with still missing fazit -> does NOT re-trigger
+        handleAutoDayFazit(
+            group = group,
+            fazitMap = emptyMap(),
+            loadingFazits = emptyList(),
+            autoFazitTime = true,
+            onGenerateFazit = { _, _ -> triggeredCount++ }
+        )
+        assertEquals(1, triggeredCount)
+
+        // 5. Existing fazit that became outdated (new meal added) -> DOES re-trigger
+        val outdatedFazit = DayFazit(dayKey = key, ampel = TrafficLight.GREEN, text = "Alt", entryIds = listOf(999L))
+        handleAutoDayFazit(
+            group = group,
+            fazitMap = mapOf(key to outdatedFazit),
+            loadingFazits = emptyList(),
+            autoFazitTime = true,
+            onGenerateFazit = { _, _ -> triggeredCount++ }
+        )
+        assertEquals(2, triggeredCount)
+    }
 }
