@@ -1,5 +1,7 @@
 package de.gurum.besseresser
 
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -76,7 +78,7 @@ class ApiClientTest {
     fun testOpenAiChatClientTolerantJson() {
         val markdownJson = "Hier ist die Antwort:\n```json\n{\"ampel\":\"rot\",\"text\":\"Zu viel Zucker\"}\n```\nDanke!"
         val obj = OpenAiChatClient.tolerantJson(markdownJson)
-        assertEquals("rot", obj["ampel"]?.let { kotlinx.serialization.json.jsonPrimitive.contentOrNull })
-        assertEquals("Zu viel Zucker", obj["text"]?.let { kotlinx.serialization.json.jsonPrimitive.contentOrNull })
+        assertEquals("rot", obj["ampel"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("Zu viel Zucker", obj["text"]?.jsonPrimitive?.contentOrNull)
     }
 }

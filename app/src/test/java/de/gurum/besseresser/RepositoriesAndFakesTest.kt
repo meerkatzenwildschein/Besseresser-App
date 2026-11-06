@@ -168,21 +168,23 @@ class FakeApiService(
         )
     ),
     var dayFazitResult: Result<DayFazitResult> = Result.success(
-        DayFazitResult(TrafficLight.GREEN, "Guter Tag!", "Super Tag")
+        DayFazitResult(TrafficLight.GREEN, "Guter Tag!")
     ),
     var splitResult: Result<List<String>> = Result.success(listOf("Ziel A", "Ziel B")),
-    var modelsResult: Result<List<String>> = Result.success(listOf("gpt-4o", "gpt-4o-mini"))
+    var modelsResult: Result<ApiClient.ModelsResult> = Result.success(
+        ApiClient.ModelsResult(vision = listOf("gpt-4o", "gpt-4o-mini"), all = listOf("gpt-4o", "gpt-4o-mini"))
+    )
 ) : BesseresserApiService {
 
     override suspend fun analyze(
-        ctx: Context?,
+        ctx: Context,
         photoUri: Uri,
         settings: Settings,
         promptBundle: PromptBundle
     ): Result<Evaluation> = analyzeResult
 
     override suspend fun analyzeText(
-        ctx: Context?,
+        ctx: Context,
         settings: Settings,
         userDescription: String
     ): Result<Evaluation> = analyzeResult
@@ -190,19 +192,16 @@ class FakeApiService(
     override suspend fun dayFazit(
         settings: Settings,
         goals: List<String>,
-        profile: Profile,
+        promptContext: String?,
         mealLines: List<String>,
         prompts: FazitPromptBundle
     ): Result<DayFazitResult> = dayFazitResult
 
     override suspend fun splitGoals(
-        baseUrl: String,
-        apiKey: String,
-        model: String,
         request: SplitGoalsRequest
     ): Result<List<String>> = splitResult
 
-    override suspend fun fetchModels(baseUrl: String, apiKey: String): Result<List<String>> = modelsResult
+    override suspend fun fetchModels(baseUrl: String, apiKey: String): Result<ApiClient.ModelsResult> = modelsResult
 }
 
 // ----------------------------------------------------------------- Tests
@@ -259,7 +258,7 @@ class RepositoriesAndFakesTest {
         repo.ensureMigrated()
         assertTrue(repo.migrationChecked)
 
-        val ev = Evaluation("Salat", listOf(GoalResult("Z1", TrafficLight.GREEN, "Frisch")), "Toll")
+        val ev = Evaluation(goalResults = listOf(GoalResult("Z1", TrafficLight.GREEN, "Frisch")), summary = "Toll", erkannt = "Salat")
         val entry = repo.add(null, ev, note = "Mittagessen")
         assertEquals("Salat", entry.erkannt)
         assertEquals("Mittagessen", entry.note)
@@ -294,7 +293,7 @@ class RepositoriesAndFakesTest {
         vm.setNote("Leckerer Snack")
         assertEquals("Leckerer Snack", vm.uiState.value.note)
 
-        val ev = Evaluation("Apfel", listOf(GoalResult("Ziel", TrafficLight.GREEN, "Top")), "Sehr gut")
+        val ev = Evaluation(goalResults = listOf(GoalResult("Ziel", TrafficLight.GREEN, "Top")), summary = "Sehr gut", erkannt = "Apfel")
         api.analyzeResult = Result.success(ev)
 
         vm.saveToHistory(settings = Settings("", "", "", emptyList()))

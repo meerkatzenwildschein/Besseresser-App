@@ -221,7 +221,7 @@ fun ProfileScreen(
                     (weight == null || weight in 1.0..700.0) &&
                     (height == null || height in 30..280)
                 if (!plausible) {
-                    viewModel.save(ctx, onSave)
+                    viewModel.save(ctx, onSaved = onSave)
                 } else {
                     onSave(Profile(uiState.birthDate, weight, height, uiState.notesText.trim(), uiState.gender))
                 }

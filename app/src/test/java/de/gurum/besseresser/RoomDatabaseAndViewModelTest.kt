@@ -171,7 +171,7 @@ class RoomDatabaseAndViewModelTest {
         viewModel.initFromProfile(profile)
         val state = viewModel.uiState.value
         assertEquals("1985-10-20", state.birthDate)
-        assertEquals("82.0", state.weightText)
+        assertEquals("82", state.weightText)
         assertEquals("178", state.heightText)
         assertEquals("Test Note", state.notesText)
         assertEquals(Gender.MALE, state.gender)

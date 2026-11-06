@@ -56,6 +56,8 @@
     <string name="profile_intro">All entries are optional – they help the AI better estimate portions and rates.</string>
     <string name="profile_weight_label">Weight (kg)</string>
     <string name="profile_height_label">Height (cm)</string>
+    <string name="profile_err_weight">Please enter a valid weight (1–500 kg).</string>
+    <string name="profile_err_height">Please enter a valid height (30–280 cm).</string>
     <string name="profile_gender_label">Gender</string>
     <string name="profile_gender_male">Male</string>
     <string name="profile_gender_female">Female</string>
@@ -150,6 +152,7 @@
     <string name="history_list_hint">%1$d ratings – swipe left to delete</string>
     <string name="history_delete_action">🗑 Delete</string>
     <string name="history_no_goals">No goals captured</string>
+    <string name="history_swipe_blocked_overlay">A capture is in progress - please finish or cancel it first.</string>
     <string name="score_caption">Traffic-light average</string>
     <string name="weekfazit_row_label">Week summary</string>
     <string name="weekfazit_chip_idle">✨ Create week summary</string>

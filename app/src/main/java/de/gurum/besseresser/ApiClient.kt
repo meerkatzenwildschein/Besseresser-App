@@ -37,7 +37,25 @@ data class FazitPromptBundle(
     val promptRules: String,
     val promptLanguage: String,
     val promptHonesty: String = ""
-)
+) {
+    companion object {
+        /** Lokalisierte Prompt-Bausteine für ein Tagesfazit. */
+        fun forDay(ctx: Context): FazitPromptBundle = FazitPromptBundle(
+            promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
+            promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+            promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+            promptHonesty = ctx.getString(R.string.prompt_honesty)
+        )
+
+        /** Lokalisierte Prompt-Bausteine für ein Wochenfazit (eigene Einleitung, Rest wie Tagesfazit). */
+        fun forWeek(ctx: Context): FazitPromptBundle = FazitPromptBundle(
+            promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
+            promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+            promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+            promptHonesty = ctx.getString(R.string.prompt_honesty)
+        )
+    }
+}
 
 /** Parameter für die KI-gestützte Aufteilung von Zielen. */
 data class SplitGoalsRequest(

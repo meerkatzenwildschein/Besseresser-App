@@ -58,18 +58,14 @@ fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
     }.map { (day, list) -> DayGroup(day = day, entries = list) }
         .sortedByDescending { it.day }
 
-/** Merkt sich Versuche pro App-Lauf (damit fehlgeschlagene KI-Calls nicht im Loop hängen). */
-object DayFazitSession {
-    val attempted = mutableSetOf<String>()
-    val attemptedWeekly = mutableSetOf<String>()
-}
+/** Merkt sich Versuche pro App-Lauf — Deklaration liegt zentral in HistoryStore.kt. */
 
 @Composable
 fun HistoryListContent(
     entries: List<HistoryEntry>,
     fazitMap: Map<String, DayFazit>,
     loadingFazits: List<String>,
-    expandedFazits: MutableList<String>,
+    expandedFazits: List<String>,
     weekFazit: DayFazit?,
     loadingWeek: Boolean,
     expandedWeek: Boolean,
@@ -78,6 +74,7 @@ fun HistoryListContent(
     onGenerateFazit: (LocalDate, List<HistoryEntry>) -> Unit,
     onGenerateWeekFazit: () -> Unit,
     onToggleExpandWeek: () -> Unit,
+    onToggleExpandFazit: (String) -> Unit,
     onAddMealForDay: (LocalDate) -> Unit,
     onDeleteEntry: (HistoryEntry) -> Unit
 ) {
@@ -118,10 +115,7 @@ fun HistoryListContent(
                         loading = loadingFazit,
                         stale = staleFazit,
                         expanded = dayKey in expandedFazits,
-                        onToggleExpand = {
-                            if (dayKey in expandedFazits) expandedFazits.remove(dayKey)
-                            else expandedFazits.add(dayKey)
-                        },
+                        onToggleExpand = { onToggleExpandFazit(dayKey) },
                         onGenerate = { onGenerateFazit(group.day, group.entries) },
                         onAddMeal = { onAddMealForDay(group.day) }
                     )
