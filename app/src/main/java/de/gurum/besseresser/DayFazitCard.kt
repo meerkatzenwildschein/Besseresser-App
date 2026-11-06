@@ -83,18 +83,31 @@ fun HeadChip(
             trailing?.invoke()
         }
     }
-    Surface(
-        onClick = { onClick?.invoke() },
-        enabled = onClick != null,
-        shape = shape,
-        color = accent ?: MaterialTheme.colorScheme.surfaceVariant,
-        border = border,
-        modifier = Modifier.height(40.dp)
-    ) {
-        Box(
-            modifier = Modifier.fillMaxHeight(),
-            contentAlignment = Alignment.Center
-        ) { content() }
+    if (onClick != null) {
+        Surface(
+            onClick = onClick,
+            shape = shape,
+            color = accent ?: MaterialTheme.colorScheme.surfaceVariant,
+            border = border,
+            modifier = Modifier.height(40.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) { content() }
+        }
+    } else {
+        Surface(
+            shape = shape,
+            color = accent ?: MaterialTheme.colorScheme.surfaceVariant,
+            border = border,
+            modifier = Modifier.height(40.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) { content() }
+        }
     }
 }
 

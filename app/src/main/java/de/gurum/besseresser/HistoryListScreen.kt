@@ -93,51 +93,16 @@ fun HistoryListContent(
         icon = Icons.Filled.DateRange
     )
 
-    if (entries.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("🍽️", fontSize = 32.sp)
-                    }
-                    Text(
-                        stringResource(R.string.history_empty),
-                        textAlign = TextAlign.Center,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        stringResource(R.string.history_empty_sub),
-                        textAlign = TextAlign.Center,
-                        fontSize = 13.sp,
-                        lineHeight = 18.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
+    val today = LocalDate.now()
+    val rawGroups = groupByDay(entries)
+    val displayGroups = if (rawGroups.any { it.day == today }) {
+        rawGroups
     } else {
+        (listOf(DayGroup(day = today, entries = emptyList())) + rawGroups)
+            .sortedByDescending { it.day }
+    }
+
+    if (entries.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
         Text(
             stringResource(R.string.history_list_hint, entries.size),
@@ -146,108 +111,154 @@ fun HistoryListContent(
             modifier = Modifier.padding(horizontal = 4.dp)
         )
         Spacer(Modifier.height(6.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            groupByDay(entries).forEach { group ->
-                val dayKey = dayKeyOf(group.day)
-                val fazit = fazitMap[dayKey]
-                val loadingFazit = dayKey in loadingFazits
-                val staleFazit = fazit != null && (
-                    fazit.entryIds.toSet() != group.entries.map { it.id }.toSet() ||
-                        (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(group.entries))
+    } else {
+        Spacer(Modifier.height(8.dp))
+    }
+
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        displayGroups.forEach { group ->
+            val dayKey = dayKeyOf(group.day)
+            val hasEntries = group.entries.isNotEmpty()
+            val fazit = if (hasEntries) fazitMap[dayKey] else null
+            val loadingFazit = hasEntries && dayKey in loadingFazits
+            val staleFazit = hasEntries && fazit != null && (
+                fazit.entryIds.toSet() != group.entries.map { it.id }.toSet() ||
+                    (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(group.entries))
+                )
+            item(key = "day-$dayKey") {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateContentSize()
+                ) {
+                    DayGroupHeader(
+                        date = group.day,
+                        fazit = fazit,
+                        loading = loadingFazit,
+                        stale = staleFazit,
+                        expanded = dayKey in expandedFazits,
+                        onToggleExpand = { onToggleExpandFazit(dayKey) },
+                        onGenerate = { onGenerateFazit(group.day, group.entries) },
+                        onAddMeal = { onAddMealForDay(group.day) },
+                        hasEntries = hasEntries
                     )
-                item(key = "day-$dayKey") {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateContentSize()
-                    ) {
-                        DayGroupHeader(
-                            date = group.day,
-                            fazit = fazit,
-                            loading = loadingFazit,
-                            stale = staleFazit,
-                            expanded = dayKey in expandedFazits,
-                            onToggleExpand = { onToggleExpandFazit(dayKey) },
-                            onGenerate = { onGenerateFazit(group.day, group.entries) },
-                            onAddMeal = { onAddMealForDay(group.day) }
+                    when {
+                        loadingFazit -> Text(
+                            stringResource(R.string.dayfazit_loading_line),
+                            fontSize = 11.5.sp,
+                            fontStyle = FontStyle.Italic,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp, start = 6.dp)
                         )
-                        when {
-                            loadingFazit -> Text(
-                                stringResource(R.string.dayfazit_loading_line),
-                                fontSize = 11.5.sp,
-                                fontStyle = FontStyle.Italic,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 8.dp, start = 6.dp)
-                            )
-                            fazit != null && !staleFazit && dayKey in expandedFazits -> {
-                                FazitExpandedCard(fazit = fazit)
-                            }
-                        }
-                    }
-                }
-                group.entries.forEach { entry ->
-                    item(key = entry.id) {
-                        val dismissState = rememberSwipeToDismissBoxState(
-                            confirmValueChange = { value ->
-                                if (value == SwipeToDismissBoxValue.EndToStart) {
-                                    onDeleteEntry(entry)
-                                    true
-                                } else false
-                            }
-                        )
-                        SwipeToDismissBox(
-                            state = dismissState,
-                            enableDismissFromStartToEnd = false,
-                            backgroundContent = {
-                                val isSwiping = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .fillMaxSize()
-                                        .background(if (isSwiping) Color(0xFFD32F2F) else Color.Transparent),
-                                    contentAlignment = Alignment.CenterEnd
-                                ) {
-                                    if (isSwiping) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(horizontal = 22.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Filled.Delete,
-                                                contentDescription = null,
-                                                tint = Color.White,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(Modifier.width(6.dp))
-                                            Text(
-                                                stringResource(R.string.delete),
-                                                color = Color.White,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 14.sp
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        ) {
-                            HistoryItem(entry, onClick = { onPick(entry) })
+                        fazit != null && !staleFazit && dayKey in expandedFazits -> {
+                            FazitExpandedCard(fazit = fazit)
                         }
                     }
                 }
             }
-
-            if (LocalDate.now().dayOfWeek == java.time.DayOfWeek.SUNDAY &&
-                LocalTime.now().hour >= FAZIT_AUTO_HOUR
-            ) {
-                item(key = "week") {
-                    WeekFazitRow(
-                        fazit = weekFazit,
-                        loading = loadingWeek,
-                        expanded = expandedWeek,
-                        onToggleExpand = onToggleExpandWeek,
-                        onGenerate = onGenerateWeekFazit
+            group.entries.forEach { entry ->
+                item(key = entry.id) {
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { value ->
+                            if (value == SwipeToDismissBoxValue.EndToStart) {
+                                onDeleteEntry(entry)
+                                true
+                            } else false
+                        }
                     )
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = false,
+                        backgroundContent = {
+                            val isSwiping = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .fillMaxSize()
+                                    .background(if (isSwiping) Color(0xFFD32F2F) else Color.Transparent),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                if (isSwiping) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 22.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Delete,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            stringResource(R.string.delete),
+                                            color = Color.White,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    ) {
+                        HistoryItem(entry, onClick = { onPick(entry) })
+                    }
                 }
+            }
+        }
+
+        if (entries.isEmpty()) {
+            item(key = "empty-hint") {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🍽️", fontSize = 32.sp)
+                        }
+                        Text(
+                            stringResource(R.string.history_empty),
+                            textAlign = TextAlign.Center,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            stringResource(R.string.history_empty_sub),
+                            textAlign = TextAlign.Center,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        } else if (LocalDate.now().dayOfWeek == java.time.DayOfWeek.SUNDAY &&
+            LocalTime.now().hour >= FAZIT_AUTO_HOUR
+        ) {
+            item(key = "week") {
+                WeekFazitRow(
+                    fazit = weekFazit,
+                    loading = loadingWeek,
+                    expanded = expandedWeek,
+                    onToggleExpand = onToggleExpandWeek,
+                    onGenerate = onGenerateWeekFazit
+                )
             }
         }
     }
