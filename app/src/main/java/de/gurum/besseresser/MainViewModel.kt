@@ -28,7 +28,9 @@ data class MainUiState(
 )
 
 class MainViewModel(
-    private val apiService: BesseresserApiService = ApiClient
+    private val apiService: BesseresserApiService = ApiClient,
+    private val historyRepository: HistoryRepository? = null,
+    private val settingsRepository: SettingsRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -36,13 +38,23 @@ class MainViewModel(
 
     private var analyzeJob: Job? = null
 
-    fun loadRecentNotes(ctx: Context) {
-        _uiState.update { it.copy(recentNotes = RecentNotesStore.load(ctx)) }
+    private fun getHistoryRepo(ctx: Context?): HistoryRepository? =
+        historyRepository ?: ctx?.let { RepositoryProvider.getHistoryRepository(it) }
+
+    private fun getSettingsRepo(ctx: Context?): SettingsRepository? =
+        settingsRepository ?: ctx?.let { RepositoryProvider.getSettingsRepository(it) }
+
+    fun loadRecentNotes(ctx: Context? = null) {
+        val repo = getSettingsRepo(ctx)
+        if (repo != null) {
+            _uiState.update { it.copy(recentNotes = repo.loadRecentNotes()) }
+        }
     }
 
-    fun toggleStarNote(ctx: Context, noteText: String) {
-        RecentNotesStore.toggleStar(ctx, noteText)
-        _uiState.update { it.copy(recentNotes = RecentNotesStore.load(ctx, sortStarredFirst = false)) }
+    fun toggleStarNote(ctx: Context? = null, noteText: String) {
+        val repo = getSettingsRepo(ctx) ?: return
+        repo.toggleStarRecentNote(noteText)
+        _uiState.update { it.copy(recentNotes = repo.loadRecentNotes(sortStarredFirst = false)) }
     }
 
     fun setNote(note: String) {
@@ -106,37 +118,42 @@ class MainViewModel(
         _uiState.update { it.copy(isBusy = false) }
     }
 
-    fun saveToHistory(ctx: Context, settings: Settings, onSaved: (HistoryEntry) -> Unit = {}) {
+    fun saveToHistory(ctx: Context? = null, settings: Settings, onSaved: (HistoryEntry) -> Unit = {}) {
         val ev = _uiState.value.evaluation ?: return
         val uri = _uiState.value.photoPreviewUri
         val note = _uiState.value.note
+        val histRepo = getHistoryRepo(ctx)
+        val setRepo = getSettingsRepo(ctx)
         viewModelScope.launch {
             _uiState.update { it.copy(savingHistory = true) }
-            val entry = HistoryStore.add(ctx, uri, ev, note = note)
-            DayFazitStore.deleteForEntry(ctx, entry)
-            WeekFazitStore.deleteForEntry(ctx, entry)
-            RecentNotesStore.push(ctx, note)
+            val entry = histRepo?.add(uri, ev, note = note)
+                ?: HistoryEntry(id = System.currentTimeMillis(), goalResults = ev.goalResults, summary = ev.summary, note = note)
+            histRepo?.deleteDayFazitForEntry(entry)
+            histRepo?.deleteWeekFazitForEntry(entry)
+            setRepo?.pushRecentNote(note)
+            val updatedNotes = setRepo?.loadRecentNotes() ?: _uiState.value.recentNotes
             _uiState.update {
                 it.copy(
                     savingHistory = false,
                     savedToHistory = true,
                     savedEntryId = entry.id,
-                    recentNotes = RecentNotesStore.load(ctx)
+                    recentNotes = updatedNotes
                 )
             }
             onSaved(entry)
         }
     }
 
-    fun updateErkannt(ctx: Context, newText: String) {
+    fun updateErkannt(ctx: Context? = null, newText: String) {
         val entryId = _uiState.value.savedEntryId
         _uiState.update { state ->
             val updatedEv = state.evaluation?.copy(erkannt = newText.trim())
             state.copy(evaluation = updatedEv, showErkanntEdit = false)
         }
         if (entryId != null) {
+            val histRepo = getHistoryRepo(ctx)
             viewModelScope.launch {
-                HistoryStore.updateErkannt(ctx, entryId, newText.trim())
+                histRepo?.updateErkannt(entryId, newText.trim())
             }
         }
     }
@@ -152,9 +169,11 @@ class MainViewModel(
                 _uiState.update { it.copy(evaluation = merged, isBusy = false) }
                 val entryId = _uiState.value.savedEntryId
                 if (entryId != null) {
-                    HistoryStore.updateEvaluation(ctx, entryId, merged.goalResults, merged.summary)
-                    DayFazitStore.deleteForEntry(ctx, HistoryEntry(id = entryId, dateMillis = System.currentTimeMillis()))
-                    WeekFazitStore.deleteForEntry(ctx, HistoryEntry(id = entryId, dateMillis = System.currentTimeMillis()))
+                    val histRepo = getHistoryRepo(ctx)
+                    val dummyEntry = HistoryEntry(id = entryId, dateMillis = System.currentTimeMillis())
+                    histRepo?.updateEvaluation(entryId, merged.goalResults, merged.summary)
+                    histRepo?.deleteDayFazitForEntry(dummyEntry)
+                    histRepo?.deleteWeekFazitForEntry(dummyEntry)
                 }
             }.onFailure { e ->
                 _uiState.update { it.copy(error = e.message ?: "Re-Evaluation fehlgeschlagen.", isBusy = false) }

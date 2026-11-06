@@ -173,6 +173,7 @@ Besseresser-App/
 │       │   │   ├── ProfileScreen.kt        ← Nutzerprofil-Verwaltung
 │       │   │   ├── ProfileViewModel.kt     ← ViewModel für Profil-Daten & Validierung
 │       │   │   ├── PromptBuilder.kt        ← Dynamische Prompt-Generierung (Analyse, Fazit, Ziele)
+│       │   │   ├── Repositories.kt         ← Repository-Abstraktionen (Settings, Profile, History) & Provider
 │       │   │   ├── SetupScreen.kt          ← Ersteinrichtung, Provider- & Modell-Auswahl
 │       │   │   ├── SetupViewModel.kt       ← ViewModel für API-Konfiguration & Zielaufteilung
 │       │   │   └── Store.kt                ← SharedPreferences-Speicher (Settings, Profile, RecentNotes)
@@ -185,6 +186,8 @@ Besseresser-App/
 │           └── java/de/gurum/besseresser/
 │               ├── ApiClientTest.kt              ← Unit-Tests für ApiClient-Hilfsmethoden & Fehlermodelle
 │               ├── DataSerializationTest.kt      ← Unit-Tests für Serialisierung, Enums und Scores
+│               ├── DomainLogicAndFingerprintTest.kt ← Unit-Tests für Fingerprints, Tages-/Wochenkeys, Alter & Scores
+│               ├── RepositoriesAndFakesTest.kt   ← Unit-Tests für Fake-Repositories & isolierte ViewModel-Logik
 │               └── RoomDatabaseAndViewModelTest.kt ← Unit-Tests für Room-Converter, Mappings & ViewModels
 
 ---

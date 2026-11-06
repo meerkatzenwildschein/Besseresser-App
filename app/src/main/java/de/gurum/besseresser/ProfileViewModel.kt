@@ -19,10 +19,15 @@ data class ProfileUiState(
     val showDatePicker: Boolean = false
 )
 
-class ProfileViewModel : ViewModel() {
+class ProfileViewModel(
+    private val profileRepository: ProfileRepository? = null
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
+
+    private fun getProfileRepo(ctx: Context?): ProfileRepository? =
+        profileRepository ?: ctx?.let { RepositoryProvider.getProfileRepository(it) }
 
     fun initFromProfile(profile: Profile) {
         _uiState.update {
@@ -60,17 +65,32 @@ class ProfileViewModel : ViewModel() {
         _uiState.update { it.copy(showDatePicker = show) }
     }
 
-    fun save(ctx: Context, onSaved: (Profile) -> Unit): Boolean {
+    fun save(
+        ctx: Context? = null,
+        weightErrMsg: String? = null,
+        heightErrMsg: String? = null,
+        onSaved: (Profile) -> Unit = {}
+    ): Boolean {
         val state = _uiState.value
         val w = if (state.weightText.isBlank()) null
         else state.weightText.replace(',', '.').toDoubleOrNull()
         if (state.weightText.isNotBlank() && (w == null || w <= 0 || w > 500)) {
-            _uiState.update { it.copy(error = ctx.getString(R.string.profile_err_weight)) }
+            val err = when {
+                weightErrMsg != null -> weightErrMsg
+                ctx != null -> ctx.getString(R.string.profile_err_weight)
+                else -> "Ungültiges Gewicht."
+            }
+            _uiState.update { it.copy(error = err) }
             return false
         }
         val h = if (state.heightText.isBlank()) null else state.heightText.toIntOrNull()
         if (state.heightText.isNotBlank() && (h == null || h <= 30 || h > 280)) {
-            _uiState.update { it.copy(error = ctx.getString(R.string.profile_err_height)) }
+            val err = when {
+                heightErrMsg != null -> heightErrMsg
+                ctx != null -> ctx.getString(R.string.profile_err_height)
+                else -> "Ungültige Größe."
+            }
+            _uiState.update { it.copy(error = err) }
             return false
         }
         _uiState.update { it.copy(error = null) }
@@ -81,7 +101,8 @@ class ProfileViewModel : ViewModel() {
             notes = state.notesText.trim(),
             gender = state.gender
         )
-        ProfileStore.save(ctx, updated.birthDate, updated.weightKg, updated.heightCm, updated.notes, updated.gender)
+        val repo = getProfileRepo(ctx)
+        repo?.save(updated)
         onSaved(updated)
         return true
     }

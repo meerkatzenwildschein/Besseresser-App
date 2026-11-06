@@ -25,7 +25,8 @@ data class SetupUiState(
 )
 
 class SetupViewModel(
-    private val apiService: BesseresserApiService = ApiClient
+    private val apiService: BesseresserApiService = ApiClient,
+    settingsRepository: SettingsRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SetupUiState())
@@ -75,22 +76,24 @@ class SetupViewModel(
     }
 
     fun startSplitGoals(
-        ctx: Context,
+        ctx: Context? = null,
         rawGoals: String,
-        onDone: (Settings) -> Unit
+        splitRequest: SplitGoalsRequest? = null,
+        onDone: (Settings) -> Unit = {}
     ) {
         val state = _uiState.value
         _uiState.update { it.copy(splitting = true) }
+        val req = splitRequest ?: SplitGoalsRequest(
+            rawGoals = rawGoals,
+            splitIntro = ctx?.getString(R.string.split_intro) ?: "Ziele zerlegen:",
+            splitRules = ctx?.getString(R.string.split_rules) ?: "Regeln"
+        )
         viewModelScope.launch {
             val result = apiService.splitGoals(
                 baseUrl = state.url,
                 apiKey = state.key,
                 model = state.model,
-                request = SplitGoalsRequest(
-                    rawGoals = rawGoals,
-                    splitIntro = ctx.getString(R.string.split_intro),
-                    splitRules = ctx.getString(R.string.split_rules)
-                )
+                request = req
             )
             result.onSuccess { splitList ->
                 _uiState.update {
