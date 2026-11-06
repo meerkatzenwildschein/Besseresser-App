@@ -6,6 +6,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -167,11 +168,16 @@ class ApiClientTest {
         ).jsonObject
         assertEquals("Teil 1 Teil 2", OpenAiChatClient.extractContent(partsResp))
 
-        // 3. Fallback to reasoning_content when content is empty
+        // 3. Fallback to reasoning_content or OpenRouter's reasoning when content is empty/null
         val reasoningResp = AppJson.parseToJsonElement(
             """{"choices":[{"message":{"content":"","reasoning_content":"Gedanke"}}]}"""
         ).jsonObject
         assertEquals("Gedanke", OpenAiChatClient.extractContent(reasoningResp))
+
+        val openRouterReasoningResp = AppJson.parseToJsonElement(
+            """{"choices":[{"message":{"content":null,"reasoning":"{\"ampel\":\"gruen\"}"}}]}"""
+        ).jsonObject
+        assertEquals("""{"ampel":"gruen"}""", OpenAiChatClient.extractContent(openRouterReasoningResp))
 
         // 4. Fallback to choices[0].text
         val legacyTextResp = AppJson.parseToJsonElement(
@@ -185,23 +191,36 @@ class ApiClientTest {
     }
 
     @Test
-    fun testOpenAiChatClientChatBodyReasoningExclusion() {
+    fun testOpenAiChatClientChatBodyReasoningAndBoostedBudget() {
+        OpenAiChatClient.boostedBudgetModels.clear()
         val msgs = buildJsonArray {
             add(buildJsonObject { put("role", "user"); put("content", "Hi") })
         }
 
         // Standard OpenAI -> no reasoning block
-        val openaiBody = OpenAiChatClient.chatBody("gpt-4o-mini", "https://api.openai.com/v1", 0.2, 1000, msgs)
+        val openaiBody = OpenAiChatClient.chatBody("gpt-4o-mini", "https://api.openai.com/v1", 0.2, 4096, msgs)
         assertFalse(openaiBody.containsKey("reasoning"))
+        assertEquals(4096, openaiBody["max_tokens"]?.jsonPrimitive?.intOrNull)
 
-        // OpenRouter -> reasoning.exclude = true
-        val openRouterBody = OpenAiChatClient.chatBody("gpt-4o-mini", "https://openrouter.ai/api/v1", 0.2, 1000, msgs)
+        // OpenRouter -> reasoning.effort = "low", reasoning.exclude = true
+        val openRouterBody = OpenAiChatClient.chatBody("deepseek/deepseek-v4.1-flash", "https://openrouter.ai/api/v1", 0.2, 4096, msgs)
         assertTrue(openRouterBody.containsKey("reasoning"))
+        assertEquals("low", openRouterBody["reasoning"]?.jsonObject?.get("effort")?.jsonPrimitive?.contentOrNull)
         assertEquals(true, openRouterBody["reasoning"]?.jsonObject?.get("exclude")?.jsonPrimitive?.booleanOrNull)
 
-        // DeepSeek model -> reasoning.exclude = true
-        val deepseekBody = OpenAiChatClient.chatBody("deepseek-reasoner", "https://api.example.com/v1", 0.2, 1000, msgs)
-        assertTrue(deepseekBody.containsKey("reasoning"))
+        // Detect length truncation without content (exact OpenRouter Together failure case)
+        val truncatedResp = AppJson.parseToJsonElement(
+            """{"id":"gen-1","model":"deepseek/deepseek-v4.1-flash","choices":[{"index":0,"finish_reason":"length","native_finish_reason":"length","message":{"role":"assistant","content":null}}]}"""
+        ).jsonObject
+        assertTrue(OpenAiChatClient.isLengthTruncatedWithoutContent(truncatedResp))
+
+        // Once marked for boosted budget, subsequent calls use 16384 tokens automatically
+        OpenAiChatClient.markModelNeedsBoostedBudget("deepseek/deepseek-v4.1-flash")
+        assertTrue(OpenAiChatClient.hasBoostedBudget("deepseek/deepseek-v4.1-flash"))
+
+        val boostedBody = OpenAiChatClient.chatBody("deepseek/deepseek-v4.1-flash", "https://openrouter.ai/api/v1", 0.2, 4096, msgs, highBudgetRetry = true)
+        assertEquals(OpenAiChatClient.BOOSTED_MAX_TOKENS, boostedBody["max_tokens"]?.jsonPrimitive?.intOrNull)
+        assertEquals(false, boostedBody["reasoning"]?.jsonObject?.get("exclude")?.jsonPrimitive?.booleanOrNull)
     }
 
     @Test

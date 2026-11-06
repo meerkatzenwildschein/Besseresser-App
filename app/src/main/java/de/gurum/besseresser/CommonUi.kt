@@ -136,13 +136,15 @@ fun ErrorBanner(message: String) {
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             Icon(
                 Icons.Filled.Warning,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .size(20.dp)
             )
             Spacer(Modifier.width(10.dp))
             Text(

@@ -13,6 +13,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 import java.net.HttpURLConnection
 import java.net.URI
+import java.util.Collections
 
 /**
  * HTTP-Fehlerobjekt mit HTTP-Statuscode und Antwort-Body für strukturierte Fehler- und Debug-Reports.
@@ -24,6 +25,23 @@ class ChatHttpException(val code: Int, val bodyText: String) :
  * Low-Level-HTTP-Client für OpenAI-kompatible /chat/completions Endpunkte.
  */
 object OpenAiChatClient {
+
+    const val BOOSTED_MAX_TOKENS = 16384
+
+    /** Merkt sich Modelle, deren Reasoning das Standard-Token-Budget gesprengt hat,
+     *  damit Folgeaufrufe (und der automatische Retry) sofort mit erhöhtem Budget starten. */
+    internal val boostedBudgetModels: MutableSet<String> =
+        Collections.synchronizedSet(mutableSetOf<String>())
+
+    fun markModelNeedsBoostedBudget(model: String) {
+        val key = model.trim().lowercase()
+        if (key.isNotBlank()) {
+            boostedBudgetModels.add(key)
+        }
+    }
+
+    fun hasBoostedBudget(model: String): Boolean =
+        model.trim().lowercase() in boostedBudgetModels
 
     /**
      * Führt einen synchronen POST-Request an den angegebenen Chat-Completions-Endpunkt aus.
@@ -50,28 +68,51 @@ object OpenAiChatClient {
     }
 
     /**
-     * Erstellt den JSON-Payload für Chat-Completions inklusive Modell, Temperatur, Budget und Reasoning-Ausschluss.
+     * Erstellt den JSON-Payload für Chat-Completions inklusive Modell, Temperatur, Budget und Reasoning-Steuerung.
+     * Wichtig für OpenRouter / Hybrid-Modelle (wie deepseek-v4.1-flash):
+     * Ein bloßes `{"exclude": true}` ohne `"effort": "low"` aktiviert bei OpenRouter volles Reasoning
+     * und frisst das `max_tokens`-Budget komplett auf, während die Ausgabe unterdrückt wird (`content: null`).
      */
     fun chatBody(
         model: String,
         baseUrl: String,
         temperature: Double,
         maxTokens: Int,
-        messages: JsonArray
+        messages: JsonArray,
+        highBudgetRetry: Boolean = false
     ): JsonObject = buildJsonObject {
-        put("model", model.trim())
+        val trimmedModel = model.trim()
+        val boosted = highBudgetRetry || hasBoostedBudget(trimmedModel)
+        val effectiveMaxTokens = if (boosted) maxOf(maxTokens, BOOSTED_MAX_TOKENS) else maxTokens
+
+        put("model", trimmedModel)
         put("temperature", temperature)
-        // Budget großzügig: Reasoning-Modelle „denken“ vom selben Konto —
-        // zu knapp → finish=length mit LEEREM content (klassischer stiller Fehler)
-        put("max_tokens", maxTokens)
+        put("max_tokens", effectiveMaxTokens)
         if (baseUrl.contains("openrouter", true) || baseUrl.contains("deepseek", true) ||
-            model.contains("deepseek", true)
+            trimmedModel.contains("deepseek", true)
         ) {
             putJsonObject("reasoning") {
-                put("exclude", true)
+                put("effort", "low")
+                put("exclude", !highBudgetRetry)
             }
         }
         put("messages", messages)
+    }
+
+    /**
+     * Prüft, ob die KI-Antwort wegen des Token-Limits (`finish_reason == "length"`) abgebrochen wurde,
+     * bevor überhaupt Antworttext in `content` erzeugt werden konnte.
+     */
+    fun isLengthTruncatedWithoutContent(resp: JsonObject): Boolean {
+        if (!extractContent(resp).isNullOrBlank()) return false
+        return try {
+            val first = (resp["choices"] as? JsonArray)?.firstOrNull() as? JsonObject ?: return false
+            val finish = first["finish_reason"]?.jsonPrimitive?.contentOrNull
+            val nativeFinish = first["native_finish_reason"]?.jsonPrimitive?.contentOrNull
+            finish.equals("length", ignoreCase = true) || nativeFinish.equals("length", ignoreCase = true)
+        } catch (e: Exception) {
+            false
+        }
     }
 
     /**
@@ -105,6 +146,9 @@ object OpenAiChatClient {
                 return contentFromMsg
             }
             val reasoning = msg?.get("reasoning_content")?.jsonPrimitive?.contentOrNull
+                ?.takeIf { it.isNotBlank() }
+                ?: msg?.get("reasoning")?.jsonPrimitive?.contentOrNull
+                    ?.takeIf { it.isNotBlank() }
             if (!reasoning.isNullOrBlank()) {
                 return reasoning
             }
