@@ -49,6 +49,15 @@
     <string name="recent_notes_star_desc">Als Favorit markieren</string>
     <string name="main_new_photo">Neues Foto aufnehmen</string>
     <string name="nav_blocked_hint">Bitte speichere oder verwerfe die Bewertung erst.</string>
+    <string name="main_hero_title">Bereit für deine nächste Mahlzeit?</string>
+    <string name="main_hero_sub">Mach ein Foto – die KI prüft sofort jedes deiner persönlichen Ziele per Ampel.</string>
+    <string name="main_swipe_hint">Nach links wischen für Verlauf →</string>
+    <string name="cam_hint_frame">Mahlzeit gut sichtbar im Bild platzieren</string>
+    <string name="setup_section_api">KI-Verbindung</string>
+    <string name="setup_section_goals">Persönliche Ziele</string>
+    <string name="profile_section_body">Körperdaten</string>
+    <string name="profile_section_notes">Gesundheit &amp; Ernährung</string>
+    <string name="history_empty_sub">Deine bewerteten Mahlzeiten, Tages- und Wochenfazits erscheinen übersichtlich an dieser Stelle.</string>
 
     <!-- Profil -->
     <string name="menu_profile">Profil</string>

@@ -1,7 +1,10 @@
 package de.gurum.besseresser
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,13 +12,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
@@ -29,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
@@ -86,20 +94,59 @@ fun HistoryListContent(
     )
 
     if (entries.isEmpty()) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                stringResource(R.string.history_empty),
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primaryContainer),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🍽️", fontSize = 32.sp)
+                    }
+                    Text(
+                        stringResource(R.string.history_empty),
+                        textAlign = TextAlign.Center,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        stringResource(R.string.history_empty_sub),
+                        textAlign = TextAlign.Center,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     } else {
+        Spacer(Modifier.height(8.dp))
         Text(
             stringResource(R.string.history_list_hint, entries.size),
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            fontSize = 12.5.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 4.dp)
         )
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Spacer(Modifier.height(6.dp))
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             groupByDay(entries).forEach { group ->
                 val dayKey = dayKeyOf(group.day)
                 val fazit = fazitMap[dayKey]
@@ -109,37 +156,32 @@ fun HistoryListContent(
                         (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(group.entries))
                     )
                 item(key = "day-$dayKey") {
-                    DayGroupHeader(
-                        date = group.day,
-                        fazit = fazit,
-                        loading = loadingFazit,
-                        stale = staleFazit,
-                        expanded = dayKey in expandedFazits,
-                        onToggleExpand = { onToggleExpandFazit(dayKey) },
-                        onGenerate = { onGenerateFazit(group.day, group.entries) },
-                        onAddMeal = { onAddMealForDay(group.day) }
-                    )
-                    when {
-                        loadingFazit -> Text(
-                            stringResource(R.string.dayfazit_loading_line),
-                            fontSize = 11.sp,
-                            fontStyle = FontStyle.Italic,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp, start = 4.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize()
+                    ) {
+                        DayGroupHeader(
+                            date = group.day,
+                            fazit = fazit,
+                            loading = loadingFazit,
+                            stale = staleFazit,
+                            expanded = dayKey in expandedFazits,
+                            onToggleExpand = { onToggleExpandFazit(dayKey) },
+                            onGenerate = { onGenerateFazit(group.day, group.entries) },
+                            onAddMeal = { onAddMealForDay(group.day) }
                         )
-                        fazit != null && !staleFazit && dayKey in expandedFazits -> Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 10.dp, bottom = 2.dp)
-                        ) {
-                            Text(
-                                fazit.text,
-                                fontSize = 12.sp,
-                                lineHeight = 17.sp,
-                                modifier = Modifier.padding(12.dp)
+                        when {
+                            loadingFazit -> Text(
+                                stringResource(R.string.dayfazit_loading_line),
+                                fontSize = 11.5.sp,
+                                fontStyle = FontStyle.Italic,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp, start = 6.dp)
                             )
+                            fazit != null && !staleFazit && dayKey in expandedFazits -> {
+                                FazitExpandedCard(fazit = fazit)
+                            }
                         }
                     }
                 }
@@ -159,17 +201,29 @@ fun HistoryListContent(
                             backgroundContent = {
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(16.dp))
                                         .fillMaxSize()
                                         .background(Color(0xFFD32F2F)),
                                     contentAlignment = Alignment.CenterEnd
                                 ) {
-                                    Text(
-                                        stringResource(R.string.history_delete_action),
-                                        color = Color.White,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.padding(horizontal = 24.dp)
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 22.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Filled.Delete,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(
+                                            stringResource(R.string.delete),
+                                            color = Color.White,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 14.sp
+                                        )
+                                    }
                                 }
                             }
                         ) {
@@ -201,12 +255,13 @@ fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
     val ctx = LocalContext.current
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(10.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             val thumb = remember(entry.id) {
@@ -216,36 +271,74 @@ fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
                 Image(
                     bitmap = thumb.asImageBitmap(),
                     contentDescription = stringResource(R.string.photo_of_meal),
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(64.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                            RoundedCornerShape(12.dp)
+                        )
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(64.dp)
-                        .clip(RoundedCornerShape(10.dp)),
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.75f))
+                        .border(
+                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                            RoundedCornerShape(12.dp)
+                        ),
                     contentAlignment = Alignment.Center
-                ) { Text("📷", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                ) {
+                    Text("🍽️", fontSize = 24.sp)
+                }
             }
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    if (entry.backdated)
-                        stringResource(R.string.nacherfassen_label)
-                    else
-                        SimpleDateFormat("HH:mm", Locale.getDefault())
-                            .format(Date(entry.dateMillis)),
-                    fontSize = if (entry.backdated) 12.sp else 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontStyle = if (entry.backdated) FontStyle.Italic else FontStyle.Normal
-                )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        if (entry.backdated)
+                            stringResource(R.string.nacherfassen_label)
+                        else
+                            SimpleDateFormat("HH:mm", Locale.getDefault())
+                                .format(Date(entry.dateMillis)),
+                        fontSize = if (entry.backdated) 12.sp else 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontStyle = if (entry.backdated) FontStyle.Italic else FontStyle.Normal,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (entry.goalResults.isNotEmpty()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            entry.goalResults.take(6).forEach { gr ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(gr.ampel.color())
+                                )
+                            }
+                        }
+                    }
+                }
                 if (entry.erkannt.isNotBlank()) {
                     Text(
                         stringResource(R.string.detected_prefix, entry.erkannt),
-                        fontSize = 12.sp,
+                        fontSize = 12.5.sp,
+                        lineHeight = 17.sp,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Text(
@@ -257,10 +350,13 @@ fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
                             (entry.goalResults.size - 2).coerceAtLeast(0)
                         )
                     ),
-                    fontSize = 12.sp,
+                    fontSize = 11.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            Spacer(Modifier.width(8.dp))
             ScoreBadge(entry)
         }
     }

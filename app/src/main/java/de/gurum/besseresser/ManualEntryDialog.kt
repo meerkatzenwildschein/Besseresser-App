@@ -3,11 +3,13 @@ package de.gurum.besseresser
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,7 +17,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -34,7 +38,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -49,27 +57,39 @@ import java.time.LocalDate
 fun BackdatedBusyDialog() {
     androidx.compose.ui.window.Dialog(onDismissRequest = { /* läuft, nicht abbrechen */ }) {
         Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant
+            shape = RoundedCornerShape(26.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp,
+            shadowElevation = 12.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(horizontal = 28.dp, vertical = 30.dp)
             ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(52.dp),
-                    strokeWidth = 4.dp
-                )
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(42.dp),
+                        strokeWidth = 3.5.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 Text(
                     stringResource(R.string.main_ai_working),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 16.5.sp,
+                    fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
                 Text(
                     stringResource(R.string.main_ai_working_sub),
-                    fontSize = 12.sp,
+                    fontSize = 12.5.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
@@ -88,21 +108,70 @@ fun NacherfassenChoiceDialog(
     day?.let { targetDay ->
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text(stringResource(R.string.nacherfassen_title)) },
-            text = {
+            title = {
                 Text(
-                    stringResource(R.string.nacherfassen_text) + "\n" +
-                        targetDay.format(DATE_FORMATTER)
+                    stringResource(R.string.nacherfassen_title),
+                    fontWeight = FontWeight.Bold
                 )
             },
-            confirmButton = {
-                TextButton(onClick = { onSelectWithPhoto(targetDay) }) {
-                    Text(stringResource(R.string.nacherfassen_with_photo))
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        stringResource(R.string.nacherfassen_text) + " (" +
+                            targetDay.format(DATE_FORMATTER) + ")",
+                        fontSize = 13.5.sp,
+                        lineHeight = 19.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Surface(
+                        onClick = { onSelectWithPhoto(targetDay) },
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)
+                        ) {
+                            Text("📷", fontSize = 20.sp)
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                stringResource(R.string.nacherfassen_with_photo),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    Surface(
+                        onClick = { onSelectWithoutPhoto(targetDay) },
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)
+                        ) {
+                            Text("✍️", fontSize = 20.sp)
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                stringResource(R.string.nacherfassen_without_photo),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
                 }
             },
+            confirmButton = { },
             dismissButton = {
-                TextButton(onClick = { onSelectWithoutPhoto(targetDay) }) {
-                    Text(stringResource(R.string.nacherfassen_without_photo))
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -139,6 +208,7 @@ fun BackdatedOverlays(
             onFallbackSystemCamera = onFallbackSystemCamera,
             onConfirm = {
                 onDismissCamera()
+                RecentNotesStore.push(ctx, addNote.trim())
                 onSetBusy(true)
                 val prompts = PromptBundle(
                     intro = ctx.getString(R.string.prompt_eval_intro),
@@ -179,6 +249,7 @@ fun BackdatedOverlays(
             onBack = onDismissReview,
             busy = showBusy,
             onRate = {
+                RecentNotesStore.push(ctx, addNote.trim())
                 onSetBusy(true)
                 val prompts = PromptBundle(
                     intro = ctx.getString(R.string.prompt_eval_intro),
@@ -219,6 +290,7 @@ fun BackdatedOverlays(
             onBack = onDismissText,
             busy = showBusy,
             onSend = {
+                RecentNotesStore.push(ctx, addNote.trim())
                 onSetBusy(true)
                 coroutineScope.launch {
                     val result = ApiClient.analyzeText(
@@ -261,8 +333,8 @@ fun AddMealReviewScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             TopBarRow(title = stringResource(R.string.review_title), onBack = onBack, trailing = { })
             val reviewCtx = LocalContext.current
@@ -272,11 +344,18 @@ fun AddMealReviewScreen(
                 } catch (e: Exception) { null }
             }
             if (bmp != null) {
-                Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Image(
                         bitmap = bmp.asImageBitmap(),
                         contentDescription = stringResource(R.string.photo_of_meal),
-                        modifier = Modifier.fillMaxWidth().height(280.dp)
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(280.dp)
                     )
                 }
             }
@@ -286,24 +365,44 @@ fun AddMealReviewScreen(
                 onValueChange = onNoteChange,
                 placeholder = { Text(stringResource(R.string.main_note_placeholder)) },
                 trailingIcon = { RecentNotesButton(onPick = onNoteChange) },
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 1,
+                minLines = 2,
                 maxLines = 4
             )
             Spacer(Modifier.height(100.dp))
         }
-        Button(
-            onClick = onRate,
-            enabled = !busy,
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                // Mit der Tastatur mitfahren (Notizfeld + fixierter Button kollidieren sonst)
-                .imePadding()
-                .padding(16.dp)
                 .fillMaxWidth()
-                .height(56.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Transparent,
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
         ) {
-            Text(stringResource(if (busy) R.string.main_ai_working else R.string.main_rate_now), fontSize = 17.sp)
+            Button(
+                onClick = onRate,
+                enabled = !busy,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    // Mit der Tastatur mitfahren (Notizfeld + fixierter Button kollidieren sonst)
+                    .imePadding()
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .fillMaxWidth()
+                    .height(56.dp)
+            ) {
+                Text(
+                    stringResource(if (busy) R.string.main_ai_working else R.string.main_rate_now),
+                    fontSize = 16.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }
@@ -327,8 +426,8 @@ fun AddMealNoPhotoScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             TopBarRow(
                 title = stringResource(R.string.nacherfassen_title),
@@ -336,22 +435,36 @@ fun AddMealNoPhotoScreen(
                 trailing = { },
                 icon = Icons.Filled.Add
             )
-            Text(
-                (day?.format(DATE_FORMATTER) ?: "") +
-                    " · " + stringResource(R.string.nacherfassen_without_photo),
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                stringResource(R.string.nacherfassen_empty_hint),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        "📅 " + (day?.format(DATE_FORMATTER) ?: "") +
+                            " · " + stringResource(R.string.nacherfassen_without_photo),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        stringResource(R.string.nacherfassen_empty_hint),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
+                }
+            }
             OutlinedTextField(
                 value = note,
                 onValueChange = onNoteChange,
                 placeholder = { Text(stringResource(R.string.main_note_placeholder)) },
                 trailingIcon = { RecentNotesButton(onPick = onNoteChange) },
+                shape = RoundedCornerShape(14.dp),
                 minLines = 3,
                 maxLines = 6,
                 modifier = Modifier.fillMaxWidth()
@@ -359,24 +472,40 @@ fun AddMealNoPhotoScreen(
             if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(100.dp))
         }
-        Button(
-            onClick = onSend,
-            enabled = !busy && note.isNotBlank(),
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                // Fahrt mit der Tastatur mit: Der Button bleibt immer sichtbar/ tappbar,
-                // statt hinter dem Input-Panel zu verschwinden
-                .imePadding()
-                .padding(16.dp)
                 .fillMaxWidth()
-                .height(56.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Transparent,
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
         ) {
-            Text(
-                stringResource(
-                    if (busy) R.string.main_ai_working else R.string.nacherfassen_send
-                ),
-                fontSize = 17.sp
-            )
+            Button(
+                onClick = onSend,
+                enabled = !busy && note.isNotBlank(),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    // Fahrt mit der Tastatur mit: Der Button bleibt immer sichtbar/ tappbar,
+                    // statt hinter dem Input-Panel zu verschwinden
+                    .imePadding()
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .fillMaxWidth()
+                    .height(56.dp)
+            ) {
+                Text(
+                    stringResource(
+                        if (busy) R.string.main_ai_working else R.string.nacherfassen_send
+                    ),
+                    fontSize = 16.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 }

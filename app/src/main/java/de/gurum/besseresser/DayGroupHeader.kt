@@ -1,15 +1,21 @@
 package de.gurum.besseresser
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -25,6 +31,7 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +50,7 @@ val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern(DATE_FORMAT_
 /**
  * Kopfzeile einer Tagesgruppe: Datum links, Tagesfazit-Chip rechts (Zustandsmaschine);
  * „+"-Taste zum Nachtragen eines Essens für genau diesen Tag.
+ * Fazit-Chip und „+"-Button sind einheitlich 40dp hoch.
  */
 @Composable
 fun DayGroupHeader(
@@ -55,18 +63,32 @@ fun DayGroupHeader(
     onGenerate: () -> Unit,
     onAddMeal: (() -> Unit)? = null
 ) {
+    val chevronAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "day-fazit-chevron")
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 2.dp, start = 4.dp, end = 4.dp),
+            .padding(top = 8.dp, bottom = 2.dp, start = 2.dp, end = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            date.format(DATE_FORMATTER),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Bold,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
-        )
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(18.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                date.format(DATE_FORMATTER),
+                fontSize = 15.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        }
         if (onAddMeal != null) {
             FilledTonalIconButton(
                 onClick = onAddMeal,
@@ -78,7 +100,7 @@ fun DayGroupHeader(
                     modifier = Modifier.size(20.dp)
                 )
             }
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(8.dp))
         }
         when {
             loading -> HeadChip(
@@ -118,7 +140,7 @@ fun DayGroupHeader(
                         Icons.Filled.KeyboardArrowDown,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(16.dp).rotate(if (expanded) 180f else 0f)
+                        modifier = Modifier.size(16.dp).rotate(chevronAngle)
                     )
                 }
             )
@@ -151,6 +173,7 @@ fun scoreColor(score: Int): Color = when {
 @Composable
 fun ScoreCircle(score: Int, tooltipRes: Int) {
     val tooltipState = rememberTooltipState()
+    val col = scoreColor(score)
     TooltipBox(
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
         state = tooltipState,
@@ -158,16 +181,26 @@ fun ScoreCircle(score: Int, tooltipRes: Int) {
     ) {
         Box(
             modifier = Modifier
-                .size(34.dp)
+                .size(38.dp)
                 .clip(CircleShape)
-                .background(scoreColor(score))
-                .padding(3.dp),
+                .background(col.copy(alpha = 0.18f))
+                .border(BorderStroke(1.5.dp, col.copy(alpha = 0.45f)), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                if (score >= 0) "$score" else "–",
-                fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold
-            )
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(col),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (score >= 0) "$score" else "–",
+                    fontSize = 11.5.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }
@@ -182,6 +215,11 @@ fun ScoreBadge(entry: HistoryEntry) {
             tooltipRes = if (score >= 0) R.string.score_tooltip_ok
                          else R.string.score_tooltip_unknown
         )
-        Text(stringResource(R.string.score_caption), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(2.dp))
+        Text(
+            stringResource(R.string.score_caption),
+            fontSize = 9.5.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

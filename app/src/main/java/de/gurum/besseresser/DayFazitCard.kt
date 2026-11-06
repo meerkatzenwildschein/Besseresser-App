@@ -1,6 +1,9 @@
 package de.gurum.besseresser
 
 import android.content.Context
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +26,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +61,9 @@ fun HeadChip(
     trailing: (@Composable () -> Unit)? = null
 ) {
     val shape = RoundedCornerShape(20.dp)
+    val border = if (accent == null) {
+        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+    } else null
     val content: @Composable () -> Unit = {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -81,12 +88,44 @@ fun HeadChip(
         enabled = onClick != null,
         shape = shape,
         color = accent ?: MaterialTheme.colorScheme.surfaceVariant,
+        border = border,
         modifier = Modifier.height(40.dp)
     ) {
         Box(
             modifier = Modifier.fillMaxHeight(),
             contentAlignment = Alignment.Center
         ) { content() }
+    }
+}
+
+/** Aufgeklappter Fazit-Textblock (Tages- & Wochenfazit) mit Ampel-Akzentrand. */
+@Composable
+fun FazitExpandedCard(fazit: DayFazit) {
+    val accent = ampelColor(fazit.ampel)
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.45f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 4.dp)
+    ) {
+        Row(modifier = Modifier.padding(14.dp)) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(22.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(accent)
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                fazit.text,
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }
 
@@ -102,17 +141,37 @@ fun WeekFazitRow(
     onToggleExpand: () -> Unit,
     onGenerate: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+    val chevronAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "week-fazit-chevron")
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .animateContentSize()
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                stringResource(R.string.weekfazit_row_label),
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
-            )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(4.dp)
+                        .height(18.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(MaterialTheme.colorScheme.tertiary)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.weekfazit_row_label),
+                    fontSize = 15.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             when {
                 loading -> HeadChip(
                     label = stringResource(R.string.weekfazit_chip_loading),
@@ -139,7 +198,7 @@ fun WeekFazitRow(
                             Icons.Filled.KeyboardArrowDown,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(16.dp).rotate(if (expanded) 180f else 0f)
+                            modifier = Modifier.size(16.dp).rotate(chevronAngle)
                         )
                     }
                 )
@@ -148,20 +207,12 @@ fun WeekFazitRow(
         when {
             loading -> Text(
                 stringResource(R.string.weekfazit_loading_line),
-                fontSize = 11.sp,
+                fontSize = 11.5.sp,
                 fontStyle = FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp, start = 4.dp)
+                modifier = Modifier.padding(top = 8.dp, start = 6.dp)
             )
-            fazit != null && expanded -> Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 2.dp)
-            ) {
-                Text(fazit.text, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(12.dp))
-            }
+            fazit != null && expanded -> FazitExpandedCard(fazit = fazit)
         }
     }
 }

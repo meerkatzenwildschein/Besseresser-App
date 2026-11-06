@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -55,6 +56,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -219,56 +221,23 @@ fun CameraCaptureScreen(
                     onDispose { providerHolder.value?.unbindAll() }
                 }
 
-                IconButton(
-                    onClick = onCancel,
+                // Kopfzeile über dem Kamerabild mit abgedunkeltem Kreis-Button & Hinweis-Chip
+                Row(
                     modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(8.dp)
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        tint = Color.White,
-                        contentDescription = stringResource(R.string.cd_back_no_save)
-                    )
-                }
-                // Verschlussknopf: Außen-Ring mit ausgefülltem Innenkreis
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 32.dp)
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .border(5.dp, Color.White, CircleShape)
-                        .clickable { capture() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(58.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
-                    )
-                }
-            }
-
-            else -> {
-                // Nach der Aufnahme: Foto nutzt den freien Platz, Textfeld direkt unterm Foto,
-                // Zurückpfeil in der eigenen Kopfzeile (nicht über dem Foto)
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Kopfzeile mit Zurückpfeil
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.50f),
+                        modifier = Modifier.size(44.dp)
                     ) {
                         IconButton(
                             onClick = onCancel,
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(44.dp)
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -277,6 +246,59 @@ fun CameraCaptureScreen(
                             )
                         }
                     }
+
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = Color.Black.copy(alpha = 0.50f)
+                    ) {
+                        Text(
+                            stringResource(R.string.cam_hint_frame),
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.size(44.dp))
+                }
+
+                // Verschlussknopf: Außen-Ring mit ausgefülltem Innenkreis
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 36.dp)
+                        .size(84.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.25f))
+                        .border(4.dp, Color.White, CircleShape)
+                        .clickable { capture() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                    )
+                }
+            }
+
+            else -> {
+                // Nach der Aufnahme: Theme-gerechter Hintergrund (damit das Textfeld im
+                // Light- & Dark-Mode perfekt lesbar ist), Foto-Vorschau, Notiz & Bewerten/Wiederholen
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TopBarRow(
+                        title = stringResource(R.string.review_title),
+                        onBack = onCancel,
+                        trailing = { }
+                    )
 
                     // Foto: flexibler Bereich, passend skaliert (weicht der Tastatur aus)
                     Box(
@@ -289,20 +311,21 @@ fun CameraCaptureScreen(
                         }
                         if (bmp != null) {
                             Surface(
-                                shape = RoundedCornerShape(16.dp),
+                                shape = RoundedCornerShape(20.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
                                 modifier = Modifier.fillMaxSize()
                             ) {
                                 Image(
                                     bitmap = bmp.asImageBitmap(),
                                     contentDescription = stringResource(R.string.photo_of_meal),
-                                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                                    contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
                                 )
                             }
                         }
                     }
 
-                    // Anmerkung + Auswerten direkt untereinander
+                    // Anmerkung + Auswerten + Wiederholen direkt untereinander
                     OutlinedTextField(
                         value = note,
                         onValueChange = onNoteChange,
@@ -311,16 +334,33 @@ fun CameraCaptureScreen(
                             // Letzte 5 Eingaben: Auswahl rückt nach oben (MRU)
                             RecentNotesButton(onPick = onNoteChange)
                         },
+                        shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 1,
                         maxLines = 4
                     )
                     Button(
                         onClick = onConfirm,
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp)
-                    ) { Text(stringResource(R.string.main_rate_now), fontSize = 17.sp) }
+                    ) {
+                        Text(
+                            stringResource(R.string.main_rate_now),
+                            fontSize = 16.5.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = { hasCaptured = false },
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Text(stringResource(R.string.main_retake))
+                    }
                 }
             }
         }
