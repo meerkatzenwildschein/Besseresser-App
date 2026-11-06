@@ -44,6 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 
 // ----------------------------------------------------------------- Gängige Anbieter
@@ -74,79 +76,48 @@ private val PROVIDERS = listOf(
  * Standard-Ziele: string-array "default_goals" (lokalisiert).
  */
 @Composable
-fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDone: (Settings) -> Unit) {
+fun SetupScreen(
+    initial: Settings,
+    firstRun: Boolean,
+    onCancel: () -> Unit,
+    onDone: (Settings) -> Unit,
+    viewModel: SetupViewModel = viewModel()
+) {
     val ctx = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val defaultGoals = remember { ctx.resources.getStringArray(R.array.default_goals).toList() }
-    var url by remember { mutableStateOf(initial.baseUrl) }
-    var key by remember { mutableStateOf(initial.apiKey) }
-    var model by remember { mutableStateOf(initial.model.ifBlank { "gpt-4o-mini" }) }
-    var goals by remember { mutableStateOf(initial.goals.joinToString("\n").ifBlank { defaultGoals.joinToString("\n") }) }
-    var goalsDirty by remember { mutableStateOf(false) }   // Feld wurde angefasst → neue KI-Aufteilung
-    var showModels by remember { mutableStateOf(false) }
-    var showProviders by remember { mutableStateOf(false) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // --- KI-Aufteilung beim Speichern
-    var splitting by remember { mutableStateOf(false) }
-    var showSplit by remember { mutableStateOf(false) }
-    var splitEdited by remember { mutableStateOf("") }
-    var splitRaw by remember { mutableStateOf("") }
-    var splitDebug by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(initial) {
+        viewModel.init(initial, defaultGoals)
+    }
 
-    if (showModels) {
+    if (uiState.showModels) {
         ModelListScreen(
-            url = url,
-            apiKey = key,
-            onPick = { model = it; showModels = false },
-            onBack = { showModels = false }
+            url = uiState.url,
+            apiKey = uiState.key,
+            onPick = {
+                viewModel.setModel(it)
+                viewModel.setShowModels(false)
+            },
+            onBack = { viewModel.setShowModels(false) }
         )
         return
     }
 
-    val valid = url.trim().startsWith("http") && key.isNotBlank() && model.isNotBlank() && !splitting
-    // Leeres Ziele-Feld ist ok – dann greifen DEFAULT_GOALS beim Speichern
+    val valid = uiState.url.trim().startsWith("http") && uiState.key.isNotBlank() && uiState.model.isNotBlank() && !uiState.splitting
 
     val doSave: (List<String>, Boolean) -> Unit = { liste, wasSplit ->
-        onDone(Settings(url.trim(), key.trim(), model.trim(), liste.ifEmpty { defaultGoals }, wasSplit))
+        onDone(Settings(uiState.url.trim(), uiState.key.trim(), uiState.model.trim(), liste.ifEmpty { defaultGoals }, wasSplit))
     }
 
     val save: () -> Unit = {
-        val text = goals.trim()
+        val text = uiState.goals.trim()
         when {
-            // Leeres Feld = Standard-Ziele, keine KI nötig
             text.isBlank() -> doSave(defaultGoals, true)
-            // Bereits bestätigt aufgeteilt und unverändert → direkt übernehmen
-            initial.goalsWereSplit && !goalsDirty -> doSave(
+            initial.goalsWereSplit && !uiState.goalsDirty -> doSave(
                 text.split("\n").map { it.trim() }.filter { it.isNotBlank() }, true
             )
-            // Sonst: KI-Aufteilung anfordern
-            else -> {
-                splitting = true
-                splitDebug = null
-                splitRaw = text
-                coroutineScope.launch {
-                    val result = ApiClient.splitGoals(
-                        request = SplitGoalsRequest(
-                            baseUrl = url,
-                            apiKey = key,
-                            model = model,
-                            rawGoals = text,
-                            splitIntro = ctx.getString(R.string.prompt_split_intro),
-                            splitRules = ctx.getString(R.string.prompt_split_rules)
-                        )
-                    )
-                    result.onSuccess { liste ->
-                        splitting = false
-                        splitEdited = liste.joinToString("\n")
-                        showSplit = true
-                    }.onFailure { e ->
-                        splitting = false
-                        splitDebug = extractErrorDebugReport(e)
-                        splitEdited = ApiClient.splitGoalsLocally(text).joinToString("\n").ifBlank { text }
-                        showSplit = true
-                    }
-                }
-            }
+            else -> viewModel.startSplitGoals(ctx, text, onDone)
         }
     }
 
@@ -162,7 +133,6 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // --- Top-Bar: Zurueck (ohne Speichern) | Titel; Speichern als Button unten
         TopBarRow(
             title = "Einstellungen",
             onBack = onCancel,
@@ -186,21 +156,21 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
 
         LabelledField(stringResource(R.string.setup_url_label)) {
             OutlinedTextField(
-                value = url,
-                onValueChange = { url = it },
+                value = uiState.url,
+                onValueChange = { viewModel.setUrl(it) },
                 placeholder = { Text("https://api.openai.com/v1") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
         }
-        TextButton(onClick = { showProviders = true }) {
+        TextButton(onClick = { viewModel.setShowProviders(true) }) {
             Text(stringResource(R.string.setup_pick_provider))
         }
 
         LabelledField(stringResource(R.string.setup_key_label)) {
             OutlinedTextField(
-                value = key,
-                onValueChange = { key = it },
+                value = uiState.key,
+                onValueChange = { viewModel.setKey(it) },
                 placeholder = { Text(stringResource(R.string.setup_key_placeholder)) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
@@ -209,30 +179,30 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
         }
         LabelledField(stringResource(R.string.setup_model_label)) {
             OutlinedTextField(
-                value = model,
-                onValueChange = { model = it },
+                value = uiState.model,
+                onValueChange = { viewModel.setModel(it) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
         }
         TextButton(
-            onClick = { showModels = true },
-            enabled = url.trim().startsWith("http")
+            onClick = { viewModel.setShowModels(true) },
+            enabled = uiState.url.trim().startsWith("http")
         ) {
             Text(stringResource(R.string.setup_models_link))
         }
 
         LabelledField(stringResource(R.string.setup_goals_label), required = false) {
             OutlinedTextField(
-                value = goals,
-                onValueChange = { goals = it; goalsDirty = true },
+                value = uiState.goals,
+                onValueChange = { viewModel.setGoals(it) },
                 placeholder = { Text(defaultGoals.joinToString("\n")) },
                 minLines = 4,
                 modifier = Modifier.fillMaxWidth()
             )
         }
 
-        if (splitting) {
+        if (uiState.splitting) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(Modifier.size(20.dp))
                 Spacer(Modifier.width(12.dp))
@@ -247,11 +217,9 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        // Platzhalter, damit die Build-Zeile nie unter dem fixierten Save-Button steckt
         Spacer(Modifier.height(90.dp))
     }
 
-    // Fixierter Speicher-CTA unten (immer sichtbar, wie der Foto-Button)
     Button(
         onClick = save,
         enabled = valid,
@@ -262,22 +230,24 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
             .height(56.dp)
     ) {
         Text(
-            stringResource(if (splitting) R.string.setup_ai_splitting_button else R.string.setup_save_continue),
+            stringResource(if (uiState.splitting) R.string.setup_ai_splitting_button else R.string.setup_save_continue),
             fontSize = 17.sp
         )
     }
     }
 
-    // --- Dialog: Anbieter-Auswahl (fuellt das URL-Feld)
-    if (showProviders) {
+    if (uiState.showProviders) {
         AlertDialog(
-            onDismissRequest = { showProviders = false },
+            onDismissRequest = { viewModel.setShowProviders(false) },
             title = { Text(stringResource(R.string.provider_picker_title)) },
             text = {
                 LazyColumn(Modifier.heightIn(max = 450.dp)) {
                     items(PROVIDERS) { p ->
                         TextButton(
-                            onClick = { url = p.url; showProviders = false },
+                            onClick = {
+                                viewModel.setUrl(p.url)
+                                viewModel.setShowProviders(false)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(Modifier.fillMaxWidth()) {
@@ -301,25 +271,24 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showProviders = false }) { Text(stringResource(R.string.close)) }
+                TextButton(onClick = { viewModel.setShowProviders(false) }) { Text(stringResource(R.string.close)) }
             }
         )
     }
 
-    // --- Dialog: KI-aufgeteilte Ziele pruefen & uebernehmen
-    if (showSplit) {
+    if (uiState.showSplit) {
         AlertDialog(
-            onDismissRequest = { showSplit = false },
+            onDismissRequest = { viewModel.setShowSplit(false) },
             title = {
                 Text(
                     stringResource(
-                        if (splitDebug == null) R.string.split_title_ok else R.string.split_title_fail
+                        if (uiState.splitDebug == null) R.string.split_title_ok else R.string.split_title_fail
                     )
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (splitDebug != null) {
+                    if (uiState.splitDebug != null) {
                         Surface(
                             color = MaterialTheme.colorScheme.errorContainer,
                             shape = MaterialTheme.shapes.small,
@@ -327,7 +296,7 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
                         ) {
                             SelectionContainer {
                                 Text(
-                                    splitDebug.orEmpty(),
+                                    uiState.splitDebug.orEmpty(),
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 10.sp,
                                     modifier = Modifier.padding(8.dp)
@@ -343,8 +312,8 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
                         Text(stringResource(R.string.split_check_hint), fontSize = 13.sp)
                     }
                     OutlinedTextField(
-                        value = splitEdited,
-                        onValueChange = { splitEdited = it },
+                        value = uiState.splitEdited,
+                        onValueChange = { viewModel.setSplitEdited(it) },
                         minLines = 5,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -352,16 +321,15 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val liste = splitEdited.split("\n").map { it.trim() }.filter { it.isNotBlank() }
-                    showSplit = false
+                    val liste = uiState.splitEdited.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+                    viewModel.setShowSplit(false)
                     doSave(liste, true)
                 }) { Text(stringResource(R.string.split_save)) }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    showSplit = false
-                    // Ausweg: Original-Freitext unverändert als ein Ziel
-                    doSave(listOf(splitRaw), true)
+                    viewModel.setShowSplit(false)
+                    doSave(listOf(uiState.splitRaw), true)
                 }) { Text(stringResource(R.string.split_keep_original)) }
             }
         )

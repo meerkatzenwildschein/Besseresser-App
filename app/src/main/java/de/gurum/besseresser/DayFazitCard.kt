@@ -1,0 +1,269 @@
+package de.gurum.besseresser
+
+import android.content.Context
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.LocalTime
+import java.util.Date
+import java.util.Locale
+
+/** Auto-Fazits starten erst ab dieser Uhrzeit (Stunde, lokal) – davor nur manueller Chip. */
+const val FAZIT_AUTO_HOUR = 18
+
+/**
+ * Kopf-Chip (Tages-/Wochenfazit): 40dp hoch — exakt so hoch wie der „+“-Button —,
+ * zentrierter Inhalt, größere Schrift (13sp). accent != null → farbiger Ampel-Chip
+ * mit weißem Inhalt; sonst grau. onClick = null → nicht tappbar (Loading).
+ */
+@Composable
+fun HeadChip(
+    label: String,
+    onClick: (() -> Unit)?,
+    accent: Color? = null,
+    leading: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    val shape = RoundedCornerShape(20.dp)
+    val content: @Composable () -> Unit = {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .height(40.dp)
+                .padding(horizontal = 14.dp)
+        ) {
+            leading?.invoke()
+            if (leading != null) Spacer(Modifier.width(6.dp))
+            Text(
+                label,
+                fontSize = 13.sp,
+                fontWeight = if (accent != null) FontWeight.Bold else FontWeight.SemiBold,
+                color = if (accent != null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (trailing != null) Spacer(Modifier.width(4.dp))
+            trailing?.invoke()
+        }
+    }
+    Surface(
+        onClick = { onClick?.invoke() },
+        enabled = onClick != null,
+        shape = shape,
+        color = accent ?: MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.height(40.dp)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxHeight(),
+            contentAlignment = Alignment.Center
+        ) { content() }
+    }
+}
+
+/**
+ * Wochenfazit-Zeile: Label links, Chip rechts (idle/loading/ready-farbig); kein „veraltet"-
+ * Zustand – Wochen-Änderungen löschen das Fazit stattdessen (Chip → idle).
+ */
+@Composable
+fun WeekFazitRow(
+    fazit: DayFazit?,
+    loading: Boolean,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onGenerate: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                stringResource(R.string.weekfazit_row_label),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            when {
+                loading -> HeadChip(
+                    label = stringResource(R.string.weekfazit_chip_loading),
+                    onClick = null,
+                    leading = {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                )
+                fazit == null -> HeadChip(
+                    label = stringResource(R.string.weekfazit_chip_idle),
+                    onClick = onGenerate
+                )
+                else -> HeadChip(
+                    label = stringResource(R.string.weekfazit_chip_label),
+                    onClick = onToggleExpand,
+                    accent = ampelColor(fazit.ampel),
+                    leading = { Box(Modifier.size(10.dp).clip(CircleShape).background(Color.White)) },
+                    trailing = {
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp).rotate(if (expanded) 180f else 0f)
+                        )
+                    }
+                )
+            }
+        }
+        when {
+            loading -> Text(
+                stringResource(R.string.weekfazit_loading_line),
+                fontSize = 11.sp,
+                fontStyle = FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp, start = 4.dp)
+            )
+            fazit != null && expanded -> Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp, bottom = 2.dp)
+            ) {
+                Text(fazit.text, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(12.dp))
+            }
+        }
+    }
+}
+
+/** Mahlzeiten-Zeilen für den Tagesfazit-Prompt: „HH:mm · Erkanntes mit Menge · Anmerkung“;
+ *  nachgetragene Einträge ohne echte Uhrzeit → Label „nachträglich erfasst“. */
+fun dayFazitMealLines(ctx: Context, entriesOfDay: List<HistoryEntry>): List<String> =
+    entriesOfDay.sortedBy { it.dateMillis }.map { e ->
+        val time = if (e.backdated)
+            ctx.getString(R.string.nacherfassen_label)
+        else
+            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(e.dateMillis))
+        val recog = e.erkannt.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
+        var line = "$time · $recog"
+        e.note.takeIf { it.isNotBlank() }
+            ?.let { line += " · " + ctx.getString(R.string.dayfazit_line_note, it.trim()) }
+        line
+    }
+
+fun createDayFazitPrompts(ctx: Context): FazitPromptBundle = FazitPromptBundle(
+    promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
+    promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+    promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+    promptHonesty = ctx.getString(R.string.prompt_honesty)
+)
+
+fun createWeekFazitPrompts(ctx: Context): FazitPromptBundle = FazitPromptBundle(
+    promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
+    promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+    promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+    promptHonesty = ctx.getString(R.string.prompt_honesty)
+)
+
+fun syncWeekFazit(ctx: Context, entries: List<HistoryEntry>): DayFazit? {
+    val wk = weekKeyOf(System.currentTimeMillis())
+    val wf = WeekFazitStore.load(ctx, wk) ?: return null
+    val currentWkEntries = entries.filter { dayKeyOf(it.dateMillis) == wk }
+    if (wf.fingerprint != dayFingerprint(currentWkEntries)) {
+        WeekFazitStore.delete(ctx, wk)
+        return null
+    }
+    return wf
+}
+
+fun isFazitOutdated(fazit: DayFazit, entries: List<HistoryEntry>): Boolean {
+    if (fazit.entryIds.toSet() != entries.map { it.id }.toSet()) return true
+    return fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(entries)
+}
+
+@Composable
+fun HistoryAutoFazitEffect(
+    entries: List<HistoryEntry>,
+    fazitMap: Map<String, DayFazit>,
+    loadingFazits: List<String>,
+    weekFazit: DayFazit?,
+    loadingWeek: Boolean,
+    onGenerateFazit: (LocalDate, List<HistoryEntry>) -> Unit,
+    onGenerateWeekFazit: () -> Unit
+) {
+    LaunchedEffect(entries, fazitMap) {
+        if (entries.isEmpty()) return@LaunchedEffect
+        delay(1200)   // Debounce
+        val autoFazitTime = LocalTime.now().hour >= FAZIT_AUTO_HOUR
+        groupByDay(entries).take(2).forEach { group ->
+            handleAutoDayFazit(group, fazitMap, loadingFazits, autoFazitTime, onGenerateFazit)
+        }
+        handleAutoWeekFazit(autoFazitTime, weekFazit, loadingWeek, onGenerateWeekFazit)
+    }
+}
+
+fun handleAutoDayFazit(
+    group: DayGroup,
+    fazitMap: Map<String, DayFazit>,
+    loadingFazits: List<String>,
+    autoFazitTime: Boolean,
+    onGenerateFazit: (LocalDate, List<HistoryEntry>) -> Unit
+) {
+    val key = dayKeyOf(group.day)
+    if (key in loadingFazits || !autoFazitTime) return
+    val fazit = fazitMap[key]
+    if (fazit == null) {
+        if (key !in DayFazitSession.attempted) {
+            DayFazitSession.attempted.add(key)
+            onGenerateFazit(group.day, group.entries)
+        }
+    } else if (isFazitOutdated(fazit, group.entries)) {
+        onGenerateFazit(group.day, group.entries)
+    }
+}
+
+fun handleAutoWeekFazit(
+    autoFazitTime: Boolean,
+    weekFazit: DayFazit?,
+    loadingWeek: Boolean,
+    onGenerateWeekFazit: () -> Unit
+) {
+    if (!autoFazitTime || LocalDate.now().dayOfWeek != java.time.DayOfWeek.SUNDAY || weekFazit != null || loadingWeek) {
+        return
+    }
+    val wk = weekKeyOf(System.currentTimeMillis())
+    if (wk !in DayFazitSession.attemptedWeekly) {
+        DayFazitSession.attemptedWeekly.add(wk)
+        onGenerateWeekFazit()
+    }
+}

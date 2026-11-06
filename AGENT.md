@@ -126,10 +126,12 @@ Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz 
 | UI-Framework | Jetpack Compose (BOM 2024.09.02), Material 3 |
 | Android Gradle Plugin | 8.5.2 (Gradle 8.9) |
 | SDK-Versionen | `compileSdk` / `targetSdk` = 34, `minSdk` = 26 |
+| Persistenz | Room Database 2.6.1 (`androidx.room:room-runtime`, `room-ktx`, `room-compiler` via KSP) |
+| State Management | Jetpack Lifecycle ViewModel & Compose (`lifecycle-viewmodel-compose:2.8.6`, `StateFlow`) |
 | Serialisierung | `kotlinx-serialization-json:1.7.3` |
 | Kamera | CameraX 1.3.4 (`camera-core`, `camera-camera2`, `camera-lifecycle`, `camera-view`) |
 | Sicherheit | Android Keystore / AES-256-GCM (`KeyVault.kt`) |
-| Tests | JUnit 4 (`DataSerializationTest.kt`, `ApiClientTest.kt`) |
+| Tests | JUnit 4 (`DataSerializationTest.kt`, `ApiClientTest.kt`, `RoomDatabaseAndViewModelTest.kt`) |
 
 ---
 
@@ -140,16 +142,17 @@ Besseresser-App/
 ├── AGENT.md                      ← Diese Architektur- & Kontextdatei
 ├── README.md                     ← Allgemeine Projektübersicht
 ├── REFACTORING.md                ← Refactoring-Roadmap & Fortschrittstracking
-├── build.gradle.kts              ← Root-Build-Skript mit Plugin-Definitionen
+├── build.gradle.kts              ← Root-Build-Skript mit Plugin-Definitionen (KSP, Kotlin, Compose)
 ├── settings.gradle.kts           ← Modul- & Repository-Konfiguration
 ├── gradle.properties
 ├── app/
-│   ├── build.gradle.kts          ← App-Dependencies (Compose, CameraX, Serialization, Tests)
+│   ├── build.gradle.kts          ← App-Dependencies (Compose, Room, ViewModel, CameraX, Serialization)
 │   └── src/
 │       ├── main/
 │       │   ├── AndroidManifest.xml
 │       │   ├── java/de/gurum/besseresser/
 │       │   │   ├── ApiClient.kt            ← OpenAI-Netzwerk-Koordinator, BesseresserApiService
+│       │   │   ├── AppDatabase.kt          ← Room SQLite-Datenbank, Entities, DAOs & TypeConverters
 │       │   │   ├── CameraScreen.kt         ← CameraX-Live-Preview & Foto-Review
 │       │   │   ├── CommonUi.kt             ← Wiederverwendbare UI-Elemente (TopBars, Dialoge, Badges)
 │       │   │   ├── Data.kt                 ← Domänenmodelle, Enums (TrafficLight, Gender), AppJson
@@ -158,16 +161,20 @@ Besseresser-App/
 │       │   │   ├── HistoryDetailScreen.kt  ← Detailansicht einzelner Mahlzeiten, Re-Evaluation
 │       │   │   ├── HistoryListScreen.kt    ← Verlaufslisten-UI, Swipe-To-Dismiss, HistoryItem
 │       │   │   ├── HistoryScreen.kt        ← Haupt-Verlaufsansicht & Navigation
-│       │   │   ├── HistoryStore.kt         ← Persistenz für Mahlzeiten, Tages- und Wochenfazits
+│       │   │   ├── HistoryStore.kt         ← Persistenzbrücke & automatische JSON-zu-Room-Migration
+│       │   │   ├── HistoryViewModel.kt     ← ViewModel für Verlaufsdaten, Filter & Fazit-Generierung
 │       │   │   ├── ImagePreprocessor.kt    ← Bildskalierung & Base64-Data-URI-Aufbereitung
 │       │   │   ├── KeyVault.kt             ← Keystore-Verschlüsselung für API-Keys
 │       │   │   ├── MainActivity.kt         ← App-Einstiegspunkt, Theme, Root-Navigation
 │       │   │   ├── MainScreen.kt           ← Hauptbildschirm, CTA-Handling, Auswertungsansicht
+│       │   │   ├── MainViewModel.kt        ← ViewModel für Foto-Erfassung, Analyse & Review
 │       │   │   ├── ManualEntryDialog.kt    ← Dialoge & Overlays zur Nacherfassung (mit/ohne Foto)
 │       │   │   ├── OpenAiChatClient.kt     ← Reiner HTTP-Netzwerktransport & tolerantes JSON-Parsing
 │       │   │   ├── ProfileScreen.kt        ← Nutzerprofil-Verwaltung
+│       │   │   ├── ProfileViewModel.kt     ← ViewModel für Profil-Daten & Validierung
 │       │   │   ├── PromptBuilder.kt        ← Dynamische Prompt-Generierung (Analyse, Fazit, Ziele)
 │       │   │   ├── SetupScreen.kt          ← Ersteinrichtung, Provider- & Modell-Auswahl
+│       │   │   ├── SetupViewModel.kt       ← ViewModel für API-Konfiguration & Zielaufteilung
 │       │   │   └── Store.kt                ← SharedPreferences-Speicher (Settings, Profile, RecentNotes)
 │       │   └── res/
 │       │       ├── values/             ← strings.xml (EN Default), themes.xml, colors.xml
@@ -176,9 +183,9 @@ Besseresser-App/
 │       │       └── xml/                ← file_paths.xml, locales_config.xml
 │       └── test/
 │           └── java/de/gurum/besseresser/
-│               ├── ApiClientTest.kt         ← Unit-Tests für ApiClient-Hilfsmethoden & Fehlermodelle
-│               └── DataSerializationTest.kt ← Unit-Tests für Serialisierung, Enums und Scores
-```
+│               ├── ApiClientTest.kt              ← Unit-Tests für ApiClient-Hilfsmethoden & Fehlermodelle
+│               ├── DataSerializationTest.kt      ← Unit-Tests für Serialisierung, Enums und Scores
+│               └── RoomDatabaseAndViewModelTest.kt ← Unit-Tests für Room-Converter, Mappings & ViewModels
 
 ---
 

@@ -31,10 +31,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +41,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -83,20 +83,20 @@ fun profileContextLine(ctx: Context, profile: Profile): String? {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> Unit) {
+fun ProfileScreen(
+    initial: Profile,
+    onCancel: () -> Unit,
+    onSave: (Profile) -> Unit,
+    viewModel: ProfileViewModel = viewModel()
+) {
     val ctx = LocalContext.current
-    // Android-Zurück-Button schließt das Profil (wie der TopBar-Pfeil)
     BackHandler(onBack = onCancel)
 
-    var birthDateIso by remember { mutableStateOf(initial.birthDate) }
-    var weightText by remember {
-        mutableStateOf(initial.weightKg?.toString()?.replace('.', ',') ?: "")
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(initial) {
+        viewModel.initFromProfile(initial)
     }
-    var heightText by remember { mutableStateOf(initial.heightCm?.toString() ?: "") }
-    var notesText by remember { mutableStateOf(initial.notes) }
-    var gender by remember { mutableStateOf(initial.gender) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var showDatePicker by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -124,18 +124,13 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            error?.let { msg ->
+            uiState.error?.let { msg ->
                 ErrorBanner(msg)
             }
 
-            // Geburtsdatum: Material-DatePicker (System-lokalisiert), Anzeige dd.MM.yyyy.
-            // Bitte-nicht-fixable-Falle: readOnly-TextField mit clickable(interactionSource) schluckt
-            // den Tap (TextField-eigene Gestures). Robustes Muster: Feld optisch normal
-            // (enabled=false + Farben über OutlinedTextFieldDefaults zurückgesetzt), dann
-            // transparente Click-Box drüber – die fängt den Tap zuverlässig ab.
             Box {
                 OutlinedTextField(
-                    value = birthDateIso?.let {
+                    value = uiState.birthDate?.let {
                         LocalDate.parse(it).format(BIRTH_DISPLAY_FORMAT)
                     } ?: "",
                     onValueChange = { },
@@ -158,11 +153,10 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
                 Box(
                     modifier = Modifier
                         .matchParentSize()
-                        .clickable { showDatePicker = true }
+                        .clickable { viewModel.setShowDatePicker(true) }
                 )
             }
 
-            // Geschlecht (optional): drei FilterChips, nochmal antippen = wieder leer
             Text(
                 stringResource(R.string.profile_gender_label),
                 fontSize = 14.sp,
@@ -170,25 +164,25 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
-                    selected = gender == Gender.MALE,
-                    onClick = { gender = if (gender == Gender.MALE) Gender.NONE else Gender.MALE },
+                    selected = uiState.gender == Gender.MALE,
+                    onClick = { viewModel.setGender(if (uiState.gender == Gender.MALE) Gender.NONE else Gender.MALE) },
                     label = { Text(stringResource(R.string.profile_gender_male), fontSize = 12.sp) }
                 )
                 FilterChip(
-                    selected = gender == Gender.FEMALE,
-                    onClick = { gender = if (gender == Gender.FEMALE) Gender.NONE else Gender.FEMALE },
+                    selected = uiState.gender == Gender.FEMALE,
+                    onClick = { viewModel.setGender(if (uiState.gender == Gender.FEMALE) Gender.NONE else Gender.FEMALE) },
                     label = { Text(stringResource(R.string.profile_gender_female), fontSize = 12.sp) }
                 )
                 FilterChip(
-                    selected = gender == Gender.DIVERSE,
-                    onClick = { gender = if (gender == Gender.DIVERSE) Gender.NONE else Gender.DIVERSE },
+                    selected = uiState.gender == Gender.DIVERSE,
+                    onClick = { viewModel.setGender(if (uiState.gender == Gender.DIVERSE) Gender.NONE else Gender.DIVERSE) },
                     label = { Text(stringResource(R.string.profile_gender_diverse), fontSize = 12.sp) }
                 )
             }
 
             OutlinedTextField(
-                value = weightText,
-                onValueChange = { weightText = it },
+                value = uiState.weightText,
+                onValueChange = { viewModel.setWeightText(it) },
                 label = { Text(stringResource(R.string.profile_weight_label)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
@@ -196,8 +190,8 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
             )
 
             OutlinedTextField(
-                value = heightText,
-                onValueChange = { heightText = it },
+                value = uiState.heightText,
+                onValueChange = { viewModel.setHeightText(it) },
                 label = { Text(stringResource(R.string.profile_height_label)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
@@ -205,8 +199,8 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
             )
 
             OutlinedTextField(
-                value = notesText,
-                onValueChange = { notesText = it },
+                value = uiState.notesText,
+                onValueChange = { viewModel.setNotesText(it) },
                 label = { Text(stringResource(R.string.profile_notes_label)) },
                 placeholder = { Text(stringResource(R.string.profile_notes_hint)) },
                 minLines = 3,
@@ -214,24 +208,22 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Platzhalter, damit nichts unter dem fixierten Speichern-CTA steckt
             Spacer(Modifier.height(100.dp))
         }
 
-        // Fixierter Speichern-CTA unten (wie im Setup)
         Button(
             onClick = {
-                val weight = weightText.trim().replace(',', '.')
+                val weight = uiState.weightText.trim().replace(',', '.')
                     .takeIf { it.isNotBlank() }?.toDoubleOrNull()
-                val height = heightText.trim().takeIf { it.isNotBlank() }?.toIntOrNull()
+                val height = uiState.heightText.trim().takeIf { it.isNotBlank() }?.toIntOrNull()
 
                 val plausible =
                     (weight == null || weight in 1.0..700.0) &&
                     (height == null || height in 30..280)
                 if (!plausible) {
-                    error = ctx.getString(R.string.profile_invalid_number)
+                    viewModel.save(ctx, onSave)
                 } else {
-                    onSave(Profile(birthDateIso, weight, height, notesText.trim(), gender))
+                    onSave(Profile(uiState.birthDate, weight, height, uiState.notesText.trim(), uiState.gender))
                 }
             },
             modifier = Modifier
@@ -244,25 +236,25 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
         }
     }
 
-    if (showDatePicker) {
+    if (uiState.showDatePicker) {
         val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = birthDateIso
+            initialSelectedDateMillis = uiState.birthDate
                 ?.let { try { LocalDate.parse(it).toEpochDay() * 86_400_000 } catch (e: Exception) { null } }
         )
         DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
+            onDismissRequest = { viewModel.setShowDatePicker(false) },
             confirmButton = {
                 TextButton(onClick = {
                     pickerState.selectedDateMillis?.let { ms ->
-                        birthDateIso = LocalDate.ofEpochDay(ms / 86_400_000).toString()
+                        viewModel.setBirthDate(LocalDate.ofEpochDay(ms / 86_400_000).toString())
                     }
-                    showDatePicker = false
+                    viewModel.setShowDatePicker(false)
                 }) { Text(stringResource(R.string.profile_ok)) }
             },
             dismissButton = {
                 TextButton(onClick = {
-                    birthDateIso = null
-                    showDatePicker = false
+                    viewModel.setBirthDate(null)
+                    viewModel.setShowDatePicker(false)
                 }) { Text(stringResource(R.string.profile_date_clear)) }
             }
         ) {
