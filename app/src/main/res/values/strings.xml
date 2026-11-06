@@ -185,6 +185,9 @@
     <string name="score_tooltip_ok">Average of the rated goals: 🟢 100 · 🟡 50 · 🔴 0</string>
     <string name="score_tooltip_unknown">No average: no rating received</string>
     <string name="history_entry_delete">Delete entry</string>
+    <string name="history_entry_duplicate">Duplicate entry</string>
+    <string name="history_duplicate_pick_date_title">Duplicate meal to date</string>
+    <string name="history_duplicate_done">Meal duplicated to %1$s</string>
     <string name="history_delete_confirm_title">Delete entry?</string>
     <string name="history_delete_confirm_text">Photo and rating will be removed irreversibly.</string>
 </resources>

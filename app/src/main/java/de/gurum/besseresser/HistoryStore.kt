@@ -153,6 +153,61 @@ object HistoryStore {
         }
     }
 
+    /** Erzeugt ein Duplikat-Domänenobjekt für das gewählte Zieldatum (ohne echte Uhrzeit -> backdated = true). */
+    internal fun createDuplicatedEntry(
+        source: HistoryEntry,
+        targetDay: LocalDate,
+        newId: Long = System.currentTimeMillis(),
+        newPhotoFile: String = ""
+    ): HistoryEntry {
+        val targetMillis = targetDay
+            .atTime(23, 59)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        return source.copy(
+            id = newId,
+            dateMillis = targetMillis,
+            photoFile = newPhotoFile,
+            backdated = true
+        )
+    }
+
+    /** Dupliziert einen bestehenden Eintrag komplett (inkl. Foto, Ziele, Texte, Notiz) ohne erneute KI-Bewertung
+     *  auf das gewählte Zieldatum. Der neue Eintrag wird als „nachträglich erfasst“ (backdated = true) markiert.
+     *  Ein bestehendes Tagesfazit des Zieltags bleibt in der DB, damit es über den Entry-ID-/Fingerprint-Mismatch
+     *  genau wie bei einer Eintrags-Bearbeitung als geändert/veraltet („⟳ Neu bewerten“) getrackt wird. */
+    fun duplicateToDate(ctx: Context, source: HistoryEntry, targetDay: LocalDate): HistoryEntry {
+        ensureMigrated(ctx)
+        val id = System.currentTimeMillis()
+        var copiedPhotoName = ""
+        val existingPhoto = photoFileOf(ctx, source)
+        if (existingPhoto != null) {
+            try {
+                val targetFile = File(dir(ctx), "$id.jpg")
+                existingPhoto.copyTo(targetFile, overwrite = true)
+                if (targetFile.exists() && targetFile.length() > 0) {
+                    copiedPhotoName = targetFile.name
+                }
+            } catch (e: Exception) {
+                copiedPhotoName = ""
+            }
+        }
+        val duplicated = createDuplicatedEntry(
+            source = source,
+            targetDay = targetDay,
+            newId = id,
+            newPhotoFile = copiedPhotoName
+        )
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).historyDao().insert(duplicated.toEntity())
+        }
+        // Wochenfazit der Zielwoche invalidieren; Tagesfazit bleibt stehen und wird durch die neue
+        // Entry-ID automatisch als veraltet (stale = true / „⟳ Neu bewerten“) markiert.
+        WeekFazitStore.deleteForEntry(ctx, duplicated)
+        return duplicated
+    }
+
     /** Foto downgesampelt (<1024px) speichern, JPEG-Qualitaet Schritt fuer Schritt bis < 100 KB. */
     private fun saveScaledJpeg(ctx: Context, uri: Uri, out: File) {
         val res = ctx.contentResolver
