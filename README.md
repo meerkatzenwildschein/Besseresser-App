@@ -1,84 +1,62 @@
-# 🍽️ Besseresser
+# 🥗 Besseresser
 
-**Besseresser** ist eine Android-App, die Essen fotografiert und es per KI gegen deine persönlichen Ziele bewertet – als einfache Ampel: 🟢🟡🔴.
+**Kein Kalorienzählen. Keine endlosen Lebensmitteltabellen. Einfach fotografieren und sofort wissen, ob dein Essen zu deinen Zielen passt.**
 
-Ob „Gesünder essen", „Weniger Zucker" oder „Blutdruck senken": Du definierst deine Ziele, fotografierst dein Essen, und die KI sagt dir für jedes Ziel individuell, wie gut die Mahlzeit passt – mit kurzer Begründung, statt komplizierter Nährwerttabellen.
+**Besseresser** ist dein persönlicher KI-Ernährungsbegleiter für Android. Du legst einmal fest, worauf du achten möchtest – zum Beispiel *„Blutdruck senken"*, *„Weniger Zucker"*, *„Gewicht verlieren"* oder *„Mehr Eiweiß"* –, machst ein Foto von deinem Teller und erhältst in Sekunden eine ehrliche **Ampel-Bewertung (🟢 Grün · 🟡 Gelb · 🔴 Rot)** für jedes einzelne Ziel.
 
-## ✨ Features
+---
 
-- **Eigene Ziele als Freitext** – die KI zerlegt deine Wünsche beim Setup automatisch in einzelne, prägnante Ziele (die du vor dem Speichern noch bearbeiten kannst)
-- **Foto direkt in der App** – eingebaute Kamera (CameraX) mit Anmerkungsfeld; Fallback auf die Systemkamera
-- **Ampel-Bewertung pro Ziel** – grün/gelb/rot plus Begründung und ein Gesamteindruck-Satz
-- **Historie** – gespeicherte Bewertungen mit Thumbnails, Details pro Ziel, wischbar zum Löschen
-- **Beliebige OpenAI-kompatible APIs** – OpenAI, OpenRouter, Gemini, Mistral, Groq, xAI, Anthropic u. v. m.; Modellliste wird direkt aus der API geladen und auf Bildverstehen gefiltert
-- **Datenschutz zuerst** – alle Einstellungen (inkl. API-Key, verschlüsselt via Android-Keystore) bleiben **lokal** auf dem Gerät; die Fotos gehen nur an den API-Anbieter deiner Wahl
-- **Hell & dunkel**, Deutsch & Englisch (auf Android 13+ auch als App-Sprache wählbar)
+## 📸 Einblicke
 
-## 🚀 Schnellstart
+| Start & Ziele | Mahlzeiten-Auswertung | Verlauf & Tagesfazit |
+| :---: | :---: | :---: |
+| <img src="screenshots/Start.jpg" width="250" alt="Startbildschirm mit persönlichen Zielen" /> | <img src="screenshots/Details.jpg" width="250" alt="Detailansicht einer ausgewerteten Mahlzeit" /> | <img src="screenshots/Verlaufsansicht.jpg" width="250" alt="Verlaufsansicht mit Ampelschnitt und Tagesfazit" /> |
 
-1. App auf ein Android-Gerät mit **Android 8.0 (API 26)+** installieren (siehe [Build](#🔨-bauen))
-2. Beim ersten Start einmal einrichten:
-   - Ziele als Freitext eintragen (eine Zeile = ein Ziel, oder die Vorschläge nutzen)
-   - API-URL und API-Key einer OpenAI-kompatiblen API angeben (z. B. `https://api.openai.com/v1` – Anbieter-Vorschläge sind per Link im Setup verlinkt)
-   - Modell mit Bildverstehen wählen (z. B. `gpt-4o-mini`) – direkt aus der Modellliste der API
-3. Essen fotografieren → Ampel-Bewertung erhalten 🟢
+---
 
-## 🔄 So funktioniert es
+## ✨ Warum Besseresser?
 
-1. **Foto** wird in der App aufgenommen (max. 1280 px, JPEG) und Base64-kodiert an die konfigurierte API geschickt
-2. Der **Prompt** enthält deine Ziele und verlangt strikt ein JSON-Ergebnis:
+- **🎯 Deine Ziele, deine Maßstäbe:**
+  Statt starrer Diätprogramme formulierst du deine eigenen Gesundheits- oder Ernährungsziele einfach als Freitext. Auf Wunsch hilft dir die KI beim Einrichten sogar dabei, längere Sätze in klare Einzelziele aufzuteilen.
+- **📷 Fotografieren, ergänzen, fertig:**
+  Knipse dein Essen direkt in der App. Falls man etwas auf dem Bild nicht sieht (z. B. *„mit Olivenöl zubereitet"* oder *„nur die halbe Portion"*), gibst du kurz einen Hinweis dazu – häufig genutzte Notizen lassen sich mit einem ⭐ als Favorit speichern.
+- **🚦 Klare Ampeln statt Zahlenwüsten:**
+  Zu jedem deiner Ziele zeigt dir Besseresser sofort Grün, Gelb oder Rot mit einer kurzen, verständlichen Begründung, einer Mengenschätzung der erkannten Speisen und einem Gesamt-Ampelschnitt (0–100).
+- **✏️ Jederzeit korrigierbar:**
+  Hat die KI einmal Tofu für Feta gehalten? Ein Tipp auf das Stift-Symbol genügt, um das erkannte Essen anzupassen – die Bewertung wird sofort passend aktualisiert.
+- **📅 Tages- & Wochenfazit mit Augenmaß:**
+  Ein einzelnes Stück Schokolade macht noch keinen schlechten Tag. Abends (oder jederzeit auf Fingertipp) zieht Besseresser ein ausgewogenes **Tagesfazit** über alle Mahlzeiten hinweg – und sonntags ein **Wochenfazit**.
+- **➕ Vergessenes Essen nachtragen & duplizieren:**
+  Kein Foto gemacht? Über das **„+"** am jeweiligen Tag kannst du Mahlzeiten jederzeit nachträglich erfassen – mit Foto oder rein per Textbeschreibung. Wiederkehrende Lieblingsgerichte (wie dein Standard-Frühstück) lassen sich aus der Detailansicht mit einem Tipp auf jeden beliebigen Kalendertag **duplizieren**.
+- **👤 Optionales persönliches Profil:**
+  Wenn du möchtest, kannst du Alter, Gewicht, Größe oder Besonderheiten (z. B. Diabetes, Unverträglichkeiten, Medikamente) hinterlegen. Diese Angaben fließen automatisch in dein Tages- und Wochenfazit ein.
+- **🔒 Volle Kontrolle & Datenschutz (Bring Your Own AI):**
+  Kein Abo-Zwang, kein fremder Cloud-Account: Alle deine Mahlzeiten, Fotos, Ziele und dein Profil bleiben **lokal auf deinem Smartphone**. Dein API-Schlüssel wird hardwaregeschützt im Android-Keystore verschlüsselt.
 
-   ```json
-   {
-     "bewertung": [
-       { "ziel": "Weniger Zucker", "ampel": "gelb", "begruendung": "..." }
-     ],
-     "zusatz": "<Gesamteindruck-Satz>"
-   }
-   ```
+---
 
-3. Das **Parsing ist tolerant** (Alias-Schlüssel, Code-Fences, Groß-/Kleinschreibung) – fehlende Ziele erscheinen als graue Ampel
+## 🚀 In 2 Minuten startklar
 
-Die Bewertung wird **nicht** automatisch gespeichert: nur was du mit „In Historie speichern" bestätigst, landet in der Historie (lokal als JSON + verkleinertes Foto).
+1. **Einrichten:** Beim ersten Start trägst du deine persönlichen Ziele ein und wählst deinen bevorzugten KI-Anbieter.
+2. **KI-Anbieter verbinden:** Besseresser funktioniert mit nahezu jedem OpenAI-kompatiblen Dienst – eine Schnellauswahl ist direkt integriert:
+   - **Google Gemini** *(bietet ein kostenloses Kontingent)*
+   - **OpenRouter** *(Zugriff auf hunderte Modelle über einen Account)*
+   - **OpenAI**, **Mistral**, **Groq**, **xAI (Grok)**, **Anthropic** u. v. m.
+   - Über *„Modelle laden & auswählen"* zeigt dir die App automatisch alle bildfähigen Modelle deines Anbieters an.
+3. **Loslegen:** Essen fotografieren, Ampeln prüfen und bei Gefallen im Verlauf speichern!
 
-## 🔨 Bauen
+---
+
+## 📦 Installation & Bauen
+
+Du kannst die App direkt aus dem Quellcode mit Android Studio oder über die Kommandozeile auf deinem Android-Smartphone (ab Android 8.0) installieren:
 
 ```bash
 ./gradlew installDebug
 ```
 
-Oder das Projekt in Android Studio öffnen und auf das Gerät deployen. Benötigt wird ein JDK 17 und Android SDK 34.
-
-## 🛠️ Tech-Stack
-
-| | |
-|---|---|
-| Sprache / UI | Kotlin 2.0, Jetpack Compose (Material 3) |
-| Android | minSdk 26, targetSdk 34 (Gradle 8.9, AGP 8.5.2) |
-| Kamera | CameraX |
-| Netz | `HttpURLConnection` (keine Netz-Bibliothek nötig) |
-| Persistenz | SharedPreferences + eigene Dateien (nur lokal) |
-| Verschlüsselung | AES-256-GCM, Schlüssel im Android-Keystore |
-
-## 📁 Struktur
-
-```
-app/src/main/java/de/gurum/besseresser/
-│       ├── MainActivity.kt       Activity, Theme, Navigation (GesundEssenApp, AppScreen-Enum)
-│       ├── MainScreen.kt         Hauptbildschirm komplett (Kamera-Overlay, Review-Zweig, Auswertung, CTA)
-│       ├── CommonUi.kt           Gemeinsame Bausteine: TopBarRow, GoalRow, CollapsibleSummaryBlock, ErkanntEditDialog, ErrorBanner
-│       ├── SetupScreen.kt        Setup, Anbieter & Modell-Auswahl (TopBarRow ist nach CommonUi gezogen)
-├── CameraScreen.kt     Eigene Kamera + Foto-Review
-├── HistoryScreen.kt    Historie & Detail-Ansicht
-├── ApiClient.kt        OpenAI-kompatible API (KI-Calls, Parsing)
-├── Data.kt             Datenmodelle (Ziele, Bewertung, Ampel)
-├── Store.kt            Lokale Einstellungen
-├── KeyVault.kt         Verschlüsselung des API-Keys
-└── HistoryStore.kt     Lokale Historie (JSON + Fotos)
-```
-
-Hinweise für Entwicklung und Werkzeuge (KI-Assistenten) liegen in [`AGENT.md`](AGENT.md).
+---
 
 ## 📄 Lizenz
 
-[GPL-3.0](LICENSE)
+Veröffentlicht unter der [GNU General Public License v3.0 (GPL-3.0)](LICENSE).
