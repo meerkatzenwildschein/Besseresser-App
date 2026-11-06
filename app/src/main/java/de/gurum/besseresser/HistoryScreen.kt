@@ -119,7 +119,10 @@ fun HistoryScreen(
                 onToggleExpandFazit = { viewModel.toggleFazitExpanded(it) },
                 onAddMealForDay = { day -> viewModel.setAddDialogForDay(day) },
                 onDeleteEntry = { entry -> viewModel.requestDeleteEntry(ctx, entry) },
-                onUndoDeleteEntry = { entry -> viewModel.undoDeleteEntry(entry.id) }
+                onUndoDeleteEntry = { entry -> viewModel.undoDeleteEntry(entry.id) },
+                onMoveEntryWithinDay = { day, fromIdx, toIdx ->
+                    viewModel.moveEntryWithinDay(ctx, day, fromIdx, toIdx)
+                }
             )
         }
 

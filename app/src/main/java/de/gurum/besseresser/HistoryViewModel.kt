@@ -249,6 +249,48 @@ class HistoryViewModel(
         }
     }
 
+    /** Verschiebt einen Eintrag innerhalb seines Tages von [fromIndex] nach [toIndex].
+     *  Vergibt saubere Zeitstempel (absteigend), damit die Reihenfolge persistent bleibt. */
+    fun moveEntryWithinDay(ctx: Context? = null, day: LocalDate, fromIndex: Int, toIndex: Int) {
+        if (fromIndex == toIndex) return
+        val currentEntries = _uiState.value.entries
+        val dayEntries = currentEntries.filter {
+            java.time.Instant.ofEpochMilli(it.dateMillis)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate() == day
+        }.toMutableList()
+
+        if (fromIndex !in dayEntries.indices || toIndex !in dayEntries.indices) return
+
+        val moved = dayEntries.removeAt(fromIndex)
+        dayEntries.add(toIndex, moved)
+
+        // Die vorhandenen Millis absteigend sortieren und der neuen Reihenfolge zuweisen
+        val timestamps = dayEntries.map { it.dateMillis }.sortedDescending().toMutableList()
+        // Sicherstellen, dass keine doppelten Zeitstempel existieren (jeweils mind. 1 ms Differenz)
+        for (i in 1 until timestamps.size) {
+            if (timestamps[i] >= timestamps[i - 1]) {
+                timestamps[i] = timestamps[i - 1] - 1000L
+            }
+        }
+
+        val reorderedDayEntries = dayEntries.mapIndexed { idx, entry ->
+            entry.copy(dateMillis = timestamps[idx])
+        }
+
+        // Optimistisches Update im UI-State
+        val reorderedMap = reorderedDayEntries.associateBy { it.id }
+        val updatedAllEntries = currentEntries.map { reorderedMap[it.id] ?: it }
+            .sortedByDescending { it.dateMillis }
+
+        _uiState.update { it.copy(entries = updatedAllEntries) }
+
+        val histRepo = getHistoryRepo(ctx)
+        viewModelScope.launch {
+            histRepo?.reorderEntries(reorderedDayEntries)
+        }
+    }
+
     fun generateFazit(
         ctx: Context? = null,
         day: LocalDate,

@@ -111,7 +111,7 @@ class FakeHistoryRepository : HistoryRepository {
             erkannt = ev.erkannt,
             backdated = backdated
         )
-        entriesFlow.update { listOf(entry) + it }
+        entriesFlow.update { (listOf(entry) + it).sortedByDescending { e -> e.dateMillis } }
         return entry
     }
 
@@ -129,6 +129,13 @@ class FakeHistoryRepository : HistoryRepository {
 
     override suspend fun delete(entry: HistoryEntry) {
         entriesFlow.update { list -> list.filter { it.id != entry.id } }
+    }
+
+    override suspend fun reorderEntries(reordered: List<HistoryEntry>) {
+        val reorderedMap = reordered.associateBy { it.id }
+        entriesFlow.update { list ->
+            list.map { reorderedMap[it.id] ?: it }.sortedByDescending { it.dateMillis }
+        }
     }
 
     override suspend fun saveDayFazit(fazit: DayFazit) {
@@ -512,5 +519,43 @@ class RepositoriesAndFakesTest {
         assertTrue(vm.uiState.value.pendingDeleteIds.isEmpty())
         assertEquals(1, vm.uiState.value.entries.size)
         assertEquals(e1.id, vm.uiState.value.entries.first().id)
+    }
+
+    @Test
+    fun testHistoryViewModelMoveEntryWithinDay() = runTest(testDispatcher) {
+        val histRepo = FakeHistoryRepository()
+        val vm = HistoryViewModel(
+            apiService = FakeApiService(),
+            historyRepository = histRepo,
+            settingsRepository = FakeSettingsRepository()
+        )
+        vm.startObserving()
+
+        val day = LocalDate.of(2026, 11, 6)
+        val m1 = day.atTime(8, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val m2 = day.atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val m3 = day.atTime(19, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+        // Descending order initially: Abendessen (m3), Mittagessen (m2), Frühstück (m1)
+        val eAbend = histRepo.add(null, Evaluation(erkannt = "Abendessen"), dateOverride = m3)
+        val eMittag = histRepo.add(null, Evaluation(erkannt = "Mittagessen"), dateOverride = m2)
+        val eFrueh = histRepo.add(null, Evaluation(erkannt = "Frühstück"), dateOverride = m1)
+        advanceUntilIdle()
+
+        assertEquals("Abendessen", vm.uiState.value.entries[0].erkannt)
+        assertEquals("Mittagessen", vm.uiState.value.entries[1].erkannt)
+        assertEquals("Frühstück", vm.uiState.value.entries[2].erkannt)
+
+        // Move Frühstück (index 2) to top (index 0)
+        vm.moveEntryWithinDay(day = day, fromIndex = 2, toIndex = 0)
+        advanceUntilIdle()
+
+        val reordered = vm.uiState.value.entries
+        assertEquals("Frühstück", reordered[0].erkannt)
+        assertEquals("Abendessen", reordered[1].erkannt)
+        assertEquals("Mittagessen", reordered[2].erkannt)
+        // Timestamps must stay strictly descending
+        assertTrue(reordered[0].dateMillis > reordered[1].dateMillis)
+        assertTrue(reordered[1].dateMillis > reordered[2].dateMillis)
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,12 +39,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
@@ -59,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -101,7 +108,8 @@ fun HistoryListContent(
     onToggleExpandFazit: (String) -> Unit,
     onAddMealForDay: (LocalDate) -> Unit,
     onDeleteEntry: (HistoryEntry) -> Unit,
-    onUndoDeleteEntry: (HistoryEntry) -> Unit = {}
+    onUndoDeleteEntry: (HistoryEntry) -> Unit = {},
+    onMoveEntryWithinDay: (LocalDate, Int, Int) -> Unit = { _, _, _ -> }
 ) {
     TopBarRow(
         title = stringResource(R.string.history_title),
@@ -173,7 +181,7 @@ fun HistoryListContent(
                     }
                 }
             }
-            group.entries.forEach { entry ->
+            group.entries.forEachIndexed { indexOnDay, entry ->
                 item(key = entry.id) {
                     val isPendingDelete = entry.id in pendingDeleteIds
                     if (isPendingDelete) {
@@ -182,10 +190,18 @@ fun HistoryListContent(
                             onUndo = { onUndoDeleteEntry(entry) }
                         )
                     } else {
-                        ShortSwipeToDeleteBox(
-                            onTriggerDelete = { onDeleteEntry(entry) }
-                        ) {
-                            HistoryItem(entry, onClick = { onPick(entry) })
+                        ReorderableDayMealBox(
+                            day = group.day,
+                            currentIndexOnDay = indexOnDay,
+                            totalCountOnDay = group.entries.size,
+                            onMove = { from, to -> onMoveEntryWithinDay(group.day, from, to) }
+                        ) { isDragging ->
+                            ShortSwipeToDeleteBox(
+                                enabled = !isDragging,
+                                onTriggerDelete = { onDeleteEntry(entry) }
+                            ) {
+                                HistoryItem(entry, onClick = { onPick(entry) }, isLifted = isDragging)
+                            }
                         }
                     }
                 }
@@ -250,14 +266,37 @@ fun HistoryListContent(
 }
 
 @Composable
-fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
+fun HistoryItem(
+    entry: HistoryEntry,
+    onClick: () -> Unit,
+    isLifted: Boolean = false
+) {
     val ctx = LocalContext.current
+    val scale by animateFloatAsState(
+        targetValue = if (isLifted) 1.025f else 1f,
+        animationSpec = tween(150),
+        label = "lift-scale"
+    )
+    val shadowElevation by animateFloatAsState(
+        targetValue = if (isLifted) 12f else 0f,
+        animationSpec = tween(150),
+        label = "lift-shadow"
+    )
+    val borderColor = if (isLifted) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+    }
+
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
-        modifier = Modifier.fillMaxWidth()
+        border = BorderStroke(if (isLifted) 1.5.dp else 1.dp, borderColor),
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .shadow(shadowElevation.dp, RoundedCornerShape(16.dp))
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -362,12 +401,84 @@ fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
 }
 
 /**
+ * Ermöglicht das vertikale Verschieben einer Mahlzeiten-Karte innerhalb desselben Tages per Long-Press.
+ * Beim Gedrückthalten vibriert das Gerät kurz und die Karte hebt sich visuell an.
+ */
+@Composable
+private fun ReorderableDayMealBox(
+    day: LocalDate,
+    currentIndexOnDay: Int,
+    totalCountOnDay: Int,
+    onMove: (fromIndex: Int, toIndex: Int) -> Unit,
+    content: @Composable (isDragging: Boolean) -> Unit
+) {
+    if (totalCountOnDay <= 1) {
+        content(false)
+        return
+    }
+
+    val haptic = LocalHapticFeedback.current
+    val density = LocalDensity.current
+    val slotHeightPx = remember(density) { with(density) { 88.dp.toPx() } }
+
+    var isDragging by remember { mutableStateOf(false) }
+    var dragAccumY by remember { mutableFloatStateOf(0f) }
+
+    val currentDragOffset by animateFloatAsState(
+        targetValue = if (isDragging) dragAccumY else 0f,
+        animationSpec = tween(durationMillis = 100),
+        label = "reorder-drag-y"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .zIndex(if (isDragging) 10f else 0f)
+            .offset { IntOffset(0, currentDragOffset.roundToInt()) }
+            .pointerInput(day, currentIndexOnDay, totalCountOnDay) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        isDragging = true
+                        dragAccumY = 0f
+                    },
+                    onDragEnd = {
+                        isDragging = false
+                        dragAccumY = 0f
+                    },
+                    onDragCancel = {
+                        isDragging = false
+                        dragAccumY = 0f
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        dragAccumY += dragAmount.y
+                        // Wenn um ca. eine Kartenhöhe nach oben oder unten gezogen wurde: Platz tauschen
+                        val slotsMoved = (dragAccumY / slotHeightPx).roundToInt()
+                        if (slotsMoved != 0) {
+                            val targetIndex = (currentIndexOnDay + slotsMoved).coerceIn(0, totalCountOnDay - 1)
+                            if (targetIndex != currentIndexOnDay) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onMove(currentIndexOnDay, targetIndex)
+                                dragAccumY -= (targetIndex - currentIndexOnDay) * slotHeightPx
+                            }
+                        }
+                    }
+                )
+            }
+    ) {
+        content(isDragging)
+    }
+}
+
+/**
  * Begrenztes Links-Schieben mit festem kurzem Anschlag (~96dp):
  * Die Karte lässt sich nur so weit nach links schieben, bis das rote Mülleimer-Feld sichtbar ist.
  * Wird die Karte am Anschlag losgelassen, löst [onTriggerDelete] den deaktivierten „Rückgängig"-Zustand aus.
  */
 @Composable
 private fun ShortSwipeToDeleteBox(
+    enabled: Boolean = true,
     onTriggerDelete: () -> Unit,
     content: @Composable () -> Unit
 ) {
@@ -384,27 +495,31 @@ private fun ShortSwipeToDeleteBox(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .pointerInput(maxSwipePx) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        val shouldDelete = dragOffset <= -triggerPx
-                        dragOffset = 0f
-                        if (shouldDelete) {
-                            onTriggerDelete()
-                        }
-                    },
-                    onDragCancel = {
-                        dragOffset = 0f
-                    },
-                    onHorizontalDrag = { change, dragAmount ->
-                        // Nur Links-Schieben (oder Zurückschieben aus bereits geöffneter Position) abfangen
-                        if (dragAmount < 0f || dragOffset < 0f) {
-                            change.consume()
-                            dragOffset = (dragOffset + dragAmount).coerceIn(-maxSwipePx, 0f)
-                        }
+            .then(
+                if (enabled) {
+                    Modifier.pointerInput(maxSwipePx) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                val shouldDelete = dragOffset <= -triggerPx
+                                dragOffset = 0f
+                                if (shouldDelete) {
+                                    onTriggerDelete()
+                                }
+                            },
+                            onDragCancel = {
+                                dragOffset = 0f
+                            },
+                            onHorizontalDrag = { change, dragAmount ->
+                                // Nur Links-Schieben (oder Zurückschieben aus bereits geöffneter Position) abfangen
+                                if (dragAmount < 0f || dragOffset < 0f) {
+                                    change.consume()
+                                    dragOffset = (dragOffset + dragAmount).coerceIn(-maxSwipePx, 0f)
+                                }
+                            }
+                        )
                     }
-                )
-            }
+                } else Modifier
+            )
     ) {
         if (animatedOffset < -2f) {
             Box(

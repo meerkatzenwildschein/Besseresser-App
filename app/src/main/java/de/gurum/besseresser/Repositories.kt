@@ -33,6 +33,7 @@ interface HistoryRepository {
     suspend fun add(photoUri: Uri?, ev: Evaluation, note: String = "", dateOverride: Long? = null, backdated: Boolean = false): HistoryEntry
     suspend fun updateErkannt(id: Long, newText: String)
     suspend fun updateEvaluation(id: Long, goalResults: List<GoalResult>, summary: String)
+    suspend fun reorderEntries(reordered: List<HistoryEntry>)
     suspend fun delete(entry: HistoryEntry)
     suspend fun saveDayFazit(fazit: DayFazit)
     suspend fun loadDayFazit(dayKey: String): DayFazit?
@@ -99,6 +100,10 @@ class DefaultHistoryRepository(
 
     override suspend fun updateEvaluation(id: Long, goalResults: List<GoalResult>, summary: String) = withContext(Dispatchers.IO) {
         HistoryStore.updateEvaluation(context, id, goalResults, summary)
+    }
+
+    override suspend fun reorderEntries(reordered: List<HistoryEntry>) = withContext(Dispatchers.IO) {
+        HistoryStore.reorderEntries(context, reordered)
     }
 
     override suspend fun delete(entry: HistoryEntry) = withContext(Dispatchers.IO) {
