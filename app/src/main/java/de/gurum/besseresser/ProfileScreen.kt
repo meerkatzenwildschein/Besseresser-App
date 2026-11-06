@@ -2,6 +2,8 @@ package de.gurum.besseresser
 
 import android.content.Context
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -27,6 +30,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -35,6 +39,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -103,8 +110,8 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             TopBarRow(
                 title = stringResource(R.string.profile_title),
@@ -113,126 +120,176 @@ fun ProfileScreen(
                 icon = Icons.Filled.Person
             )
 
-            Text(
-                stringResource(R.string.profile_intro),
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                stringResource(R.string.profile_usage_hint),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.profile_intro),
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        stringResource(R.string.profile_usage_hint),
+                        fontSize = 11.5.sp,
+                        lineHeight = 16.sp,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    )
+                }
+            }
 
             uiState.error?.let { msg ->
                 ErrorBanner(msg)
             }
 
-            Box {
+            SectionCard(title = stringResource(R.string.profile_section_body)) {
+                Box {
+                    OutlinedTextField(
+                        value = uiState.birthDate?.let {
+                            LocalDate.parse(it).format(BIRTH_DISPLAY_FORMAT)
+                        } ?: "",
+                        onValueChange = { },
+                        enabled = false,
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.profile_birth_label)) },
+                        trailingIcon = {
+                            Icon(Icons.Filled.DateRange, contentDescription = null)
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                            disabledContainerColor = MaterialTheme.colorScheme.surface,
+                            disabledBorderColor = MaterialTheme.colorScheme.outline,
+                            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { viewModel.setShowDatePicker(true) }
+                    )
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        stringResource(R.string.profile_gender_label),
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = uiState.gender == Gender.MALE,
+                            onClick = { viewModel.setGender(if (uiState.gender == Gender.MALE) Gender.NONE else Gender.MALE) },
+                            label = { Text(stringResource(R.string.profile_gender_male), fontSize = 12.5.sp) }
+                        )
+                        FilterChip(
+                            selected = uiState.gender == Gender.FEMALE,
+                            onClick = { viewModel.setGender(if (uiState.gender == Gender.FEMALE) Gender.NONE else Gender.FEMALE) },
+                            label = { Text(stringResource(R.string.profile_gender_female), fontSize = 12.5.sp) }
+                        )
+                        FilterChip(
+                            selected = uiState.gender == Gender.DIVERSE,
+                            onClick = { viewModel.setGender(if (uiState.gender == Gender.DIVERSE) Gender.NONE else Gender.DIVERSE) },
+                            label = { Text(stringResource(R.string.profile_gender_diverse), fontSize = 12.5.sp) }
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = uiState.weightText,
+                        onValueChange = { viewModel.setWeightText(it) },
+                        label = { Text(stringResource(R.string.profile_weight_label)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    OutlinedTextField(
+                        value = uiState.heightText,
+                        onValueChange = { viewModel.setHeightText(it) },
+                        label = { Text(stringResource(R.string.profile_height_label)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            SectionCard(title = stringResource(R.string.profile_section_notes)) {
                 OutlinedTextField(
-                    value = uiState.birthDate?.let {
-                        LocalDate.parse(it).format(BIRTH_DISPLAY_FORMAT)
-                    } ?: "",
-                    onValueChange = { },
-                    enabled = false,
-                    readOnly = true,
-                    label = { Text(stringResource(R.string.profile_birth_label)) },
-                    trailingIcon = {
-                        Icon(Icons.Filled.DateRange, contentDescription = null)
-                    },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                        disabledContainerColor = MaterialTheme.colorScheme.surface,
-                        disabledBorderColor = MaterialTheme.colorScheme.outline,
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    singleLine = true,
+                    value = uiState.notesText,
+                    onValueChange = { viewModel.setNotesText(it) },
+                    label = { Text(stringResource(R.string.profile_notes_label)) },
+                    placeholder = { Text(stringResource(R.string.profile_notes_hint)) },
+                    shape = RoundedCornerShape(12.dp),
+                    minLines = 3,
+                    maxLines = 6,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .clickable { viewModel.setShowDatePicker(true) }
-                )
             }
-
-            Text(
-                stringResource(R.string.profile_gender_label),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = uiState.gender == Gender.MALE,
-                    onClick = { viewModel.setGender(if (uiState.gender == Gender.MALE) Gender.NONE else Gender.MALE) },
-                    label = { Text(stringResource(R.string.profile_gender_male), fontSize = 12.sp) }
-                )
-                FilterChip(
-                    selected = uiState.gender == Gender.FEMALE,
-                    onClick = { viewModel.setGender(if (uiState.gender == Gender.FEMALE) Gender.NONE else Gender.FEMALE) },
-                    label = { Text(stringResource(R.string.profile_gender_female), fontSize = 12.sp) }
-                )
-                FilterChip(
-                    selected = uiState.gender == Gender.DIVERSE,
-                    onClick = { viewModel.setGender(if (uiState.gender == Gender.DIVERSE) Gender.NONE else Gender.DIVERSE) },
-                    label = { Text(stringResource(R.string.profile_gender_diverse), fontSize = 12.sp) }
-                )
-            }
-
-            OutlinedTextField(
-                value = uiState.weightText,
-                onValueChange = { viewModel.setWeightText(it) },
-                label = { Text(stringResource(R.string.profile_weight_label)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = uiState.heightText,
-                onValueChange = { viewModel.setHeightText(it) },
-                label = { Text(stringResource(R.string.profile_height_label)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = uiState.notesText,
-                onValueChange = { viewModel.setNotesText(it) },
-                label = { Text(stringResource(R.string.profile_notes_label)) },
-                placeholder = { Text(stringResource(R.string.profile_notes_hint)) },
-                minLines = 3,
-                maxLines = 6,
-                modifier = Modifier.fillMaxWidth()
-            )
 
             Spacer(Modifier.height(100.dp))
         }
 
-        Button(
-            onClick = {
-                val weight = uiState.weightText.trim().replace(',', '.')
-                    .takeIf { it.isNotBlank() }?.toDoubleOrNull()
-                val height = uiState.heightText.trim().takeIf { it.isNotBlank() }?.toIntOrNull()
-
-                val plausible =
-                    (weight == null || weight in 1.0..700.0) &&
-                    (height == null || height in 30..280)
-                if (!plausible) {
-                    viewModel.save(ctx, onSaved = onSave)
-                } else {
-                    onSave(Profile(uiState.birthDate, weight, height, uiState.notesText.trim(), uiState.gender))
-                }
-            },
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(16.dp)
                 .fillMaxWidth()
-                .height(56.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Transparent,
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
         ) {
-            Text(stringResource(R.string.profile_save), fontSize = 17.sp)
+            Button(
+                onClick = {
+                    val weight = uiState.weightText.trim().replace(',', '.')
+                        .takeIf { it.isNotBlank() }?.toDoubleOrNull()
+                    val height = uiState.heightText.trim().takeIf { it.isNotBlank() }?.toIntOrNull()
+
+                    val plausible =
+                        (weight == null || weight in 1.0..700.0) &&
+                        (height == null || height in 30..280)
+                    if (!plausible) {
+                        viewModel.save(ctx, onSaved = onSave)
+                    } else {
+                        onSave(Profile(uiState.birthDate, weight, height, uiState.notesText.trim(), uiState.gender))
+                    }
+                },
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .fillMaxWidth()
+                    .height(56.dp)
+            ) {
+                Text(
+                    stringResource(R.string.profile_save),
+                    fontSize = 16.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
     }
 

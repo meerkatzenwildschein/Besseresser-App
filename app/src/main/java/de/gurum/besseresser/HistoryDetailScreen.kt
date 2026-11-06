@@ -3,6 +3,7 @@ package de.gurum.besseresser
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -36,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -114,7 +117,7 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+            .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         TopBarRow(
@@ -125,23 +128,39 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
                 SimpleDateFormat("$DATE_FORMAT_PATTERN HH:mm", Locale.getDefault()).format(Date(current.dateMillis)),
             onBack = onBack,
             trailing = {
-                IconButton(onClick = { confirmDelete = true }) {
-                    Icon(
-                        Icons.Filled.Delete,
-                        contentDescription = stringResource(R.string.history_entry_delete)
-                    )
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    IconButton(
+                        onClick = { confirmDelete = true },
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.history_entry_delete),
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(19.dp)
+                        )
+                    }
                 }
             }
         )
 
         if (thumb != null) {
-            Surface(shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 Image(
                     bitmap = thumb.asImageBitmap(),
                     contentDescription = stringResource(R.string.photo_of_meal),
+                    contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(230.dp)
+                        .height(240.dp)
                 )
             }
         }
@@ -149,14 +168,27 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
         if (reEvalBusy) {
             // Re-Bewertung durch KI läuft (nach erkannt-Korrektur)
             Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
-                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                     Spacer(Modifier.width(10.dp))
-                    Text(stringResource(R.string.reeval_progress), fontSize = 13.sp)
+                    Text(
+                        stringResource(R.string.reeval_progress),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 }
             }
         }
@@ -172,7 +204,35 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
             )
         }
 
-        Text(stringResource(R.string.my_goals), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                stringResource(R.string.my_goals),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            if (current.score >= 0) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.score_caption),
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    ScoreCircle(
+                        score = current.score,
+                        tooltipRes = R.string.score_tooltip_ok
+                    )
+                }
+            }
+        }
         current.goalResults.forEach { GoalRow(it.goal, it) }
 
         Spacer(Modifier.height(16.dp))

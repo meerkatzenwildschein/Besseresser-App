@@ -49,6 +49,15 @@
     <string name="recent_notes_star_desc">Mark as favorite</string>
     <string name="main_new_photo">Take a new photo</string>
     <string name="nav_blocked_hint">Please save or discard the rating first.</string>
+    <string name="main_hero_title">Ready for your next meal?</string>
+    <string name="main_hero_sub">Snap a photo – the AI checks each of your personal goals with a clear traffic light.</string>
+    <string name="main_swipe_hint">Swipe left for history →</string>
+    <string name="cam_hint_frame">Center your meal clearly in the frame</string>
+    <string name="setup_section_api">AI Connection</string>
+    <string name="setup_section_goals">Personal Goals</string>
+    <string name="profile_section_body">Personal Details</string>
+    <string name="profile_section_notes">Health &amp; Dietary Notes</string>
+    <string name="history_empty_sub">Your rated meals, daily summaries, and weekly insights will appear here.</string>
 
     <!-- Profile -->
     <string name="menu_profile">Profile</string>

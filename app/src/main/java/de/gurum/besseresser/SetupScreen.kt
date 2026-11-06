@@ -1,5 +1,7 @@
 package de.gurum.besseresser
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -23,6 +26,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -37,6 +41,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -126,136 +132,213 @@ fun SetupScreen(
             .fillMaxSize()
             .imePadding()
     ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
-        TopBarRow(
-            title = "Einstellungen",
-            onBack = onCancel,
-            trailing = { },
-            icon = Icons.Filled.Settings
-        )
-        Spacer(Modifier.height(4.dp))
-        if (firstRun) {
-            Text(stringResource(R.string.setup_welcome), fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Text(
-                stringResource(R.string.setup_welcome_text),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Text(stringResource(R.string.setup_edit_title), fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text(
-                stringResource(R.string.setup_edit_text),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-
-        LabelledField(stringResource(R.string.setup_url_label)) {
-            OutlinedTextField(
-                value = uiState.url,
-                onValueChange = { viewModel.setUrl(it) },
-                placeholder = { Text("https://api.openai.com/v1") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-        }
-        TextButton(onClick = { viewModel.setShowProviders(true) }) {
-            Text(stringResource(R.string.setup_pick_provider))
-        }
-
-        LabelledField(stringResource(R.string.setup_key_label)) {
-            OutlinedTextField(
-                value = uiState.key,
-                onValueChange = { viewModel.setKey(it) },
-                placeholder = { Text(stringResource(R.string.setup_key_placeholder)) },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-        }
-        LabelledField(stringResource(R.string.setup_model_label)) {
-            OutlinedTextField(
-                value = uiState.model,
-                onValueChange = { viewModel.setModel(it) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-        }
-        TextButton(
-            onClick = { viewModel.setShowModels(true) },
-            enabled = uiState.url.trim().startsWith("http")
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(stringResource(R.string.setup_models_link))
-        }
-
-        LabelledField(stringResource(R.string.setup_goals_label), required = false) {
-            OutlinedTextField(
-                value = uiState.goals,
-                onValueChange = { viewModel.setGoals(it) },
-                placeholder = { Text(defaultGoals.joinToString("\n")) },
-                minLines = 4,
-                modifier = Modifier.fillMaxWidth()
+            TopBarRow(
+                title = stringResource(R.string.menu_settings),
+                onBack = onCancel,
+                trailing = { },
+                icon = Icons.Filled.Settings
             )
+
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (firstRun) {
+                        Text(
+                            stringResource(R.string.setup_welcome),
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            stringResource(R.string.setup_welcome_text),
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                        )
+                    } else {
+                        Text(
+                            stringResource(R.string.setup_edit_title),
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            stringResource(R.string.setup_edit_text),
+                            fontSize = 12.5.sp,
+                            lineHeight = 17.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                        )
+                    }
+                }
+            }
+
+            SectionCard(title = stringResource(R.string.setup_section_api)) {
+                LabelledField(stringResource(R.string.setup_url_label)) {
+                    OutlinedTextField(
+                        value = uiState.url,
+                        onValueChange = { viewModel.setUrl(it) },
+                        placeholder = { Text("https://api.openai.com/v1") },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+                FilledTonalButton(
+                    onClick = { viewModel.setShowProviders(true) },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.setup_pick_provider), fontWeight = FontWeight.SemiBold)
+                }
+
+                LabelledField(stringResource(R.string.setup_key_label)) {
+                    OutlinedTextField(
+                        value = uiState.key,
+                        onValueChange = { viewModel.setKey(it) },
+                        placeholder = { Text(stringResource(R.string.setup_key_placeholder)) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+
+                LabelledField(stringResource(R.string.setup_model_label)) {
+                    OutlinedTextField(
+                        value = uiState.model,
+                        onValueChange = { viewModel.setModel(it) },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+                FilledTonalButton(
+                    onClick = { viewModel.setShowModels(true) },
+                    enabled = uiState.url.trim().startsWith("http"),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.setup_models_link), fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            SectionCard(title = stringResource(R.string.setup_section_goals)) {
+                LabelledField(stringResource(R.string.setup_goals_label), required = false) {
+                    OutlinedTextField(
+                        value = uiState.goals,
+                        onValueChange = { viewModel.setGoals(it) },
+                        placeholder = { Text(defaultGoals.joinToString("\n")) },
+                        shape = RoundedCornerShape(12.dp),
+                        minLines = 4,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                if (uiState.splitting) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(stringResource(R.string.setup_ai_splitting_text), fontSize = 13.sp)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.build_label, BuildConfig.APP_VERSION, BuildConfig.BUILD_TIME),
+                fontSize = 11.5.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+
+            Spacer(Modifier.height(95.dp))
         }
 
-        if (uiState.splitting) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(20.dp))
-                Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.setup_ai_splitting_text), fontSize = 13.sp)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Transparent,
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
+        ) {
+            Button(
+                onClick = save,
+                enabled = valid,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .fillMaxWidth()
+                    .height(56.dp)
+            ) {
+                Text(
+                    stringResource(if (uiState.splitting) R.string.setup_ai_splitting_button else R.string.setup_save_continue),
+                    fontSize = 16.5.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
-
-        Spacer(Modifier.height(28.dp))
-        Text(
-            stringResource(R.string.build_label, BuildConfig.APP_VERSION, BuildConfig.BUILD_TIME),
-            fontSize = 12.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(Modifier.height(90.dp))
-    }
-
-    Button(
-        onClick = save,
-        enabled = valid,
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(16.dp)
-            .fillMaxWidth()
-            .height(56.dp)
-    ) {
-        Text(
-            stringResource(if (uiState.splitting) R.string.setup_ai_splitting_button else R.string.setup_save_continue),
-            fontSize = 17.sp
-        )
-    }
     }
 
     if (uiState.showProviders) {
         AlertDialog(
             onDismissRequest = { viewModel.setShowProviders(false) },
-            title = { Text(stringResource(R.string.provider_picker_title)) },
+            title = { Text(stringResource(R.string.provider_picker_title), fontWeight = FontWeight.Bold) },
             text = {
-                LazyColumn(Modifier.heightIn(max = 450.dp)) {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 450.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     items(PROVIDERS) { p ->
-                        TextButton(
+                        val isSelected = uiState.url.trim().trimEnd('/') == p.url.trim().trimEnd('/')
+                        Surface(
                             onClick = {
                                 viewModel.setUrl(p.url)
                                 viewModel.setShowProviders(false)
                             },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected)
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                            ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(Modifier.fillMaxWidth()) {
-                                Text(p.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(p.name, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
                                 if (p.noteRes != 0) {
                                     Text(
                                         stringResource(p.noteRes),
-                                        fontSize = 11.sp,
+                                        fontSize = 11.5.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -283,7 +366,8 @@ fun SetupScreen(
                 Text(
                     stringResource(
                         if (uiState.splitDebug == null) R.string.split_title_ok else R.string.split_title_fail
-                    )
+                    ),
+                    fontWeight = FontWeight.Bold
                 )
             },
             text = {
@@ -314,6 +398,7 @@ fun SetupScreen(
                     OutlinedTextField(
                         value = uiState.splitEdited,
                         onValueChange = { viewModel.setSplitEdited(it) },
+                        shape = RoundedCornerShape(12.dp),
                         minLines = 5,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -368,7 +453,7 @@ fun ModelListScreen(url: String, apiKey: String, onPick: (String) -> Unit, onBac
             .fillMaxSize()
             .imePadding()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         TopBarRow(
@@ -379,10 +464,19 @@ fun ModelListScreen(url: String, apiKey: String, onPick: (String) -> Unit, onBac
         )
 
         if (loading) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(20.dp))
-                Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.models_loading, url.trimEnd('/')), fontSize = 14.sp)
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(14.dp)
+                ) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.5.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(stringResource(R.string.models_loading, url.trimEnd('/')), fontSize = 13.5.sp)
+                }
             }
         }
 
@@ -429,13 +523,22 @@ fun ModelListScreen(url: String, apiKey: String, onPick: (String) -> Unit, onBac
                         .fillMaxWidth()
                         .heightIn(min = 200.dp, max = 620.dp)
                 ) {
-                    LazyColumn {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(liste) { id ->
-                            TextButton(
+                            Surface(
                                 onClick = { onPick(id) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text(id, fontSize = 14.sp)
+                                Text(
+                                    id,
+                                    fontSize = 13.5.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                                )
                             }
                         }
                     }
