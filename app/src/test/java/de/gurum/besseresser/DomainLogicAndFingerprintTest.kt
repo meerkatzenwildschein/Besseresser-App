@@ -314,4 +314,63 @@ class DomainLogicAndFingerprintTest {
         )
         assertEquals(2, triggeredCount)
     }
+
+    @Test
+    fun testDuplicateEntryCopiesAllFieldsMarksBackdatedAndInvalidatesTargetDayFazit() {
+        val originalDay = LocalDate.of(2026, 11, 2)
+        val originalMillis = originalDay.atTime(12, 30).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val source = HistoryEntry(
+            id = 1001L,
+            dateMillis = originalMillis,
+            photoFile = "1001.jpg",
+            goalResults = listOf(
+                GoalResult("Blutdruck senken", TrafficLight.GREEN, "Wenig Salz"),
+                GoalResult("Weniger Zucker", TrafficLight.YELLOW, "Etwas Obstzucker")
+            ),
+            summary = "Sehr ausgewogenes Mittagessen",
+            note = "Selbstgekocht ohne Zusatzstoffe",
+            erkannt = "250 g Gemüse-Curry mit Reis",
+            backdated = false
+        )
+
+        val targetDay = LocalDate.of(2026, 11, 6)
+        val existingTargetEntry = HistoryEntry(
+            id = 2001L,
+            dateMillis = targetDay.atTime(8, 15).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            erkannt = "150 g Skyr mit Beeren"
+        )
+        // Target day had a valid Fazit before duplication
+        val targetDayFazit = DayFazit(
+            dayKey = dayKeyOf(targetDay),
+            ampel = TrafficLight.GREEN,
+            text = "Bisher ein guter Tag",
+            entryIds = listOf(existingTargetEntry.id),
+            fingerprint = dayFingerprint(listOf(existingTargetEntry))
+        )
+        assertFalse(isFazitOutdated(targetDayFazit, listOf(existingTargetEntry)))
+
+        // Duplicate source entry to targetDay
+        val duplicated = HistoryStore.createDuplicatedEntry(
+            source = source,
+            targetDay = targetDay,
+            newId = 3005L,
+            newPhotoFile = "3005.jpg"
+        )
+
+        // All content fields are copied 1:1
+        assertEquals(3005L, duplicated.id)
+        assertEquals("3005.jpg", duplicated.photoFile)
+        assertEquals(source.goalResults, duplicated.goalResults)
+        assertEquals(source.summary, duplicated.summary)
+        assertEquals(source.note, duplicated.note)
+        assertEquals(source.erkannt, duplicated.erkannt)
+        assertEquals(source.score, duplicated.score)
+        // Marked as backdated ("nachträglich erfasst") on targetDay
+        assertTrue(duplicated.backdated)
+        assertEquals(dayKeyOf(targetDay), dayKeyOf(duplicated.dateMillis))
+
+        // Target day's existing Fazit is now automatically tracked as outdated/stale
+        val entriesAfterDuplication = listOf(existingTargetEntry, duplicated)
+        assertTrue(isFazitOutdated(targetDayFazit, entriesAfterDuplication))
+    }
 }

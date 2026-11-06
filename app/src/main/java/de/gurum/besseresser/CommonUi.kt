@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -118,8 +119,8 @@ fun TopBarRow(
             )
         }
         Box(
-            modifier = Modifier.size(42.dp),
-            contentAlignment = Alignment.Center
+            modifier = Modifier.defaultMinSize(minWidth = 42.dp, minHeight = 42.dp),
+            contentAlignment = Alignment.CenterEnd
         ) { trailing() }
     }
 }

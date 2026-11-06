@@ -185,6 +185,9 @@
     <string name="score_tooltip_ok">Ampelschnitt der bewerteten Ziele: 🟢 100 · 🟡 50 · 🔴 0</string>
     <string name="score_tooltip_unknown">Kein Ampelschnitt: keine Bewertung erhalten</string>
     <string name="history_entry_delete">Eintrag löschen</string>
+    <string name="history_entry_duplicate">Eintrag duplizieren</string>
+    <string name="history_duplicate_pick_date_title">Essen auf Tag duplizieren</string>
+    <string name="history_duplicate_done">Essen auf %1$s dupliziert</string>
     <string name="history_delete_confirm_title">Eintrag löschen?</string>
     <string name="history_delete_confirm_text">Foto und Bewertung werden unwiderruflich entfernt.</string>
 </resources>
