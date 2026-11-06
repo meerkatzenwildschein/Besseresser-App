@@ -241,7 +241,6 @@ C:\Users\gurum\tools\gradle-8.9\bin\gradle.bat assembleDebug --no-daemon
 
 ## Bekannte Besonderheiten / Designentscheidungen
 
-- Kein git repo (Projekt-Ordner ist nicht initialisiert) – `.gitignore` liegt trotzdem bereit.
 - Tagging `android:configChanges` verhindert Neustart bei Rotation; Einstellungs-State liegt im
   Composable-Zustand, nicht ViewModel (bewusst klein gehalten).
 - „Nächste Mahlzeit"-Button + „KI bewertet…"-Progress im Hauptbildschirm.
