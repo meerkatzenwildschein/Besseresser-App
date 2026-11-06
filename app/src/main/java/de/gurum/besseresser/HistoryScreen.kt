@@ -57,6 +57,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,6 +74,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.time.Instant
@@ -82,7 +85,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.delay
 
 // ----------------------------------------------------------------- Historie-Screen (Liste)
 
@@ -121,6 +123,7 @@ private val DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_FORMAT_PATTERN)
 @Composable
 fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -> Unit, onBack: () -> Unit) {
     val ctx = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
     BackHandler(onBack = onBack)
     var entries by remember { mutableStateOf<List<HistoryEntry>>(emptyList()) }
@@ -204,33 +207,34 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
         loadingFazits.add(key)
         expandedFazits.add(key)   // während/neu nach dem Laden direkt anzeigen
         val lines = dayFazitMealLines(ctx, entriesOfDay)
-        ApiClient.dayFazit(
-            settings = settings,
-            goals = settings.goals,
-            promptContext = profileContextLine(ctx, profile),
-            mealLines = lines,
-            prompts = FazitPromptBundle(
-                promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
-                promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
-                promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
-                promptHonesty = ctx.getString(R.string.prompt_honesty)
-            ),
-            onOk = { ampel, text ->
+        coroutineScope.launch {
+            val result = ApiClient.dayFazit(
+                settings = settings,
+                goals = settings.goals,
+                promptContext = profileContextLine(ctx, profile),
+                mealLines = lines,
+                prompts = FazitPromptBundle(
+                    promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
+                    promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+                    promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+                    promptHonesty = ctx.getString(R.string.prompt_honesty)
+                )
+            )
+            result.onSuccess { res ->
                 DayFazitStore.save(
                     ctx,
                     DayFazit(
-                        key, ampel, text, entriesOfDay.map { it.id },
+                        key, res.ampel, res.text, entriesOfDay.map { it.id },
                         System.currentTimeMillis(), dayFingerprint(entriesOfDay)
                     )
                 )
                 loadingFazits.remove(key)
                 fazitMap = DayFazitStore.loadAll(ctx).associateBy { it.dayKey }
-            },
-            onError = { msg ->
-                Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_SHORT).show()
+            }.onFailure { e ->
+                Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, e.message ?: e.javaClass.simpleName), Toast.LENGTH_SHORT).show()
                 loadingFazits.remove(key)
             }
-        )
+        }
     }
 
     fun generateWeekFazit() {
@@ -240,33 +244,34 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
         if (entriesOfWeek.isEmpty()) return
         loadingWeek = true
         expandedWeek = true
-        ApiClient.dayFazit(
-            settings = settings,
-            goals = settings.goals,
-            promptContext = profileContextLine(ctx, profile),
-            mealLines = dayFazitMealLines(ctx, entriesOfWeek),
-            prompts = FazitPromptBundle(
-                promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
-                promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
-                promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
-                promptHonesty = ctx.getString(R.string.prompt_honesty)
-            ),
-            onOk = { ampel, text ->
+        coroutineScope.launch {
+            val result = ApiClient.dayFazit(
+                settings = settings,
+                goals = settings.goals,
+                promptContext = profileContextLine(ctx, profile),
+                mealLines = dayFazitMealLines(ctx, entriesOfWeek),
+                prompts = FazitPromptBundle(
+                    promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
+                    promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+                    promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+                    promptHonesty = ctx.getString(R.string.prompt_honesty)
+                )
+            )
+            result.onSuccess { res ->
                 WeekFazitStore.save(
                     ctx,
                     DayFazit(
-                        wk, ampel, text, entriesOfWeek.map { it.id },
+                        wk, res.ampel, res.text, entriesOfWeek.map { it.id },
                         System.currentTimeMillis(), dayFingerprint(entriesOfWeek)
                     )
                 )
                 loadingWeek = false
                 weekFazit = WeekFazitStore.load(ctx, wk)
-            },
-            onError = { msg ->
-                Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_SHORT).show()
+            }.onFailure { e ->
+                Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, e.message ?: e.javaClass.simpleName), Toast.LENGTH_SHORT).show()
                 loadingWeek = false
             }
-        )
+        }
     }
 
     // Auto-Logik (nur die beiden neuesten Tagesgruppen):
@@ -644,6 +649,7 @@ private fun BackdatedOverlays(
     onSetBusy: (Boolean) -> Unit
 ) {
     val ctx = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     if (showCamera) {
         CameraCaptureScreen(
             outputFile = addPhotoFile,
@@ -666,20 +672,22 @@ private fun BackdatedOverlays(
                         ctx.getString(R.string.prompt_note_header, addNote)
                     else ""
                 )
-                ApiClient.analyze(
-                    ctx = ctx,
-                    photoUri = addPhotoUri,
-                    settings = settings,
-                    promptBundle = prompts,
-                    onResult = {
+                coroutineScope.launch {
+                    val result = ApiClient.analyze(
+                        ctx = ctx,
+                        photoUri = addPhotoUri,
+                        settings = settings,
+                        promptBundle = prompts
+                    )
+                    result.onSuccess {
                         onSetBusy(false)
                         onSaveBackdated(it, addPhotoUri)
-                    },
-                    onError = { msg ->
+                    }.onFailure { e ->
                         onSetBusy(false)
+                        val msg = e.message ?: e.javaClass.simpleName
                         Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
                     }
-                )
+                }
             }
         )
     }
@@ -704,20 +712,22 @@ private fun BackdatedOverlays(
                         ctx.getString(R.string.prompt_note_header, addNote.trim())
                     else ""
                 )
-                ApiClient.analyze(
-                    ctx = ctx,
-                    photoUri = addPhotoUri,
-                    settings = settings,
-                    promptBundle = prompts,
-                    onResult = {
+                coroutineScope.launch {
+                    val result = ApiClient.analyze(
+                        ctx = ctx,
+                        photoUri = addPhotoUri,
+                        settings = settings,
+                        promptBundle = prompts
+                    )
+                    result.onSuccess {
                         onSetBusy(false)
                         onSaveBackdated(it, addPhotoUri)
-                    },
-                    onError = { msg ->
+                    }.onFailure { e ->
                         onSetBusy(false)
+                        val msg = e.message ?: e.javaClass.simpleName
                         Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
                     }
-                )
+                }
             }
         )
     }
@@ -730,19 +740,21 @@ private fun BackdatedOverlays(
             busy = showBusy,
             onSend = {
                 onSetBusy(true)
-                ApiClient.analyzeText(
-                    ctx = ctx,
-                    settings = settings,
-                    userDescription = addNote.trim(),
-                    onResult = {
+                coroutineScope.launch {
+                    val result = ApiClient.analyzeText(
+                        ctx = ctx,
+                        settings = settings,
+                        userDescription = addNote.trim()
+                    )
+                    result.onSuccess {
                         onSetBusy(false)
                         onSaveBackdated(it, null)
-                    },
-                    onError = { msg ->
+                    }.onFailure { e ->
                         onSetBusy(false)
+                        val msg = e.message ?: e.javaClass.simpleName
                         Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
                     }
-                )
+                }
             }
         )
     }
@@ -1229,6 +1241,7 @@ fun ScoreBadge(entry: HistoryEntry) {
 @Composable
 fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> Unit) {
     val ctx = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
     BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf(false) }
@@ -1259,32 +1272,33 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
             Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_LONG).show()
             reEvalBusy = false
         }
-        if (photoUri != null) {
-            ApiClient.analyze(
-                ctx = ctx,
-                photoUri = photoUri,
-                settings = settings,
-                promptBundle = PromptBundle(   // korrigierte Erkennung als Nutzer-Information in den Prompt
-                    intro = ctx.getString(R.string.prompt_eval_intro),
-                    formatIntro = ctx.getString(R.string.prompt_eval_format),
-                    ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                    exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                    responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                    recognized = ctx.getString(R.string.prompt_eval_recognized),
-                    honesty = ctx.getString(R.string.prompt_honesty),
-                    noteHeader = ctx.getString(R.string.prompt_reeval_header, correctedText)
-                ),
-                onResult = onDone,
-                onError = onFail
-            )
-        } else {
-            ApiClient.analyzeText(
-                ctx = ctx,
-                settings = settings,
-                userDescription = correctedText,
-                onResult = onDone,
-                onError = onFail
-            )
+        coroutineScope.launch {
+            val result = if (photoUri != null) {
+                ApiClient.analyze(
+                    ctx = ctx,
+                    photoUri = photoUri,
+                    settings = settings,
+                    promptBundle = PromptBundle(   // korrigierte Erkennung als Nutzer-Information in den Prompt
+                        intro = ctx.getString(R.string.prompt_eval_intro),
+                        formatIntro = ctx.getString(R.string.prompt_eval_format),
+                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                        recognized = ctx.getString(R.string.prompt_eval_recognized),
+                        honesty = ctx.getString(R.string.prompt_honesty),
+                        noteHeader = ctx.getString(R.string.prompt_reeval_header, correctedText)
+                    )
+                )
+            } else {
+                ApiClient.analyzeText(
+                    ctx = ctx,
+                    settings = settings,
+                    userDescription = correctedText
+                )
+            }
+            result.onSuccess(onDone).onFailure { e ->
+                onFail(e.message ?: e.javaClass.simpleName)
+            }
         }
     }
 
