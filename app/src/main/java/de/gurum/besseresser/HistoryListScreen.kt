@@ -199,30 +199,33 @@ fun HistoryListContent(
                             state = dismissState,
                             enableDismissFromStartToEnd = false,
                             backgroundContent = {
+                                val isSwiping = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(16.dp))
                                         .fillMaxSize()
-                                        .background(Color(0xFFD32F2F)),
+                                        .background(if (isSwiping) Color(0xFFD32F2F) else Color.Transparent),
                                     contentAlignment = Alignment.CenterEnd
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 22.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Delete,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(
-                                            stringResource(R.string.delete),
-                                            color = Color.White,
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 14.sp
-                                        )
+                                    if (isSwiping) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(horizontal = 22.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Filled.Delete,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                stringResource(R.string.delete),
+                                                color = Color.White,
+                                                fontWeight = FontWeight.SemiBold,
+                                                fontSize = 14.sp
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -256,7 +259,7 @@ fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
         modifier = Modifier.fillMaxWidth()
     ) {
