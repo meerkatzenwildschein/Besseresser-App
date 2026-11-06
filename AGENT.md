@@ -112,6 +112,8 @@ Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz 
 | `Profile` | Nutzerdaten | `birthDate` (ISO), `weightKg`, `heightCm`, `notes`, `gender`, dynamisches `ageYears` |
 | `HistoryEntry` | Gespeicherte Mahlzeit | ID, Datum, Foto-Pfad, Zielergebnisse, Notiz, Score-Berechnung (0..100) |
 | `DayFazit` | Tagesbewertung | Ampel, Fazit-Text, Entry-IDs und `fingerprint` |
+| `DayFazitResult` | KI-Ergebnis Tages-/Wochenfazit | Typsicheres Paar aus `TrafficLight` und Fazit-Text (`text`) |
+| `ApiException` | API-Fehlermodell | Fehlertext, optionaler Monospace-`debugReport` und Root-Cause |
 | `RecentNote` | Notiz-Schnellauswahl | Text (`t`) und Sternchen-Favoriten-Status (`s`) |
 
 ---
@@ -127,7 +129,7 @@ Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz 
 | Serialisierung | `kotlinx-serialization-json:1.7.3` |
 | Kamera | CameraX 1.3.4 (`camera-core`, `camera-camera2`, `camera-lifecycle`, `camera-view`) |
 | Sicherheit | Android Keystore / AES-256-GCM (`KeyVault.kt`) |
-| Tests | JUnit 4 (`DataSerializationTest.kt` zur Validierung von Enums, Parsing & Score-Berechnungen) |
+| Tests | JUnit 4 (`DataSerializationTest.kt`, `ApiClientTest.kt`) |
 
 ---
 
@@ -166,6 +168,7 @@ Besseresser-App/
 │       │       └── xml/                ← file_paths.xml, locales_config.xml
 │       └── test/
 │           └── java/de/gurum/besseresser/
+│               ├── ApiClientTest.kt         ← Unit-Tests für ApiClient-Hilfsmethoden & Fehlermodelle
 │               └── DataSerializationTest.kt ← Unit-Tests für Serialisierung, Enums und Scores
 ```
 

@@ -33,6 +33,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
 // ----------------------------------------------------------------- Gängige Anbieter
 
@@ -74,6 +76,7 @@ private val PROVIDERS = listOf(
 @Composable
 fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDone: (Settings) -> Unit) {
     val ctx = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val defaultGoals = remember { ctx.resources.getStringArray(R.array.default_goals).toList() }
     var url by remember { mutableStateOf(initial.baseUrl) }
     var key by remember { mutableStateOf(initial.apiKey) }
@@ -121,27 +124,29 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
                 splitting = true
                 splitDebug = null
                 splitRaw = text
-                ApiClient.splitGoals(
-                    request = SplitGoalsRequest(
-                        baseUrl = url,
-                        apiKey = key,
-                        model = model,
-                        rawGoals = text,
-                        splitIntro = ctx.getString(R.string.prompt_split_intro),
-                        splitRules = ctx.getString(R.string.prompt_split_rules)
-                    ),
-                    onOk = { liste ->
+                coroutineScope.launch {
+                    val result = ApiClient.splitGoals(
+                        request = SplitGoalsRequest(
+                            baseUrl = url,
+                            apiKey = key,
+                            model = model,
+                            rawGoals = text,
+                            splitIntro = ctx.getString(R.string.prompt_split_intro),
+                            splitRules = ctx.getString(R.string.prompt_split_rules)
+                        )
+                    )
+                    result.onSuccess { liste ->
                         splitting = false
                         splitEdited = liste.joinToString("\n")
                         showSplit = true
-                    },
-                    onError = { debug ->
+                    }.onFailure { e ->
                         splitting = false
+                        val debug = (e as? ApiException)?.debugReport ?: e.message ?: e.javaClass.simpleName
                         splitDebug = debug
                         splitEdited = ApiClient.splitGoalsLocally(text).joinToString("\n").ifBlank { text }
                         showSplit = true
                     }
-                )
+                }
             }
         }
     }
@@ -378,18 +383,17 @@ fun ModelListScreen(url: String, apiKey: String, onPick: (String) -> Unit, onBac
     var debugReport by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        ApiClient.fetchModels(
+        val result = ApiClient.fetchModels(
             baseUrl = url,
-            apiKey = apiKey,
-            onOk = {
-                models = it
-                loading = false
-            },
-            onError = {
-                debugReport = it
-                loading = false
-            }
+            apiKey = apiKey
         )
+        result.onSuccess {
+            models = it
+            loading = false
+        }.onFailure { e ->
+            debugReport = (e as? ApiException)?.debugReport ?: e.message ?: e.javaClass.simpleName
+            loading = false
+        }
     }
 
     Column(

@@ -45,6 +45,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +58,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -88,6 +91,8 @@ fun MainScreen(
     var showCamera by remember { mutableStateOf(false) }   // Eigene Kamera (CameraX)
     var showErkanntEdit by remember { mutableStateOf(false) }
     var savedEntryId by remember { mutableStateOf<Long?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+    var analyzeJob by remember { mutableStateOf<Job?>(null) }
 
     val photoFile = remember {
         File(ctx.cacheDir, "photos").also { it.mkdirs() }
@@ -112,6 +117,7 @@ fun MainScreen(
     // Ein frischer Erfassungs-Durchlauf: verwirft Evaluierung, Foto, Anmerkung, Historie-Status
     // und Fehler – genutzt vom fixierten CTA, dem „Neues Foto aufnehmen“-CTA und „Verwerfen“.
     val resetCycle = {
+        analyzeJob?.cancel()
         evaluation = null
         lastGoaled = false
         photoPreview = null
@@ -142,22 +148,24 @@ fun MainScreen(
                 ctx.getString(R.string.prompt_note_header, trimmedNote)
             else ""
         )
-        ApiClient.analyze(
-            ctx = ctx,
-            photoUri = targetUri,
-            settings = settings,
-            promptBundle = prompts,
-            onResult = {
+        analyzeJob?.cancel()
+        analyzeJob = coroutineScope.launch {
+            val result = ApiClient.analyze(
+                ctx = ctx,
+                photoUri = targetUri,
+                settings = settings,
+                promptBundle = prompts
+            )
+            result.onSuccess {
                 evaluation = it
                 busy = false
                 lastGoaled = true
                 showReview = false
-            },
-            onError = {
-                error = it
+            }.onFailure { e ->
+                error = e.message ?: e.javaClass.simpleName
                 busy = false
             }
-        )
+        }
     }
 
     Box(
