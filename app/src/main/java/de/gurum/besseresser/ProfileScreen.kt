@@ -41,11 +41,11 @@ fun profileContextLine(ctx: Context, profile: Profile): String? {
         parts.add(ctx.getString(R.string.profile_ctx_weight, shown))
     }
     profile.heightCm?.let { parts.add(ctx.getString(R.string.profile_ctx_height, it)) }
-    if (profile.gender.isNotBlank()) {
+    if (profile.gender != Gender.NONE) {
         val word = ctx.getString(
             when (profile.gender) {
-                "male" -> R.string.profile_gender_male
-                "female" -> R.string.profile_gender_female
+                Gender.MALE -> R.string.profile_gender_male
+                Gender.FEMALE -> R.string.profile_gender_female
                 else -> R.string.profile_gender_diverse
             }
         )
@@ -149,18 +149,18 @@ fun ProfileScreen(initial: Profile, onCancel: () -> Unit, onSave: (Profile) -> U
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
-                    selected = gender == "male",
-                    onClick = { gender = if (gender == "male") "" else "male" },
+                    selected = gender == Gender.MALE,
+                    onClick = { gender = if (gender == Gender.MALE) Gender.NONE else Gender.MALE },
                     label = { Text(stringResource(R.string.profile_gender_male), fontSize = 12.sp) }
                 )
                 FilterChip(
-                    selected = gender == "female",
-                    onClick = { gender = if (gender == "female") "" else "female" },
+                    selected = gender == Gender.FEMALE,
+                    onClick = { gender = if (gender == Gender.FEMALE) Gender.NONE else Gender.FEMALE },
                     label = { Text(stringResource(R.string.profile_gender_female), fontSize = 12.sp) }
                 )
                 FilterChip(
-                    selected = gender == "diverse",
-                    onClick = { gender = if (gender == "diverse") "" else "diverse" },
+                    selected = gender == Gender.DIVERSE,
+                    onClick = { gender = if (gender == Gender.DIVERSE) Gender.NONE else Gender.DIVERSE },
                     label = { Text(stringResource(R.string.profile_gender_diverse), fontSize = 12.sp) }
                 )
             }

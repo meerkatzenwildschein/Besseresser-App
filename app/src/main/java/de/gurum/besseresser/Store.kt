@@ -2,8 +2,15 @@ package de.gurum.besseresser
 
 import android.content.Context
 import android.content.SharedPreferences
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /** Eine gemeinsame Prefs-Datei für Einstellungen UND Profil (lokal auf dem Gerät). */
 internal const val BETTERESSER_PREFS = "besseresser_prefs"
@@ -40,12 +47,13 @@ object Store {
 // ----------------------------------------------------------------- Profil
 
 /** Nutzerprofil: alles optional. Geburtsdatum (ISO yyyy-MM-dd, veraltet nicht) statt Alter. */
+@Serializable
 data class Profile(
     val birthDate: String? = null,  // ISO yyyy-MM-dd
     val weightKg: Double? = null,
     val heightCm: Int? = null,
     val notes: String = "",
-    val gender: String = ""         // "" = keine Angabe; "male" | "female" | "diverse"
+    val gender: Gender = Gender.NONE
 ) {
     /** Alter in Jahren – lokal aus dem Geburtsdatum berechnet (veraltet nie). */
     val ageYears: Int?
@@ -56,7 +64,7 @@ data class Profile(
         }
 
     val isEmpty: Boolean
-        get() = birthDate == null && weightKg == null && heightCm == null && notes.isBlank() && gender.isBlank()
+        get() = birthDate == null && weightKg == null && heightCm == null && notes.isBlank() && gender == Gender.NONE
 }
 
 object ProfileStore {
@@ -68,7 +76,7 @@ object ProfileStore {
                 ?.replace(',', '.')?.toDoubleOrNull()?.takeIf { it > 0 },
             heightCm = p.getInt("profileHeight", -1).takeIf { it > 0 },
             notes = p.getString("profileNotes", "") ?: "",
-            gender = p.getString("profileGender", "") ?: ""
+            gender = Gender.fromString(p.getString("profileGender", null))
         )
     }
 
@@ -79,14 +87,14 @@ object ProfileStore {
         weightKg: Double?,
         heightCm: Int?,
         notes: String,
-        gender: String = ""
+        gender: Gender = Gender.NONE
     ) {
         ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
             .putString("birthDate", birthDateIso?.takeIf { it.isNotBlank() })
             .putString("profileWeight", weightKg?.toString())
             .putInt("profileHeight", heightCm ?: -1)
             .putString("profileNotes", notes.trim())
-            .putString("profileGender", gender.takeIf { it in setOf("male", "female", "diverse") } ?: "")
+            .putString("profileGender", gender.rawValue)
             .apply()
     }
 }
@@ -95,7 +103,13 @@ object ProfileStore {
 
 /** Eintrag der Schnellauswahl-Liste: Text + Favoriten-Sternchen.
  *  Sternchen = dauerhaft in der Liste (bis abgewählt); ohne Stern rotieren max. 5 nach MRU. */
-data class RecentNote(val text: String, val starred: Boolean = false)
+@Serializable
+data class RecentNote(
+    @SerialName("t")
+    val text: String,
+    @SerialName("s")
+    val starred: Boolean = false
+)
 
 object RecentNotesStore {
     private const val KEY = "recentNotes"
@@ -108,18 +122,7 @@ object RecentNotesStore {
     fun load(ctx: Context, sortStarredFirst: Boolean = true): List<RecentNote> = runCatching {
         val raw = ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
             .getString(KEY, null) ?: return emptyList()
-        val arr = JSONArray(raw)
-        val parsed = (0 until arr.length()).mapNotNull { i ->
-            val o = arr.opt(i)
-            when (o) {
-                is String -> RecentNote(o, false)   // Alt-Format ohne Sternchen
-                is JSONObject -> {
-                    val t = o.optString("t")
-                    if (t.isNotBlank()) RecentNote(t, o.optBoolean("s", false)) else null
-                }
-                else -> null
-            }
-        }
+        val parsed = parseRecentNotes(raw)
         if (sortStarredFirst) {
             val starred = parsed.filter { it.starred }
             val unstarred = parsed.filter { !it.starred }.take(MAX_UNSTARRED)
@@ -131,6 +134,31 @@ object RecentNotesStore {
             capped.first + keepLast
         }
     }.getOrDefault(emptyList())
+
+    private fun parseRecentNotes(raw: String): List<RecentNote> {
+        return try {
+            AppJson.decodeFromString<List<RecentNote>>(raw)
+        } catch (e: Exception) {
+            try {
+                val element = AppJson.parseToJsonElement(raw)
+                if (element is JsonArray) {
+                    element.mapNotNull { item ->
+                        when (item) {
+                            is JsonPrimitive -> item.contentOrNull?.takeIf { it.isNotBlank() }?.let { RecentNote(it, false) }
+                            is JsonObject -> {
+                                val text = item["t"]?.jsonPrimitive?.contentOrNull ?: ""
+                                val starred = item["s"]?.jsonPrimitive?.booleanOrNull ?: false
+                                if (text.isNotBlank()) RecentNote(text, starred) else null
+                            }
+                            else -> null
+                        }
+                    }
+                } else emptyList()
+            } catch (e2: Exception) {
+                emptyList()
+            }
+        }
+    }
 
     /** Nach vorne stellen (Dedup); unmarkierte rotieren max. 5 nach MRU, älteste fliegt raus.
      *  Sternchen-Einträge bleiben immer erhalten (bis abgewählt). */
@@ -152,9 +180,6 @@ object RecentNotesStore {
         val list = load(ctx).map {
             if (it.text == t) RecentNote(it.text, !it.starred) else it
         }
-        // Beim ABWÄHLEN gilt die 5er-MRU-Regel: der frisch freigestellte Eintrag ist der
-        // neueste an seiner Position – die ÄLTESTE unmarkierte fliegt (erst beim nächsten
-        // Öffnen sichtbar) raus.
         write(ctx, list)
     }
 
@@ -164,16 +189,10 @@ object RecentNotesStore {
     }
 
     private fun write(ctx: Context, notes: List<RecentNote>) {
-        val arr = JSONArray().apply {
-            notes.distinctBy { it.text }.take(MAX_TOTAL).forEach { n ->
-                put(JSONObject().apply {
-                    put("t", n.text)
-                    put("s", n.starred)
-                })
-            }
-        }
+        val items = notes.distinctBy { it.text }.take(MAX_TOTAL)
+        val json = AppJson.encodeToString(items)
         ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY, arr.toString())
+            .putString(KEY, json)
             .apply()
     }
 }
