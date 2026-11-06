@@ -665,33 +665,53 @@ private fun saveMainEntryToHistory(
     }
 }
 
+private class MainSwipeState(
+    private val isBlocked: Boolean,
+    private val onBlocked: () -> Unit,
+    private val onOpenHistory: () -> Unit
+) {
+    private var acc = 0f
+    private var hintShown = false
+
+    fun reset() {
+        acc = 0f
+        hintShown = false
+    }
+
+    fun onDrag(dragAmount: Float) {
+        if (dragAmount >= 0) {
+            acc = 0f
+            return
+        }
+        acc += dragAmount
+        if (acc > -160f) return
+
+        acc = 0f
+        if (isBlocked) {
+            handleBlocked()
+        } else {
+            onOpenHistory()
+        }
+    }
+
+    private fun handleBlocked() {
+        if (!hintShown) {
+            onBlocked()
+            hintShown = true
+        }
+    }
+}
+
 private fun Modifier.mainSwipeToHistoryHandler(
     isBlocked: Boolean,
     onBlocked: () -> Unit,
     onOpenHistory: () -> Unit
 ): Modifier = pointerInput(Unit) {
-    var acc = 0f
-    var hintShown = false
+    val state = MainSwipeState(isBlocked, onBlocked, onOpenHistory)
     detectHorizontalDragGestures(
-        onDragEnd = { acc = 0f; hintShown = false },
-        onDragCancel = { acc = 0f; hintShown = false }
+        onDragEnd = { state.reset() },
+        onDragCancel = { state.reset() }
     ) { _, dragAmount ->
-        if (dragAmount < 0) {
-            acc += dragAmount
-            if (acc < -160f) {
-                if (isBlocked) {
-                    if (!hintShown) {
-                        onBlocked()
-                        hintShown = true
-                    }
-                    acc = 0f
-                } else {
-                    acc = 0f
-                    onOpenHistory()
-                }
-            }
-        } else {
-            acc = 0f
-        }
+        state.onDrag(dragAmount)
     }
 }
