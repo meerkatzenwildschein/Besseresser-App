@@ -58,6 +58,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.File
@@ -75,24 +77,11 @@ fun MainScreen(
     settings: Settings,
     onEditSettings: () -> Unit,
     onOpenProfile: () -> Unit,
-    onOpenHistory: () -> Unit
+    onOpenHistory: () -> Unit,
+    viewModel: MainViewModel = viewModel()
 ) {
     val ctx = LocalContext.current
-    var evaluation by remember { mutableStateOf<Evaluation?>(null) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var photoPreview by remember { mutableStateOf<Uri?>(null) }
-    var lastGoaled by remember { mutableStateOf(false) }
-    var menuOpen by remember { mutableStateOf(false) }
-    var savedToHistory by remember { mutableStateOf(false) }
-    var savingHistory by remember { mutableStateOf(false) }
-    var note by remember { mutableStateOf("") }   // WhatsApp-Stil: Anmerkung zum Foto
-    var showReview by remember { mutableStateOf(false) }   // Review-Zweig (Fallback über Systemkamera)
-    var showCamera by remember { mutableStateOf(false) }   // Eigene Kamera (CameraX)
-    var showErkanntEdit by remember { mutableStateOf(false) }
-    var savedEntryId by remember { mutableStateOf<Long?>(null) }
-    val coroutineScope = rememberCoroutineScope()
-    var analyzeJob by remember { mutableStateOf<Job?>(null) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val photoFile = remember {
         File(ctx.cacheDir, "photos").also { it.mkdirs() }
@@ -107,57 +96,23 @@ fun MainScreen(
     val cameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { ok ->
+        viewModel.onSystemCameraResult(ok, photoUri)
         if (ok) {
-            error = null
-            photoPreview = photoUri
-            showReview = true
+            viewModel.setShowReview(true)
         }
-    }
-
-    // Ein frischer Erfassungs-Durchlauf: verwirft Evaluierung, Foto, Anmerkung, Historie-Status
-    // und Fehler – genutzt vom fixierten CTA, dem „Neues Foto aufnehmen“-CTA und „Verwerfen“.
-    val resetCycle = {
-        analyzeJob?.cancel()
-        evaluation = null
-        lastGoaled = false
-        photoPreview = null
-        savedToHistory = false
-        savedEntryId = null
-        error = null
-        note = ""
-        Unit
     }
 
     // Android-Zurück-Button: Overlay-Ebenen der Aufnahme schließen, statt die App zu beenden.
-    // (Die definitive Version lebt in den Screens selbst: CameraCaptureScreen + Review-Flows
-    // registrieren ihre Handler in der inneren Composition → sie gewinnen zuverlässig.)
-    BackHandler(enabled = showCamera) { showCamera = false }
+    BackHandler(enabled = uiState.showCamera) { viewModel.setShowCamera(false) }
 
     val triggerAnalyze: (String, Uri) -> Unit = { trimmedNote, targetUri ->
-        busy = true
-        error = null
         val prompts = createAnalyzePrompts(ctx, trimmedNote)
-        analyzeJob?.cancel()
-        analyzeJob = coroutineScope.launch {
-            val result = ApiClient.analyze(
-                ctx = ctx,
-                photoUri = targetUri,
-                settings = settings,
-                promptBundle = prompts
-            )
-            result.onSuccess {
-                evaluation = it
-                busy = false
-                lastGoaled = true
-                showReview = false
-            }.onFailure { e ->
-                error = e.message ?: e.javaClass.simpleName
-                busy = false
-            }
-        }
+        viewModel.onPhotoTaken(targetUri)
+        viewModel.analyze(ctx, settings, prompts)
     }
 
-    val navBlocked = busy || showCamera || showReview || (lastGoaled && !savedToHistory)
+    val lastGoaled = uiState.evaluation != null || uiState.savedToHistory
+    val navBlocked = uiState.isBusy || uiState.showCamera || uiState.showReview || (lastGoaled && !uiState.savedToHistory)
 
     Box(
         modifier = Modifier
@@ -170,111 +125,98 @@ fun MainScreen(
                 onOpenHistory = onOpenHistory
             )
     ) {
-        if (showCamera) {
+        if (uiState.showCamera) {
             CameraCaptureScreen(
                 outputFile = photoFile,
-                note = note,
-                onNoteChange = { note = it },
-                onCancel = { showCamera = false },
+                note = uiState.note,
+                onNoteChange = { viewModel.setNote(it) },
+                onCancel = { viewModel.setShowCamera(false) },
                 onFallbackSystemCamera = {
-                    showCamera = false
+                    viewModel.setShowCamera(false)
                     cameraLauncher.launch(photoUri)
                 },
                 onConfirm = {
-                    showCamera = false
-                    note = note.trim()
-                    RecentNotesStore.push(ctx, note)
-                    photoPreview = photoUri
-                    triggerAnalyze(note, photoUri)
+                    viewModel.setShowCamera(false)
+                    val noteTrimmed = uiState.note.trim()
+                    RecentNotesStore.push(ctx, noteTrimmed)
+                    triggerAnalyze(noteTrimmed, photoUri)
                 }
             )
-        } else if (showReview) {
+        } else if (uiState.showReview) {
             MainReviewScreen(
-                photoUri = photoPreview,
-                note = note,
-                error = error,
-                busy = busy,
-                onNoteChange = { note = it },
+                photoUri = uiState.photoPreviewUri ?: photoUri,
+                note = uiState.note,
+                error = uiState.error,
+                busy = uiState.isBusy,
+                onNoteChange = { viewModel.setNote(it) },
                 onBack = {
-                    showReview = false
-                    photoPreview = null
-                    note = ""
-                    error = null
+                    viewModel.setShowReview(false)
+                    viewModel.reset()
                 },
                 onRate = {
-                    val trimmed = note.trim()
+                    val trimmed = uiState.note.trim()
                     RecentNotesStore.push(ctx, trimmed)
                     triggerAnalyze(trimmed, photoUri)
                 },
                 onRetake = {
-                    showReview = false
-                    photoPreview = null
-                    note = ""
+                    viewModel.setShowReview(false)
+                    viewModel.reset()
                     cameraLauncher.launch(photoUri)
                 }
             )
         } else {
-            val reportShown = lastGoaled && !evaluation?.goalResults.isNullOrEmpty()
-            val menuEnabled = !busy && !showCamera && !showReview && !(lastGoaled && !savedToHistory)
+            val reportShown = lastGoaled && !uiState.evaluation?.goalResults.isNullOrEmpty()
+            val menuEnabled = !uiState.isBusy && !uiState.showCamera && !uiState.showReview && !(lastGoaled && !uiState.savedToHistory)
             MainReportView(
                 settings = settings,
-                evaluation = evaluation,
-                photoUri = photoPreview,
-                note = note,
-                error = error,
+                evaluation = uiState.evaluation,
+                photoUri = uiState.photoPreviewUri,
+                note = uiState.note,
+                error = uiState.error,
                 lastGoaled = lastGoaled,
-                savedToHistory = savedToHistory,
-                savingHistory = savingHistory,
+                savedToHistory = uiState.savedToHistory,
+                savingHistory = uiState.savingHistory,
                 reportShown = reportShown,
-                menuOpen = menuOpen,
+                menuOpen = uiState.menuOpen,
                 menuItemsEnabled = menuEnabled,
-                onMenuToggle = { menuOpen = it },
+                onMenuToggle = { viewModel.setMenuOpen(it) },
                 onOpenProfile = onOpenProfile,
                 onOpenHistory = onOpenHistory,
                 onEditSettings = onEditSettings,
-                onEditErkannt = { showErkanntEdit = true },
+                onEditErkannt = { viewModel.setShowErkanntEdit(true) },
                 onSaveToHistory = {
-                    savingHistory = true
-                    val stored = saveMainEntryToHistory(ctx, photoUri, evaluation, note)
-                    savedToHistory = stored != null
-                    savedEntryId = stored?.id
-                    savingHistory = false
+                    viewModel.saveToHistory(ctx, settings)
                 },
-                onDiscard = { resetCycle() }
+                onDiscard = { viewModel.reset() }
             )
 
-            if (busy && evaluation == null) {
+            if (uiState.isBusy && uiState.evaluation == null) {
                 MainAiBusyCard(modifier = Modifier.align(Alignment.Center))
             }
 
             MainFixedCtaButtons(
                 lastGoaled = lastGoaled,
-                savedToHistory = savedToHistory,
+                savedToHistory = uiState.savedToHistory,
                 reportShown = reportShown,
-                busy = busy,
+                busy = uiState.isBusy,
                 onNewPhoto = {
-                    resetCycle()
-                    showCamera = true
+                    viewModel.reset()
+                    viewModel.setShowCamera(true)
                 },
                 onTakePhoto = {
-                    resetCycle()
-                    showCamera = true
+                    viewModel.reset()
+                    viewModel.setShowCamera(true)
                 },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
 
-            if (showErkanntEdit && evaluation != null) {
+            if (uiState.showErkanntEdit && uiState.evaluation != null) {
                 ErkanntEditDialog(
-                    initialText = evaluation?.erkannt.orEmpty(),
+                    initialText = uiState.evaluation?.erkannt.orEmpty(),
                     onOk = { newText ->
-                        evaluation = evaluation?.copy(erkannt = newText)
-                        showErkanntEdit = false
-                        val entryId = savedEntryId
-                        if (savedToHistory && entryId != null) {
-                            HistoryStore.updateErkannt(ctx, entryId, newText)
-                        }
+                        viewModel.updateErkannt(ctx, newText)
                     },
-                    onDismiss = { showErkanntEdit = false }
+                    onDismiss = { viewModel.setShowErkanntEdit(false) }
                 )
             }
         }

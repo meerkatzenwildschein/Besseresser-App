@@ -13,54 +13,34 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import java.io.File
 import java.text.SimpleDateFormat
-import java.time.LocalDate
-import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
 @Composable
-fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -> Unit, onBack: () -> Unit) {
+fun HistoryScreen(
+    settings: Settings,
+    profile: Profile,
+    onPick: (HistoryEntry) -> Unit,
+    onBack: () -> Unit,
+    viewModel: HistoryViewModel = viewModel()
+) {
     val ctx = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
     BackHandler(onBack = onBack)
-    var entries by remember { mutableStateOf<List<HistoryEntry>>(emptyList()) }
-    LaunchedEffect(Unit) { entries = HistoryStore.entries(ctx) }
 
-    // ------------------------------------------------- KI-Tagesfazit-Zustand
-    var fazitMap by remember { mutableStateOf<Map<String, DayFazit>>(emptyMap()) }
-    val loadingFazits = remember { mutableStateListOf<String>() }
-    val expandedFazits = remember { mutableStateListOf<String>() }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    var weekFazit by remember { mutableStateOf<DayFazit?>(null) }
-    var loadingWeek by remember { mutableStateOf(false) }
-    var expandedWeek by remember { mutableStateOf(false) }
-
-    LaunchedEffect(entries) {
-        fazitMap = DayFazitStore.loadAll(ctx).associateBy { it.dayKey }
-        weekFazit = syncWeekFazit(ctx, entries)
+    LaunchedEffect(Unit) {
+        viewModel.startObserving(ctx)
     }
-
-    // ------------------------------------------------- Nacherfassen (Essen nachtragen für einen Tag)
-    var addDialogForDay by remember { mutableStateOf<LocalDate?>(null) }
-    var showAddCamera by remember { mutableStateOf(false) }
-    var showAddReview by remember { mutableStateOf(false) }
-    var showAddText by remember { mutableStateOf(false) }
-    var showAddBusyCard by remember { mutableStateOf(false) }
-    var addNote by remember { mutableStateOf("") }
-    var addTargetDay by remember { mutableStateOf<LocalDate?>(null) }
 
     val addPhotoFile = remember {
         File(ctx.cacheDir, "photos").also { it.mkdirs() }
@@ -73,107 +53,24 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
         ActivityResultContracts.TakePicture()
     ) { ok ->
         if (ok) {
-            showAddReview = true
+            viewModel.setShowAddReview(true)
         }
     }
-    BackHandler(enabled = showAddCamera) { showAddCamera = false }
-    BackHandler(enabled = showAddReview) { showAddReview = false }
-    BackHandler(enabled = showAddText) { showAddText = false }
-
-    fun saveBackdatedEntry(ev: Evaluation, photoUriIn: Uri?) {
-        val day = addTargetDay ?: return
-        val millis = day.atTime(23, 59).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val entry = HistoryStore.add(
-            ctx = ctx, photoUri = photoUriIn, ev = ev,
-            note = addNote.trim(), dateOverride = millis, backdated = true
-        )
-        DayFazitStore.deleteForEntry(ctx, entry)
-        WeekFazitStore.deleteForEntry(ctx, entry)
-        RecentNotesStore.push(ctx, addNote.trim())
-        entries = HistoryStore.entries(ctx)
-        showAddCamera = false
-        showAddReview = false
-        showAddText = false
-        showAddBusyCard = false
-        addNote = ""
-        addTargetDay = null
-        onPick(entry)
-    }
-
-    fun generateFazit(day: LocalDate, entriesOfDay: List<HistoryEntry>) {
-        val key = dayKeyOf(day)
-        if (key in loadingFazits) return
-        loadingFazits.add(key)
-        expandedFazits.add(key)
-        val lines = dayFazitMealLines(ctx, entriesOfDay)
-        coroutineScope.launch {
-            val result = ApiClient.dayFazit(
-                settings = settings,
-                goals = settings.goals,
-                promptContext = profileContextLine(ctx, profile),
-                mealLines = lines,
-                prompts = createDayFazitPrompts(ctx)
-            )
-            result.onSuccess { res ->
-                DayFazitStore.save(
-                    ctx,
-                    DayFazit(
-                        key, res.ampel, res.text, entriesOfDay.map { it.id },
-                        System.currentTimeMillis(), dayFingerprint(entriesOfDay)
-                    )
-                )
-                loadingFazits.remove(key)
-                fazitMap = DayFazitStore.loadAll(ctx).associateBy { it.dayKey }
-            }.onFailure { e ->
-                loadingFazits.remove(key)
-                val msg = e.message ?: e.javaClass.simpleName
-                Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_LONG).show()
-            }
-        }
-    }
-
-    fun generateWeekFazit() {
-        val wk = weekKeyOf(System.currentTimeMillis())
-        val wkEntries = entries.filter { dayKeyOf(it.dateMillis) == wk }
-        if (wkEntries.isEmpty() || loadingWeek) return
-        loadingWeek = true
-        expandedWeek = true
-        val lines = dayFazitMealLines(ctx, wkEntries)
-        coroutineScope.launch {
-            val result = ApiClient.dayFazit(
-                settings = settings,
-                goals = settings.goals,
-                promptContext = profileContextLine(ctx, profile),
-                mealLines = lines,
-                prompts = createWeekFazitPrompts(ctx)
-            )
-            result.onSuccess { res ->
-                val wf = DayFazit(
-                    wk, res.ampel, res.text, wkEntries.map { it.id },
-                    System.currentTimeMillis(), dayFingerprint(wkEntries)
-                )
-                WeekFazitStore.save(ctx, wf)
-                weekFazit = wf
-                loadingWeek = false
-            }.onFailure { e ->
-                loadingWeek = false
-                val msg = e.message ?: e.javaClass.simpleName
-                Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_LONG).show()
-            }
-        }
-    }
+    BackHandler(enabled = uiState.showAddCamera) { viewModel.setShowAddCamera(false) }
+    BackHandler(enabled = uiState.showAddReview) { viewModel.setShowAddReview(false) }
+    BackHandler(enabled = uiState.showAddText) { viewModel.setShowAddText(false) }
 
     HistoryAutoFazitEffect(
-        entries = entries,
-        fazitMap = fazitMap,
-        loadingFazits = loadingFazits,
-        weekFazit = weekFazit,
-        loadingWeek = loadingWeek,
-        onGenerateFazit = { day, list -> generateFazit(day, list) },
-        onGenerateWeekFazit = { generateWeekFazit() }
+        entries = uiState.entries,
+        fazitMap = uiState.fazitMap,
+        loadingFazits = uiState.loadingFazits.toList(),
+        weekFazit = uiState.weekFazit,
+        loadingWeek = uiState.loadingWeek,
+        onGenerateFazit = { day, list -> viewModel.generateFazit(ctx, day, list, settings, profile) },
+        onGenerateWeekFazit = { viewModel.generateWeekFazit(ctx, settings, profile) }
     )
 
-    val anyOverlayOpen = showAddCamera || showAddReview || showAddText || addDialogForDay != null || showAddBusyCard
+    val anyOverlayOpen = uiState.showAddCamera || uiState.showAddReview || uiState.showAddText || uiState.addDialogForDay != null || uiState.showAddBusyCard
 
     Box(
         modifier = Modifier
@@ -192,67 +89,64 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                 .padding(horizontal = 16.dp, vertical = 20.dp)
         ) {
             HistoryListContent(
-                entries = entries,
-                fazitMap = fazitMap,
-                loadingFazits = loadingFazits,
-                expandedFazits = expandedFazits,
-                weekFazit = weekFazit,
-                loadingWeek = loadingWeek,
-                expandedWeek = expandedWeek,
+                entries = uiState.entries,
+                fazitMap = uiState.fazitMap,
+                loadingFazits = uiState.loadingFazits.toList(),
+                expandedFazits = uiState.expandedFazits.toList(),
+                weekFazit = uiState.weekFazit,
+                loadingWeek = uiState.loadingWeek,
+                expandedWeek = uiState.expandedWeek,
                 onBack = onBack,
                 onPick = onPick,
-                onGenerateFazit = { day, list -> generateFazit(day, list) },
-                onGenerateWeekFazit = { generateWeekFazit() },
-                onToggleExpandWeek = { expandedWeek = !expandedWeek },
-                onAddMealForDay = { day -> addDialogForDay = day },
-                onDeleteEntry = { entry ->
-                    HistoryStore.delete(ctx, entry)
-                    DayFazitStore.deleteForEntry(ctx, entry)
-                    WeekFazitStore.deleteForEntry(ctx, entry)
-                    entries = HistoryStore.entries(ctx)
-                }
+                onGenerateFazit = { day, list -> viewModel.generateFazit(ctx, day, list, settings, profile) },
+                onGenerateWeekFazit = { viewModel.generateWeekFazit(ctx, settings, profile) },
+                onToggleExpandWeek = { viewModel.toggleWeekExpanded() },
+                onAddMealForDay = { day -> viewModel.setAddDialogForDay(day) },
+                onDeleteEntry = { entry -> viewModel.deleteEntry(ctx, entry) }
             )
         }
 
         NacherfassenChoiceDialog(
-            day = addDialogForDay,
-            onDismiss = { addDialogForDay = null },
+            day = uiState.addDialogForDay,
+            onDismiss = { viewModel.setAddDialogForDay(null) },
             onSelectWithPhoto = { targetDay ->
-                addTargetDay = targetDay
-                addDialogForDay = null
-                showAddCamera = true
+                viewModel.setAddTargetDay(targetDay)
+                viewModel.setAddDialogForDay(null)
+                viewModel.setShowAddCamera(true)
             },
             onSelectWithoutPhoto = { targetDay ->
-                addTargetDay = targetDay
-                addDialogForDay = null
-                showAddText = true
+                viewModel.setAddTargetDay(targetDay)
+                viewModel.setAddDialogForDay(null)
+                viewModel.setShowAddText(true)
             }
         )
 
-        if (showAddBusyCard) {
+        if (uiState.showAddBusyCard) {
             BackdatedBusyDialog()
         }
 
         BackdatedOverlays(
-            showCamera = showAddCamera,
-            showReview = showAddReview,
-            showText = showAddText,
-            showBusy = showAddBusyCard,
+            showCamera = uiState.showAddCamera,
+            showReview = uiState.showAddReview,
+            showText = uiState.showAddText,
+            showBusy = uiState.showAddBusyCard,
             addPhotoFile = addPhotoFile,
             addPhotoUri = addPhotoUri,
-            addNote = addNote,
-            addTargetDay = addTargetDay,
+            addNote = uiState.addNote,
+            addTargetDay = uiState.addTargetDay,
             settings = settings,
-            onNoteChange = { addNote = it },
-            onDismissCamera = { showAddCamera = false },
-            onDismissReview = { showAddReview = false },
-            onDismissText = { showAddText = false },
+            onNoteChange = { viewModel.setAddNote(it) },
+            onDismissCamera = { viewModel.setShowAddCamera(false) },
+            onDismissReview = { viewModel.setShowAddReview(false) },
+            onDismissText = { viewModel.setShowAddText(false) },
             onFallbackSystemCamera = {
-                showAddCamera = false
+                viewModel.setShowAddCamera(false)
                 addSystemCameraLauncher.launch(addPhotoUri)
             },
-            onSaveBackdated = { ev, uri -> saveBackdatedEntry(ev, uri) },
-            onSetBusy = { showAddBusyCard = it }
+            onSaveBackdated = { ev, uri ->
+                viewModel.saveBackdatedEntry(ctx, ev, uri, onPick)
+            },
+            onSetBusy = { viewModel.setShowAddBusyCard(it) }
         )
     }
 }

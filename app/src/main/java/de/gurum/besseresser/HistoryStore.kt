@@ -48,10 +48,35 @@ data class HistoryEntry(
         }
 }
 
-/** Persistenz der Historie: pro Eintrag <id>.json + <id>.jpg in filesDir/history. */
+/** Persistenz der Historie: Room SQLite-Datenbank + <id>.jpg in filesDir/history. */
 object HistoryStore {
     private fun dir(ctx: Context) =
         File(ctx.filesDir, "history").apply { mkdirs() }
+
+    private var migrationChecked = false
+
+    fun ensureMigrated(ctx: Context) {
+        if (migrationChecked) return
+        migrationChecked = true
+        val d = dir(ctx)
+        val db = AppDatabase.getInstance(ctx)
+        val jsonFiles = d.listFiles { f ->
+            f.extension == "json" && !f.name.startsWith("day_") && !f.name.startsWith("week_")
+        } ?: emptyArray()
+
+        if (jsonFiles.isNotEmpty()) {
+            kotlinx.coroutines.runBlocking {
+                jsonFiles.forEach { f ->
+                    runCatching {
+                        val entry = AppJson.decodeFromString<HistoryEntry>(f.readText())
+                        val e = if (entry.id == 0L) entry.copy(id = f.nameWithoutExtension.toLongOrNull() ?: 0L) else entry
+                        db.historyDao().insert(e.toEntity())
+                        f.delete()
+                    }
+                }
+            }
+        }
+    }
 
     /** Vollständiger Pfad zum gespeicherten Foto (oder null). */
     fun photoFileOf(ctx: Context, entry: HistoryEntry): File? =
@@ -70,6 +95,7 @@ object HistoryStore {
         dateOverride: Long? = null,
         backdated: Boolean = false
     ): HistoryEntry {
+        ensureMigrated(ctx)
         val id = System.currentTimeMillis()
         val date = dateOverride ?: id
         var photoFile = ""
@@ -87,60 +113,43 @@ object HistoryStore {
             goalResults = ev.goalResults, summary = ev.summary,
             note = note, erkannt = ev.erkannt, backdated = backdated
         )
-        File(dir(ctx), "$id.json").writeText(AppJson.encodeToString(entry))
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).historyDao().insert(entry.toEntity())
+        }
         return entry
     }
 
     fun entries(ctx: Context): List<HistoryEntry> {
-        val files = dir(ctx).listFiles { f ->
-            f.extension == "json" && !f.name.startsWith("day_") && !f.name.startsWith("week_")
-        } ?: return emptyList()
-        return files.mapNotNull { f ->
-            try {
-                val raw = f.readText()
-                val entry = AppJson.decodeFromString<HistoryEntry>(raw)
-                if (entry.id == 0L) {
-                    entry.copy(id = f.nameWithoutExtension.toLongOrNull() ?: 0L)
-                } else entry
-            } catch (e: Exception) {
-                null
-            }
-        }.sortedByDescending { it.dateMillis }
+        ensureMigrated(ctx)
+        return kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).historyDao().getAll().map { it.toDomain() }
+        }
     }
 
-    /** Eintrag inkl. JSON und Foto loeschen. Löscht Tages-/Wochenfazit des Tages gleich mit. */
+    /** Eintrag inkl. Foto loeschen. Löscht Tages-/Wochenfazit des Tages gleich mit. */
     fun delete(ctx: Context, entry: HistoryEntry) {
         val d = dir(ctx)
         File(d, "${entry.id}.json").delete()
         File(d, "${entry.id}.jpg").delete()
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).historyDao().deleteById(entry.id)
+        }
         DayFazitStore.deleteForEntry(ctx, entry)
         WeekFazitStore.deleteForEntry(ctx, entry)
     }
 
-    /** erkannt-Text eines gespeicherten Eintrags userkorrigieren (JSON neu schreiben).
-     *  Das Tagesfazit bleibt auf Platte, wird aber über den Fingerprint als veraltet erkannt. */
+    /** erkannt-Text eines gespeicherten Eintrags userkorrigieren (in Room DB aktualisieren).
+     *  Das Tagesfazit bleibt in der DB, wird aber über den Fingerprint als veraltet erkannt. */
     fun updateErkannt(ctx: Context, id: Long, newText: String) {
-        val f = File(dir(ctx), "$id.json")
-        if (!f.exists()) return
-        try {
-            val entry = AppJson.decodeFromString<HistoryEntry>(f.readText())
-            val updated = entry.copy(erkannt = newText.trim())
-            f.writeText(AppJson.encodeToString(updated))
-        } catch (e: Exception) {
-            // Snapshot unverändert lassen, wenn das Umschreiben scheitert
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).historyDao().updateErkannt(id, newText.trim())
         }
     }
 
     /** Ziele + Gesamteindruck eines Eintrags neu schreiben (KI-Re-Bewertung nach Korrektur). */
     fun updateEvaluation(ctx: Context, id: Long, goalResults: List<GoalResult>, summary: String) {
-        val f = File(dir(ctx), "$id.json")
-        if (!f.exists()) return
-        try {
-            val entry = AppJson.decodeFromString<HistoryEntry>(f.readText())
-            val updated = entry.copy(goalResults = goalResults, summary = summary)
-            f.writeText(AppJson.encodeToString(updated))
-        } catch (e: Exception) {
-            // bei Fehler bleibt der alte Stand bestehen
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).historyDao().updateEvaluation(id, goalResults, summary)
         }
     }
 
@@ -215,72 +224,107 @@ data class DayFazit(
     val fingerprint: String = ""    // Hash-Mix aus ID+erkannt je Eintrag (Text-Korrekturen → veraltet)
 )
 
-/** Persistenz day_<tag>.json im selben Verzeichnis; entries() filtert diese Dateien via day_-Präfix. */
+/** Persistenz von DayFazit in Room SQLite-Datenbank. */
 object DayFazitStore {
+    private var migrationChecked = false
 
-    private fun file(ctx: Context, dayKey: String) =
-        File(ctx.filesDir, "history/day_$dayKey.json")
-
-    fun load(ctx: Context, dayKey: String): DayFazit? {
-        val f = file(ctx, dayKey)
-        if (!f.exists()) return null
-        return try {
-            AppJson.decodeFromString<DayFazit>(f.readText())
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    fun loadAll(ctx: Context): List<DayFazit> {
-        val files = File(ctx.filesDir, "history")
-            .listFiles { f -> f.name.startsWith("day_") && f.extension == "json" } ?: return emptyList()
-        return files.mapNotNull { f ->
-            try {
-                AppJson.decodeFromString<DayFazit>(f.readText())
-            } catch (e: Exception) {
-                null
+    fun ensureMigrated(ctx: Context) {
+        if (migrationChecked) return
+        migrationChecked = true
+        val dir = File(ctx.filesDir, "history")
+        val files = dir.listFiles { f -> f.name.startsWith("day_") && f.extension == "json" } ?: return
+        val db = AppDatabase.getInstance(ctx)
+        kotlinx.coroutines.runBlocking {
+            files.forEach { f ->
+                runCatching {
+                    val fazit = AppJson.decodeFromString<DayFazit>(f.readText())
+                    db.dayFazitDao().insert(fazit.toEntity())
+                    f.delete()
+                }
             }
         }
     }
 
-    fun save(ctx: Context, fazit: DayFazit) {
-        file(ctx, fazit.dayKey).writeText(AppJson.encodeToString(fazit))
+    fun load(ctx: Context, dayKey: String): DayFazit? {
+        ensureMigrated(ctx)
+        return kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).dayFazitDao().getByKey(dayKey)?.toDomain()
+        }
     }
 
-    /** Fazit-Datei eines Tags löschen (z. B. weil ein Eintrag des Tages gelöscht wurde). */
-    fun deleteForEntry(ctx: Context, entry: HistoryEntry) {
-        file(ctx, dayKeyOf(entry.dateMillis)).delete()
-    }
-}
-
-/** Fazit-Speicher für die WOCHE (file-Prefix week_, Typ & Struktur wie das Tagesfazit).
- *  Invaldierung: Bei jeder Änderung der Wochen-Einträge (Fingerprint) wird die Datei GELÖSCHT –
- *  kein veraltet-Dimmen wie beim Tagesfazit (Req: „gelöscht … erneut anfordern"). */
-object WeekFazitStore {
-    private fun file(ctx: Context, weekKey: String) =
-        File(ctx.filesDir, "history/week_$weekKey.json")
-
-    fun load(ctx: Context, weekKey: String): DayFazit? {
-        val f = file(ctx, weekKey)
-        if (!f.exists()) return null
-        return try {
-            AppJson.decodeFromString<DayFazit>(f.readText())
-        } catch (e: Exception) {
-            null
+    fun loadAll(ctx: Context): List<DayFazit> {
+        ensureMigrated(ctx)
+        return kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).dayFazitDao().getAll().map { it.toDomain() }
         }
     }
 
     fun save(ctx: Context, fazit: DayFazit) {
-        file(ctx, fazit.dayKey).writeText(AppJson.encodeToString(fazit))
+        ensureMigrated(ctx)
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).dayFazitDao().insert(fazit.toEntity())
+        }
+    }
+
+    /** Fazit eines Tags löschen (z. B. weil ein Eintrag des Tages gelöscht wurde). */
+    fun deleteForEntry(ctx: Context, entry: HistoryEntry) {
+        val key = dayKeyOf(entry.dateMillis)
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).dayFazitDao().delete(key)
+        }
+    }
+}
+
+/** Fazit-Speicher für die WOCHE in Room SQLite-Datenbank.
+ *  Invalidierung: Bei jeder Änderung der Wochen-Einträge (Fingerprint) wird der Eintrag GELÖSCHT –
+ *  kein veraltet-Dimmen wie beim Tagesfazit (Req: „gelöscht … erneut anfordern"). */
+object WeekFazitStore {
+    private var migrationChecked = false
+
+    fun ensureMigrated(ctx: Context) {
+        if (migrationChecked) return
+        migrationChecked = true
+        val dir = File(ctx.filesDir, "history")
+        val files = dir.listFiles { f -> f.name.startsWith("week_") && f.extension == "json" } ?: return
+        val db = AppDatabase.getInstance(ctx)
+        kotlinx.coroutines.runBlocking {
+            files.forEach { f ->
+                runCatching {
+                    val fazit = AppJson.decodeFromString<DayFazit>(f.readText())
+                    db.weekFazitDao().insert(fazit.toWeekEntity())
+                    f.delete()
+                }
+            }
+        }
+    }
+
+    fun load(ctx: Context, weekKey: String): DayFazit? {
+        ensureMigrated(ctx)
+        return kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).weekFazitDao().getByKey(weekKey)?.toDomain()
+        }
+    }
+
+    fun save(ctx: Context, fazit: DayFazit) {
+        ensureMigrated(ctx)
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).weekFazitDao().insert(fazit.toWeekEntity())
+        }
     }
 
     /** Wochen-Fazit löschen (nachträglicher Eintrag in derselben Woche). */
     fun deleteForEntry(ctx: Context, entry: HistoryEntry) {
-        file(ctx, weekKeyOf(entry.dateMillis)).delete()
+        val key = weekKeyOf(entry.dateMillis)
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).weekFazitDao().delete(key)
+        }
     }
 
     fun delete(ctx: Context, weekKey: String) {
-        file(ctx, weekKey).delete()
+        val key = weekKey.removePrefix("week_")
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).weekFazitDao().delete(key)
+        }
     }
 }
 
