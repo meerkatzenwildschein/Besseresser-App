@@ -30,7 +30,9 @@ data class HistoryUiState(
 )
 
 class HistoryViewModel(
-    private val apiService: BesseresserApiService = ApiClient
+    private val apiService: BesseresserApiService = ApiClient,
+    private val historyRepository: HistoryRepository? = null,
+    private val settingsRepository: SettingsRepository? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HistoryUiState())
@@ -38,44 +40,71 @@ class HistoryViewModel(
 
     private var dbObserving = false
 
-    fun startObserving(ctx: Context) {
+    private fun getHistoryRepo(ctx: Context?): HistoryRepository? =
+        historyRepository ?: ctx?.let { RepositoryProvider.getHistoryRepository(it) }
+
+    private fun getSettingsRepo(ctx: Context?): SettingsRepository? =
+        settingsRepository ?: ctx?.let { RepositoryProvider.getSettingsRepository(it) }
+
+    fun startObserving(ctx: Context? = null) {
         if (dbObserving) return
+        val repo = getHistoryRepo(ctx) ?: return
         dbObserving = true
-        HistoryStore.ensureMigrated(ctx)
-        DayFazitStore.ensureMigrated(ctx)
-        WeekFazitStore.ensureMigrated(ctx)
+        repo.ensureMigrated()
 
-        val db = AppDatabase.getInstance(ctx)
+        observeEntries(repo)
+        observeDayFazits(repo)
+        observeWeekFazits(repo)
+    }
 
+    private fun observeEntries(repo: HistoryRepository) {
         viewModelScope.launch {
-            db.historyDao().getAllFlow().collect { entities ->
-                val list = entities.map { it.toDomain() }
+            repo.getAllFlow().collect { list ->
+                val wk = weekKeyOf(System.currentTimeMillis())
+                val wf = repo.loadWeekFazit(wk)
+                val currentWkEntries = list.filter { dayKeyOf(it.dateMillis) == wk }
+                val validWf = validateWeekFazit(repo, wk, wf, currentWkEntries)
                 _uiState.update { current ->
                     current.copy(
                         entries = list,
-                        weekFazit = syncWeekFazit(ctx, list)
+                        weekFazit = validWf
                     )
                 }
             }
         }
+    }
 
+    private suspend fun validateWeekFazit(
+        repo: HistoryRepository,
+        weekKey: String,
+        fazit: DayFazit?,
+        entries: List<HistoryEntry>
+    ): DayFazit? {
+        if (fazit == null) return null
+        return if (fazit.fingerprint == dayFingerprint(entries)) {
+            fazit
+        } else {
+            repo.deleteWeekFazit(weekKey)
+            null
+        }
+    }
+
+    private fun observeDayFazits(repo: HistoryRepository) {
         viewModelScope.launch {
-            db.dayFazitDao().getAllFlow().collect { entities ->
-                val map = entities.map { it.toDomain() }.associateBy { it.dayKey }
+            repo.getDayFazitsFlow().collect { map ->
                 _uiState.update { it.copy(fazitMap = map) }
             }
         }
+    }
 
+    private fun observeWeekFazits(repo: HistoryRepository) {
         viewModelScope.launch {
-            db.weekFazitDao().getAllFlow().collect { entities ->
-                val map = entities.map { it.toDomain() }.associateBy { it.dayKey }
+            repo.getWeekFazitsFlow().collect { map ->
                 val currentWk = weekKeyOf(System.currentTimeMillis())
-                val currentWf = map[currentWk]
-                if (currentWf != null) {
-                    val currentWkEntries = _uiState.value.entries.filter { dayKeyOf(it.dateMillis) == currentWk }
-                    if (currentWf.fingerprint == dayFingerprint(currentWkEntries)) {
-                        _uiState.update { it.copy(weekFazit = currentWf) }
-                    }
+                val currentWf = map[currentWk] ?: return@collect
+                val currentWkEntries = _uiState.value.entries.filter { dayKeyOf(it.dateMillis) == currentWk }
+                if (currentWf.fingerprint == dayFingerprint(currentWkEntries)) {
+                    _uiState.update { it.copy(weekFazit = currentWf) }
                 }
             }
         }
@@ -122,22 +151,24 @@ class HistoryViewModel(
     }
 
     fun saveBackdatedEntry(
-        ctx: Context,
+        ctx: Context? = null,
         ev: Evaluation,
         photoUriIn: Uri?,
-        onPick: (HistoryEntry) -> Unit
+        onPick: (HistoryEntry) -> Unit = {}
     ) {
         val day = _uiState.value.addTargetDay ?: return
         val note = _uiState.value.addNote.trim()
         val millis = day.atTime(23, 59).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val histRepo = getHistoryRepo(ctx)
+        val setRepo = getSettingsRepo(ctx)
         viewModelScope.launch {
-            val entry = HistoryStore.add(
-                ctx = ctx, photoUri = photoUriIn, ev = ev,
+            val entry = histRepo?.add(
+                photoUri = photoUriIn, ev = ev,
                 note = note, dateOverride = millis, backdated = true
-            )
-            DayFazitStore.deleteForEntry(ctx, entry)
-            WeekFazitStore.deleteForEntry(ctx, entry)
-            RecentNotesStore.push(ctx, note)
+            ) ?: HistoryEntry(id = millis, dateMillis = millis, goalResults = ev.goalResults, summary = ev.summary, note = note, backdated = true)
+            histRepo?.deleteDayFazitForEntry(entry)
+            histRepo?.deleteWeekFazitForEntry(entry)
+            setRepo?.pushRecentNote(note)
             _uiState.update {
                 it.copy(
                     showAddCamera = false,
@@ -152,20 +183,23 @@ class HistoryViewModel(
         }
     }
 
-    fun deleteEntry(ctx: Context, entry: HistoryEntry) {
+    fun deleteEntry(ctx: Context? = null, entry: HistoryEntry) {
+        val histRepo = getHistoryRepo(ctx)
         viewModelScope.launch {
-            HistoryStore.delete(ctx, entry)
-            DayFazitStore.deleteForEntry(ctx, entry)
-            WeekFazitStore.deleteForEntry(ctx, entry)
+            histRepo?.delete(entry)
+            histRepo?.deleteDayFazitForEntry(entry)
+            histRepo?.deleteWeekFazitForEntry(entry)
         }
     }
 
     fun generateFazit(
-        ctx: Context,
+        ctx: Context? = null,
         day: LocalDate,
         entriesOfDay: List<HistoryEntry>,
         settings: Settings,
-        profile: Profile
+        profile: Profile,
+        mealLines: List<String>? = null,
+        prompts: FazitPromptBundle? = null
     ) {
         val key = dayKeyOf(day)
         if (key in _uiState.value.loadingFazits) return
@@ -175,14 +209,24 @@ class HistoryViewModel(
                 expandedFazits = it.expandedFazits + key
             )
         }
-        val lines = dayFazitMealLines(ctx, entriesOfDay)
+        val lines = when {
+            mealLines != null -> mealLines
+            ctx != null -> dayFazitMealLines(ctx, entriesOfDay)
+            else -> entriesOfDay.map { it.erkannt }
+        }
+        val promptBundle = when {
+            prompts != null -> prompts
+            ctx != null -> FazitPromptBundle.forDay(ctx)
+            else -> FazitPromptBundle("", "", "", "")
+        }
+        val histRepo = getHistoryRepo(ctx)
         viewModelScope.launch {
             val result = apiService.dayFazit(
                 settings = settings,
                 goals = settings.goals,
                 profile = profile,
                 mealLines = lines,
-                prompts = FazitPromptBundle.forDay(ctx)
+                prompts = promptBundle
             )
             result.onSuccess { res ->
                 val fazit = DayFazit(
@@ -193,7 +237,7 @@ class HistoryViewModel(
                     createdAt = System.currentTimeMillis(),
                     fingerprint = dayFingerprint(entriesOfDay)
                 )
-                DayFazitStore.save(ctx, fazit)
+                histRepo?.saveDayFazit(fazit)
                 _uiState.update { it.copy(loadingFazits = it.loadingFazits - key) }
             }.onFailure {
                 _uiState.update { it.copy(loadingFazits = it.loadingFazits - key) }
@@ -202,29 +246,41 @@ class HistoryViewModel(
     }
 
     fun generateWeekFazit(
-        ctx: Context,
+        ctx: Context? = null,
         settings: Settings,
-        profile: Profile
+        profile: Profile,
+        mealLines: List<String>? = null,
+        prompts: FazitPromptBundle? = null
     ) {
         if (_uiState.value.loadingWeek) return
         _uiState.update { it.copy(loadingWeek = true, expandedWeek = true) }
         val wk = weekKeyOf(System.currentTimeMillis())
         val wkEntries = _uiState.value.entries.filter { dayKeyOf(it.dateMillis) == wk }
-        val lines = dayFazitMealLines(ctx, wkEntries)
+        val lines = when {
+            mealLines != null -> mealLines
+            ctx != null -> dayFazitMealLines(ctx, wkEntries)
+            else -> wkEntries.map { it.erkannt }
+        }
+        val promptBundle = when {
+            prompts != null -> prompts
+            ctx != null -> FazitPromptBundle.forWeek(ctx)
+            else -> FazitPromptBundle("", "", "", "")
+        }
+        val histRepo = getHistoryRepo(ctx)
         viewModelScope.launch {
             val result = apiService.dayFazit(
                 settings = settings,
                 goals = settings.goals,
                 profile = profile,
                 mealLines = lines,
-                prompts = FazitPromptBundle.forWeek(ctx)
+                prompts = promptBundle
             )
             result.onSuccess { res ->
                 val wf = DayFazit(
                     wk, res.ampel, res.text, wkEntries.map { it.id },
                     System.currentTimeMillis(), dayFingerprint(wkEntries)
                 )
-                WeekFazitStore.save(ctx, wf)
+                histRepo?.saveWeekFazit(wf)
                 _uiState.update { it.copy(weekFazit = wf, loadingWeek = false) }
             }.onFailure {
                 _uiState.update { it.copy(loadingWeek = false) }
