@@ -22,7 +22,7 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URI
 import java.util.concurrent.Executors
 
 /** KI-Anweisungstexte, lokalisiert vom Aufrufer erzeugt (App-/Systemsprache). */
@@ -40,8 +40,28 @@ data class PromptBundle(
     val honesty: String = ""
 )
 
+/** KI-Anweisungstexte für Tages- und Wochenfazits. */
+data class FazitPromptBundle(
+    val promptIntro: String,
+    val promptRules: String,
+    val promptLanguage: String,
+    val promptHonesty: String = ""
+)
+
+/** Parameter für die KI-gestützte Aufteilung von Zielen. */
+data class SplitGoalsRequest(
+    val baseUrl: String,
+    val apiKey: String,
+    val model: String,
+    val rawGoals: String,
+    val splitIntro: String,
+    val splitRules: String
+)
+
 /** Kommunikation mit der OpenAI-kompatiblen API: Foto-Bewertung, Modell-Liste, Ziele-Aufteilung. */
 object ApiClient {
+    private const val CHAT_COMPLETIONS_PATH = "/chat/completions"
+
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
 
@@ -50,7 +70,7 @@ object ApiClient {
     /** Reiner Post an /chat/completions; wirft ChatHttpException (mit Code + Roh-Body) bei Fehler,
      *  liefert sonst den Antwort-Body als String. */
     private fun postChat(url: String, apiKey: String, body: JsonObject): String {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        val conn = (URI.create(url).toURL().openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15000
             readTimeout = 120000
@@ -58,12 +78,16 @@ object ApiClient {
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Authorization", "Bearer ${apiKey.trim()}")
         }
-        conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
-        val code = conn.responseCode
-        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-        val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
-        if (code !in 200..299) throw ChatHttpException(code, text)
-        return text
+        try {
+            conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+            val code = conn.responseCode
+            val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+            val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
+            if (code !in 200..299) throw ChatHttpException(code, text)
+            return text
+        } finally {
+            conn.disconnect()
+        }
     }
 
     /** HTTP-Fehlerobjekt mit Code + Roh-Body für Debug-Reports/Toasts. */
@@ -98,7 +122,7 @@ object ApiClient {
         val cleaned = content.replace("```json", "", ignoreCase = true).replace("```", "").trim()
         val start = cleaned.indexOf('{')
         val end = cleaned.lastIndexOf('}')
-        if (start < 0 || end <= start) throw IllegalStateException("KI-Antwort ohne JSON")
+        check(start >= 0 && end > start) { "KI-Antwort ohne JSON" }
         val jsonStr = cleaned.substring(start, end + 1)
         return try {
             AppJson.parseToJsonElement(jsonStr).jsonObject
@@ -119,88 +143,17 @@ object ApiClient {
     ) {
         executor.execute {
             try {
-                // Foto laden & verkleinern
-                val resolver = ctx.contentResolver
-                val bitmap = BitmapFactory.decodeStream(resolver.openInputStream(photoUri))
-                    ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
-                val scaled = scaleDown(bitmap, 1280)
-                val jpeg = ByteArrayOutputStream().also { scaled.compress(Bitmap.CompressFormat.JPEG, 80, it) }
-                    .toByteArray()
-                val dataUri = "data:image/jpeg;base64," +
-                    Base64.encodeToString(jpeg, Base64.NO_WRAP)
-                if (scaled !== bitmap) scaled.recycle()
-
-                val prompt = buildString {
-                    appendLine(promptBundle.intro)
-                    settings.goals.forEachIndexed { i, g -> appendLine("${i + 1}. $g") }
-                    if (promptBundle.noteHeader.isNotBlank()) {
-                        appendLine("")
-                        appendLine(promptBundle.noteHeader)
-                    }
-                    appendLine("")
-                    // JSON-Schluessel (bewertung/ziel/ampel/begruendung/zusatz/erkannt) sind bewusst
-                    // fest verdrahtet – der Parser kennt diese Namen; nur die Anweisungssprache variiert.
-                    appendLine(promptBundle.formatIntro)
-                    appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","begruendung":"<short reason>"}],"zusatz":"<one-sentence overall impression>","erkannt":"<one short sentence: food with estimated quantities, e.g. '100 g pasta with sauce, one apple'>"}""")
-                    appendLine(promptBundle.ampelMeaning)
-                    appendLine(promptBundle.exactlyOne)
-                    if (promptBundle.recognized.isNotBlank()) appendLine(promptBundle.recognized)
-                    if (promptBundle.honesty.isNotBlank()) appendLine(promptBundle.honesty)
-                    appendLine(promptBundle.responseLanguage)
-                }
-
-                val body = chatBody(
-                    model = settings.model,
-                    baseUrl = settings.baseUrl,
-                    temperature = 0.3,
-                    maxTokens = 4096,
-                    messages = buildJsonArray {
-                        add(
-                            buildJsonObject {
-                                put("role", "user")
-                                putJsonArray("content") {
-                                    add(buildJsonObject {
-                                        put("type", "text")
-                                        put("text", prompt)
-                                    })
-                                    add(buildJsonObject {
-                                        put("type", "image_url")
-                                        putJsonObject("image_url") {
-                                            put("url", dataUri)
-                                        }
-                                    })
-                                }
-                            }
-                        )
-                    }
-                )
-
-                val url = settings.baseUrl.trim().trimEnd('/') + "/chat/completions"
+                val dataUri = prepareImageDataUri(ctx, photoUri)
+                val prompt = createAnalyzePrompt(settings.goals, promptBundle)
+                val body = buildAnalyzeBody(settings, prompt, dataUri)
+                val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
                 val text = postChat(url, settings.apiKey, body)
 
                 // Antwort parsen
                 val resp = AppJson.parseToJsonElement(text).jsonObject
                 val rawContent = extractContent(resp)
-
                 if (rawContent.isNullOrBlank()) {
-                    val modelName = try { resp["model"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "unbekannt" } catch (e: Exception) { "unbekannt" }
-                    val finish = try {
-                        val choices = resp["choices"]?.jsonArray
-                        choices?.firstOrNull()?.jsonObject?.get("finish_reason")?.jsonPrimitive?.contentOrNull
-                    } catch (e: Exception) { null }
-                    val hint = when {
-                        finish == "length" &&
-                            (modelName.contains("deepseek", true) ||
-                                modelName.contains("reason", true)) ->
-                            "Das Reasoning des Modells hat das Token-Budget verbraucht, bevor ein Antworttext kam. Erneut versuchen – die App setzt für den nächsten Versuch ein deutlich höheres Budget."
-                        finish == "length" ->
-                            "Die Antwort wurde durch das Token-Limit abgeschnitten. Erneut versuchen oder ein weniger aufwendiges Modell wählen."
-                        else -> "Evtl. ungewöhnliches Antwortformat – bitte ein anderes Modell versuchen."
-                    }
-                    throw IllegalStateException(
-                        "Die KI hat keinen Text geliefert (Modell: $modelName). $hint " +
-                        "Roh-Antwort-Auszug: ${text.take(400).ifBlank { "(leer)" }}"
-                    )
+                    throw buildAnalyzeMissingContentException(resp, text)
                 }
 
                 val results = parseEvaluation(rawContent, settings.goals)
@@ -211,6 +164,83 @@ object ApiClient {
         }
     }
 
+    private fun prepareImageDataUri(ctx: Context, photoUri: Uri): String {
+        val resolver = ctx.contentResolver
+        val bitmap = resolver.openInputStream(photoUri)?.use { BitmapFactory.decodeStream(it) }
+            ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
+        val scaled = scaleDown(bitmap, 1280)
+        val jpeg = ByteArrayOutputStream().also { scaled.compress(Bitmap.CompressFormat.JPEG, 80, it) }.toByteArray()
+        val dataUri = "data:image/jpeg;base64," + Base64.encodeToString(jpeg, Base64.NO_WRAP)
+        if (scaled !== bitmap) scaled.recycle()
+        return dataUri
+    }
+
+    private fun createAnalyzePrompt(goals: List<String>, promptBundle: PromptBundle): String = buildString {
+        appendLine(promptBundle.intro)
+        goals.forEachIndexed { i, g -> appendLine("${i + 1}. $g") }
+        if (promptBundle.noteHeader.isNotBlank()) {
+            appendLine("")
+            appendLine(promptBundle.noteHeader)
+        }
+        appendLine("")
+        // JSON-Schluessel (bewertung/ziel/ampel/begruendung/zusatz/erkannt) sind bewusst
+        // fest verdrahtet – der Parser kennt diese Namen; nur die Anweisungssprache variiert.
+        appendLine(promptBundle.formatIntro)
+        appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","begruendung":"<short reason>"}],"zusatz":"<one-sentence overall impression>","erkannt":"<one short sentence: food with estimated quantities, e.g. '100 g pasta with sauce, one apple'>"}""")
+        appendLine(promptBundle.ampelMeaning)
+        appendLine(promptBundle.exactlyOne)
+        if (promptBundle.recognized.isNotBlank()) appendLine(promptBundle.recognized)
+        if (promptBundle.honesty.isNotBlank()) appendLine(promptBundle.honesty)
+        appendLine(promptBundle.responseLanguage)
+    }
+
+    private fun buildAnalyzeBody(settings: Settings, prompt: String, dataUri: String): JsonObject =
+        chatBody(
+            model = settings.model,
+            baseUrl = settings.baseUrl,
+            temperature = 0.3,
+            maxTokens = 4096,
+            messages = buildJsonArray {
+                add(
+                    buildJsonObject {
+                        put("role", "user")
+                        putJsonArray("content") {
+                            add(buildJsonObject {
+                                put("type", "text")
+                                put("text", prompt)
+                            })
+                            add(buildJsonObject {
+                                put("type", "image_url")
+                                putJsonObject("image_url") {
+                                    put("url", dataUri)
+                                }
+                            })
+                        }
+                    }
+                )
+            }
+        )
+
+    private fun buildAnalyzeMissingContentException(resp: JsonObject, text: String): IllegalStateException {
+        val modelName = try { resp["model"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "unbekannt" } catch (e: Exception) { "unbekannt" }
+        val finish = try {
+            val choices = resp["choices"]?.jsonArray
+            choices?.firstOrNull()?.jsonObject?.get("finish_reason")?.jsonPrimitive?.contentOrNull
+        } catch (e: Exception) { null }
+        val hint = when {
+            finish == "length" &&
+                (modelName.contains("deepseek", true) || modelName.contains("reason", true)) ->
+                "Das Reasoning des Modells hat das Token-Budget verbraucht, bevor ein Antworttext kam. Erneut versuchen – die App setzt für den nächsten Versuch ein deutlich höheres Budget."
+            finish == "length" ->
+                "Die Antwort wurde durch das Token-Limit abgeschnitten. Erneut versuchen oder ein weniger aufwendiges Modell wählen."
+            else -> "Evtl. ungewöhnliches Antwortformat – bitte ein anderes Modell versuchen."
+        }
+        return IllegalStateException(
+            "Die KI hat keinen Text geliefert (Modell: $modelName). $hint " +
+                "Roh-Antwort-Auszug: ${text.take(400).ifBlank { "(leer)" }}"
+        )
+    }
+
     /** Text-only Tagesfazit: Ziele + optional Nutzerprofil-Kontext + Mahlzeiten-Zeilen
      *  (Zeit · Erkanntes mit Menge · Anmerkung) → JSON {ampel, text}.
      *  Kein Foto, kein Bilder-Modell nötig; benutzt denselben /chat/completions-Endpunkt. */
@@ -219,32 +249,13 @@ object ApiClient {
         goals: List<String>,
         promptContext: String?,          // z. B. Nutzerprofil-Zeile (optional)
         mealLines: List<String>,
-        promptIntro: String,
-        promptRules: String,
-        promptLanguage: String,
-        promptHonesty: String = "",
+        prompts: FazitPromptBundle,
         onOk: (ampel: TrafficLight, text: String) -> Unit,
         onError: (String) -> Unit
     ) {
         executor.execute {
             try {
-                val prompt = buildString {
-                    appendLine(promptIntro)
-                    goals.forEachIndexed { i, g -> appendLine("${i + 1}. $g") }
-                    promptContext?.takeIf { it.isNotBlank() }?.let {
-                        appendLine("")
-                        appendLine(it)
-                    }
-                    appendLine("")
-                    mealLines.forEach { appendLine(it) }
-                    appendLine("")
-                    appendLine(promptRules)
-                    if (promptHonesty.isNotBlank()) appendLine(promptHonesty)
-                    appendLine("")
-                    // JSON-Schluessel (ampel/text) fest verdrahtet, Sprache via promptLanguage
-                    appendLine("""{"ampel":"gruen|gelb|rot","text":"<2-3 sentences: day summary in the app language, directly to the point>"}""")
-                    appendLine(promptLanguage)
-                }
+                val prompt = createDayFazitPrompt(goals, promptContext, mealLines, prompts)
                 val body = chatBody(
                     model = settings.model,
                     baseUrl = settings.baseUrl,
@@ -258,25 +269,13 @@ object ApiClient {
                     }
                 )
 
-                val url = settings.baseUrl.trim().trimEnd('/') + "/chat/completions"
+                val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
                 val respText = postChat(url, settings.apiKey, body)
 
                 val respObj = AppJson.parseToJsonElement(respText).jsonObject
                 val rawContent = extractContent(respObj)
                 if (rawContent.isNullOrBlank()) {
-                    val finish = try {
-                        val choices = respObj["choices"]?.jsonArray
-                        choices?.firstOrNull()?.jsonObject?.get("finish_reason")?.jsonPrimitive?.contentOrNull
-                    } catch (e: Exception) { null }
-                    val modelName = try { respObj["model"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "?" } catch (e: Exception) { "?" }
-                    val hint = when (finish) {
-                        "length" -> "Das Token-Budget wurde verbraucht, bevor ein Antworttext kam – Modell erneut versuchen."
-                        "content_filter" -> "Der Anbieter hat die Antwort gefiltert (Inhalt blockiert). Versuch es erneut oder mit anderem Modell."
-                        else -> "Antwortformat unbekannt für dieses Modell."
-                    }
-                    throw IllegalStateException(
-                        "Die KI hat keinen Text geliefert (Modell: $modelName, finish: $finish). $hint Roh: ${respText.take(300)}"
-                    )
+                    throw buildDayFazitMissingContentException(respObj, respText)
                 }
 
                 // tolerantes JSON-Parsing (Code-Fences, closeJson)
@@ -284,12 +283,51 @@ object ApiClient {
                 val ampel = TrafficLight.fromString(pickString(obj, listOf("ampel", "rating", "status", "farbe")))
                 val fazitText = pickString(obj, listOf("text", "fazit", "summary"))
                 // Ampel UNKNOWN ist okay (grauer Chip) – nur ganz ohne Text ist ein echter Fehler.
-                if (fazitText.isBlank()) throw IllegalStateException("KI-Antwort ohne Fazit-Text (Roh: ${rawContent.take(200)})")
+                check(fazitText.isNotBlank()) { "KI-Antwort ohne Fazit-Text (Roh: ${rawContent.take(200)})" }
                 main.post { onOk(ampel, fazitText.trim()) }
             } catch (e: Exception) {
                 main.post { onError("${e.message ?: e.javaClass.simpleName}") }
             }
         }
+    }
+
+    private fun createDayFazitPrompt(
+        goals: List<String>,
+        promptContext: String?,
+        mealLines: List<String>,
+        prompts: FazitPromptBundle
+    ): String = buildString {
+        appendLine(prompts.promptIntro)
+        goals.forEachIndexed { i, g -> appendLine("${i + 1}. $g") }
+        promptContext?.takeIf { it.isNotBlank() }?.let {
+            appendLine("")
+            appendLine(it)
+        }
+        appendLine("")
+        mealLines.forEach { appendLine(it) }
+        appendLine("")
+        appendLine(prompts.promptRules)
+        if (prompts.promptHonesty.isNotBlank()) appendLine(prompts.promptHonesty)
+        appendLine("")
+        // JSON-Schluessel (ampel/text) fest verdrahtet, Sprache via promptLanguage
+        appendLine("""{"ampel":"gruen|gelb|rot","text":"<2-3 sentences: day summary in the app language, directly to the point>"}""")
+        appendLine(prompts.promptLanguage)
+    }
+
+    private fun buildDayFazitMissingContentException(respObj: JsonObject, respText: String): IllegalStateException {
+        val finish = try {
+            val choices = respObj["choices"]?.jsonArray
+            choices?.firstOrNull()?.jsonObject?.get("finish_reason")?.jsonPrimitive?.contentOrNull
+        } catch (e: Exception) { null }
+        val modelName = try { respObj["model"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "?" } catch (e: Exception) { "?" }
+        val hint = when (finish) {
+            "length" -> "Das Token-Budget wurde verbraucht, bevor ein Antworttext kam – Modell erneut versuchen."
+            "content_filter" -> "Der Anbieter hat die Antwort gefiltert (Inhalt blockiert). Versuch es erneut oder mit anderem Modell."
+            else -> "Antwortformat unbekannt für dieses Modell."
+        }
+        return IllegalStateException(
+            "Die KI hat keinen Text geliefert (Modell: $modelName, finish: $finish). $hint Roh: ${respText.take(300)}"
+        )
     }
 
     /** Text-only Analyse (Nacherfassung OHNE Foto): Beschreibung der Mahlzeit statt Foto.
@@ -329,14 +367,12 @@ object ApiClient {
                     }
                 )
 
-                val url = settings.baseUrl.trim().trimEnd('/') + "/chat/completions"
+                val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
                 val text = postChat(url, settings.apiKey, body)
 
                 val resp = AppJson.parseToJsonElement(text).jsonObject
                 val rawContent = extractContent(resp)
-                if (rawContent.isNullOrBlank()) {
-                    throw IllegalStateException("Die KI hat keinen Text geliefert. Roh-Antwort: ${text.take(300)}")
-                }
+                check(!rawContent.isNullOrBlank()) { "Die KI hat keinen Text geliefert. Roh-Antwort: ${text.take(300)}" }
 
                 val results = parseEvaluation(rawContent, settings.goals)
                 main.post { onResult(results) }
@@ -351,29 +387,24 @@ object ApiClient {
     /** KI teilt Freitext („kein Zucker, 2l Wasser, Intervallfasten") in saubere Einzel-Ziele.
      *  onError liefert einen mehrzeiligen Debug-Report (wie beim Modellabruf) inkl. Rohantwort. */
     fun splitGoals(
-        baseUrl: String,
-        apiKey: String,
-        model: String,
-        rawGoals: String,
-        splitIntro: String,
-        splitRules: String,
+        request: SplitGoalsRequest,
         onOk: (List<String>) -> Unit,
         onError: (debugReport: String) -> Unit
     ) {
-        val requestUrl = baseUrl.trim().trimEnd('/') + "/chat/completions"
+        val requestUrl = request.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
         executor.execute {
             try {
                 val prompt = buildString {
-                    appendLine(splitIntro)
-                    appendLine(splitRules)
+                    appendLine(request.splitIntro)
+                    appendLine(request.splitRules)
                     appendLine("Reply ONLY with a JSON object (no text before or after):")
                     appendLine("""{"ziele":["Goal 1","Goal 2"]}""")
                     appendLine()
-                    appendLine(rawGoals)
+                    appendLine(request.rawGoals)
                 }
                 val req = chatBody(
-                    model = model,
-                    baseUrl = baseUrl,
+                    model = request.model,
+                    baseUrl = request.baseUrl,
                     temperature = 0.1,
                     maxTokens = 1600,
                     messages = buildJsonArray {
@@ -383,7 +414,7 @@ object ApiClient {
                         })
                     }
                 )
-                val respBody = postChat(requestUrl, apiKey, req)
+                val respBody = postChat(requestUrl, request.apiKey, req)
 
                 val content = extractContent(AppJson.parseToJsonElement(respBody).jsonObject)
                     ?: throw IllegalStateException("Kein Antwortinhalt")
@@ -398,11 +429,11 @@ object ApiClient {
                         } ?: JsonArray(emptyList())
                     }
                 val goals = rawArr.mapNotNull { it.jsonPrimitive.contentOrNull?.trim()?.takeIf { s -> s.isNotBlank() } }
-                if (goals.isEmpty()) throw IllegalStateException("KI lieferte keine Ziele")
+                check(goals.isNotEmpty()) { "KI lieferte keine Ziele" }
                 main.post { onOk(goals) }
             } catch (e: Exception) {
                 val debug = buildString {
-                    appendLine("Anfrage:  POST $requestUrl (Modell: $model)")
+                    appendLine("Anfrage:  POST $requestUrl (Modell: ${request.model})")
                     appendLine("Status:   HTTP ${(e as? ChatHttpException)?.code ?: "?"}")
                     appendLine("Fehler:   ${e.message ?: e.javaClass.simpleName}")
                     appendLine()
@@ -445,47 +476,28 @@ object ApiClient {
         var body = ""
         executor.execute {
             try {
-                val conn = (URL(requestUrl).openConnection() as HttpURLConnection).apply {
+                val conn = (URI.create(requestUrl).toURL().openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
                     connectTimeout = 15000
                     readTimeout = 30000
                     setRequestProperty("Authorization", "Bearer ${apiKey.trim()}")
                 }
-                httpCode = conn.responseCode
-                val stream = if (httpCode in 200..299) conn.inputStream else conn.errorStream
-                body = stream?.bufferedReader()?.use { it.readText() } ?: ""
-                if (httpCode !in 200..299) throw IllegalStateException("HTTP $httpCode")
+                try {
+                    httpCode = conn.responseCode
+                    val stream = if (httpCode in 200..299) conn.inputStream else conn.errorStream
+                    body = stream?.bufferedReader()?.use { it.readText() } ?: ""
+                } finally {
+                    conn.disconnect()
+                }
+                check(httpCode in 200..299) { "HTTP $httpCode" }
 
                 // Antwort robust auswerten: {"data":[…]}, {"models":[…]} oder direkt [ … ]
-                val trimmed = body.trim()
-                val arr: JsonArray = when {
-                    trimmed.startsWith("[") -> try { AppJson.parseToJsonElement(trimmed).jsonArray } catch (e: Exception) { JsonArray(emptyList()) }
-                    trimmed.startsWith("{") -> {
-                        val root = try { AppJson.parseToJsonElement(trimmed).jsonObject } catch (e: Exception) { JsonObject(emptyMap()) }
-                        root["data"]?.takeIf { it is JsonArray }?.jsonArray
-                            ?: root["models"]?.takeIf { it is JsonArray }?.jsonArray
-                            ?: root["model_list"]?.takeIf { it is JsonArray }?.jsonArray
-                            ?: JsonArray(emptyList())
-                    }
-                    else -> JsonArray(emptyList())
-                }
-                if (arr.isEmpty()) {
-                    throw IllegalStateException("Antwort enthält keine Modell-Liste")
-                }
-                val entries = arr.mapNotNull { element ->
-                    val obj = element as? JsonObject ?: return@mapNotNull null
-                    val id = obj["id"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
-                        ?: obj["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
-                        ?: return@mapNotNull null
-                    // Exakte Info, falls der Provider sie liefert (z. B. OpenRouter)
-                    val modalities = (obj["architecture"] as? JsonObject)?.get("input_modalities") as? JsonArray
-                    val supportsImage = modalities != null && modalities.any {
-                        it.jsonPrimitive.contentOrNull?.equals("image", ignoreCase = true) == true
-                    }
-                    id to supportsImage
-                }
-                if (entries.isEmpty()) {
-                    throw IllegalStateException("Modell-Liste enthielt ${arr.size} Einträge, aber keine nutzbare Modell-IDs")
+                val arr = parseModelsArray(body)
+                check(arr.isNotEmpty()) { "Antwort enthält keine Modell-Liste" }
+
+                val entries = parseModelEntries(arr)
+                check(entries.isNotEmpty()) {
+                    "Modell-Liste enthielt ${arr.size} Einträge, aber keine nutzbare Modell-IDs"
                 }
                 main.post { onOk(filterVisionModels(entries)) }
             } catch (e: Exception) {
@@ -501,6 +513,35 @@ object ApiClient {
             }
         }
     }
+
+    private fun parseModelsArray(body: String): JsonArray {
+        val trimmed = body.trim()
+        return when {
+            trimmed.startsWith("[") -> try { AppJson.parseToJsonElement(trimmed).jsonArray } catch (e: Exception) { JsonArray(emptyList()) }
+            trimmed.startsWith("{") -> {
+                val root = try { AppJson.parseToJsonElement(trimmed).jsonObject } catch (e: Exception) { JsonObject(emptyMap()) }
+                root["data"]?.takeIf { it is JsonArray }?.jsonArray
+                    ?: root["models"]?.takeIf { it is JsonArray }?.jsonArray
+                    ?: root["model_list"]?.takeIf { it is JsonArray }?.jsonArray
+                    ?: JsonArray(emptyList())
+            }
+            else -> JsonArray(emptyList())
+        }
+    }
+
+    private fun parseModelEntries(arr: JsonArray): List<Pair<String, Boolean>> =
+        arr.mapNotNull { element ->
+            val obj = element as? JsonObject ?: return@mapNotNull null
+            val id = obj["id"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: obj["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: return@mapNotNull null
+            // Exakte Info, falls der Provider sie liefert (z. B. OpenRouter)
+            val modalities = (obj["architecture"] as? JsonObject)?.get("input_modalities") as? JsonArray
+            val supportsImage = modalities != null && modalities.any {
+                it.jsonPrimitive.contentOrNull?.equals("image", ignoreCase = true) == true
+            }
+            id to supportsImage
+        }
 
     private fun filterVisionModels(entries: List<Pair<String, Boolean>>): ModelsResult {
         val all = entries.map { it.first }.sorted()
@@ -518,13 +559,12 @@ object ApiClient {
     /** Holt den Antworttext tolerant aus verschiedenen Provider-Formaten. */
     private fun extractContent(resp: JsonObject): String? {
         return try {
-            val choices = resp["choices"]?.takeIf { it is JsonArray }?.jsonArray ?: return null
-            val first = choices.firstOrNull()?.takeIf { it is JsonObject }?.jsonObject ?: return null
+            val choices = resp["choices"] as? JsonArray ?: return null
+            val first = choices.firstOrNull() as? JsonObject ?: return null
 
-            // 1) Standard: choices[0].message.content (String)
-            val msg = first["message"]?.takeIf { it is JsonObject }?.jsonObject
-            val direct = msg?.get("content")
-            when (direct) {
+            // 1) Standard: choices[0].message.content (String oder Parts-Array)
+            val msg = first["message"] as? JsonObject
+            val contentFromMsg = when (val direct = msg?.get("content")) {
                 is JsonPrimitive -> direct.contentOrNull?.takeIf { it.isNotBlank() }
                 is JsonArray -> {
                     // Manche Anbieter liefern ein Parts-Array: [{"type":"text","text":"..."}]
@@ -538,6 +578,7 @@ object ApiClient {
                 }
                 else -> null
             }
+            contentFromMsg
                 ?: msg?.get("reasoning_content")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
                 ?: first["text"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
         } catch (e: Exception) {
@@ -639,20 +680,22 @@ object ApiClient {
         return t.replaceFirstChar { it.uppercase() }
     }
 
+    private val RESULT_ARRAY_KEYS = listOf("bewertung", "bewertungen", "results", "ampeln", "ratings", "ziele", "goals")
+
     /** Findet das Ergebnis-Array, auch bei anderer Verschachtelung/Feldnamen. */
     private fun findResultArray(node: JsonElement?, depth: Int = 0): JsonArray {
         if (node == null || depth > 4) return JsonArray(emptyList())
         if (node is JsonObject) {
-            for (name in listOf("bewertung", "bewertungen", "results", "ampeln", "ratings", "ziele", "goals")) {
+            for (name in RESULT_ARRAY_KEYS) {
                 val arr = node[name] as? JsonArray
                 if (arr != null && arr.isNotEmpty() && arr[0] is JsonObject) return arr
             }
-            node.values.forEach { child ->
+            for (child in node.values) {
                 val found = findResultArray(child, depth + 1)
                 if (found.isNotEmpty()) return found
             }
-        } else if (node is JsonArray) {
-            if (node.isNotEmpty() && node[0] is JsonObject) return node
+        } else if (node is JsonArray && node.isNotEmpty() && node[0] is JsonObject) {
+            return node
         }
         return JsonArray(emptyList())
     }
