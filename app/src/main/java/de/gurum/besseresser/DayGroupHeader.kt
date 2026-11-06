@@ -61,7 +61,8 @@ fun DayGroupHeader(
     expanded: Boolean,
     onToggleExpand: () -> Unit,
     onGenerate: () -> Unit,
-    onAddMeal: (() -> Unit)? = null
+    onAddMeal: (() -> Unit)? = null,
+    hasEntries: Boolean = true
 ) {
     val chevronAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "day-fazit-chevron")
     Row(
@@ -103,6 +104,10 @@ fun DayGroupHeader(
             Spacer(Modifier.width(8.dp))
         }
         when {
+            !hasEntries -> HeadChip(
+                label = stringResource(R.string.dayfazit_chip_label),
+                onClick = null
+            )
             loading -> HeadChip(
                 label = stringResource(R.string.dayfazit_chip_loading),
                 onClick = null,
