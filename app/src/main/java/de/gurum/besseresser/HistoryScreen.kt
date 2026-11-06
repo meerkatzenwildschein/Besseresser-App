@@ -9,21 +9,55 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,10 +65,10 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,6 +109,8 @@ fun dayFazitMealLines(ctx: android.content.Context, entriesOfDay: List<HistoryEn
 
 /** Auto-Fazits starten erst ab dieser Uhrzeit (Stunde, lokal) – davor nur manueller Chip. */
 private const val FAZIT_AUTO_HOUR = 18
+private const val DATE_FORMAT_PATTERN = "dd.MM.yyyy"
+private val DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_FORMAT_PATTERN)
 
 /** Nach Kalendertag gruppieren (absteigend); Einträge bleiben innerhalb der Gruppe absteigend. */private fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
     entries.groupBy {
@@ -93,7 +129,7 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
     // ------------------------------------------------- KI-Tagesfazit-Zustand
     var fazitMap by remember { mutableStateOf<Map<String, DayFazit>>(emptyMap()) }
     val loadingFazits = remember { mutableStateListOf<String>() }
-    var expandedFazits = remember { mutableStateListOf<String>() }
+    val expandedFazits = remember { mutableStateListOf<String>() }
 
     var weekFazit by remember { mutableStateOf<DayFazit?>(null) }
     var loadingWeek by remember { mutableStateOf(false) }
@@ -114,7 +150,6 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
 
     // ------------------------------------------------- Nacherfassen (Essen nachtragen für einen Tag)
     var addDialogForDay by remember { mutableStateOf<LocalDate?>(null) }
-    var addCaptureWithPhoto by remember { mutableStateOf(false) }   // false = nur Text (Pflichtfeld)
     var showAddCamera by remember { mutableStateOf(false) }
     var showAddReview by remember { mutableStateOf(false) }         // Foto-Prüfen-Zweig (Fallback + eigener Fluss)
     var showAddText by remember { mutableStateOf(false) }           // Ohne-Foto-Zweig
@@ -174,10 +209,12 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
             goals = settings.goals,
             promptContext = profileContextLine(ctx, profile),
             mealLines = lines,
-            promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
-            promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
-            promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
-            promptHonesty = ctx.getString(R.string.prompt_honesty),
+            prompts = FazitPromptBundle(
+                promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
+                promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+                promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+                promptHonesty = ctx.getString(R.string.prompt_honesty)
+            ),
             onOk = { ampel, text ->
                 DayFazitStore.save(
                     ctx,
@@ -208,10 +245,12 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
             goals = settings.goals,
             promptContext = profileContextLine(ctx, profile),
             mealLines = dayFazitMealLines(ctx, entriesOfWeek),
-            promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
-            promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
-            promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
-            promptHonesty = ctx.getString(R.string.prompt_honesty),
+            prompts = FazitPromptBundle(
+                promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
+                promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+                promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+                promptHonesty = ctx.getString(R.string.prompt_honesty)
+            ),
             onOk = { ampel, text ->
                 WeekFazitStore.save(
                     ctx,
@@ -259,13 +298,11 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
         }
         // Wochenfazit: auto NUR Sonntag ≥ 18 Uhr, 1× pro Woche & Session (sonst Chip-Tipp)
         val today = LocalDate.now()
-        if (autoFazitTime && today.dayOfWeek == java.time.DayOfWeek.SUNDAY && weekFazit == null) {
-            if (!loadingWeek) {
-                val wk = weekKeyOf(System.currentTimeMillis())
-                if (wk !in DayFazitSession.attemptedWeekly) {
-                    DayFazitSession.attemptedWeekly.add(wk)
-                    generateWeekFazit()
-                }
+        if (autoFazitTime && today.dayOfWeek == java.time.DayOfWeek.SUNDAY && weekFazit == null && !loadingWeek) {
+            val wk = weekKeyOf(System.currentTimeMillis())
+            if (wk !in DayFazitSession.attemptedWeekly) {
+                DayFazitSession.attemptedWeekly.add(wk)
+                generateWeekFazit()
             }
         }
     }
@@ -273,259 +310,350 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
     // Root als Box: Die Nacherfassen-Overlays (Kamera/Review/Text) liegen als Geschwister
     // ÜBER der Liste — Gesten & Scroll der Liste können sie nicht durchdringen.
     Box(modifier = Modifier.fillMaxSize()) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                // Nach rechts wischen → zurück zum Hauptbildschirm (SPERRE während
-                // der Nachtrage-Erfassung — Wisch-Eingaben werden ignoriert, Toast-Hinweis)
-                var acc = 0f
-                var hintShown = false
-                detectHorizontalDragGestures(
-                    onDragEnd = { acc = 0f; hintShown = false },
-                    onDragCancel = { acc = 0f; hintShown = false }
-                ) { _, dragAmount ->
-                    val overlayOpen = showAddCamera || showAddReview || showAddText || showAddBusyCard
-                    if (dragAmount != 0f) {
-                        acc += dragAmount
-                        if (kotlin.math.abs(acc) > 160f) {
-                            if (overlayOpen) {
-                                if (!hintShown) {
-                                    Toast.makeText(
-                                        ctx,
-                                        ctx.getString(R.string.nacherfassen_block_hint),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                    hintShown = true
-                                }
-                                acc = 0f
-                            } else if (dragAmount > 0) {
-                                acc = 0f
-                                onBack()
-                            } else {
-                                acc = 0f
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Verlauf-Liste nur zeigen, wenn KEIN Nachtrage-Overlay aktiv ist — sonst dieser
-        // Screen + Leiste unter dem Overlay durchscheinen (Doppelverter „Verlauf“ oben)
-        if (!showAddCamera && !showAddReview && !showAddText) {
-            TopBarRow(
-                title = stringResource(R.string.history_title),
-                onBack = onBack,
-                trailing = { },
-                icon = Icons.Filled.DateRange
-            )
-
-            if (entries.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        stringResource(R.string.history_empty),
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            } else {
-                Text(
-                    stringResource(R.string.history_list_hint, entries.size),
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    groupByDay(entries).forEach { group ->
-                        val dayKey = dayKeyOf(group.day)
-                        val fazit = fazitMap[dayKey]
-                    val loadingFazit = dayKey in loadingFazits
-                    val staleFazit = fazit != null && (
-                        fazit.entryIds.toSet() != group.entries.map { it.id }.toSet() ||
-                            // geänderte erkannt-Texte (Korrekturen) machen das Fazit ebenfalls veraltet
-                            (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(group.entries))
-                        )
-                    item(key = "day-$dayKey") {
-                        DayGroupHeader(
-                            date = group.day,
-                            fazit = fazit,
-                            loading = loadingFazit,
-                            stale = staleFazit,
-                            expanded = dayKey in expandedFazits,
-                            onToggleExpand = {
-                                if (dayKey in expandedFazits) expandedFazits.remove(dayKey)
-                                else expandedFazits.add(dayKey)
-                            },
-                            onGenerate = { generateFazit(group.day, group.entries) },
-                            onAddMeal = { addDialogForDay = group.day }
-                        )
-                        when {
-                            loadingFazit -> Text(
-                                stringResource(R.string.dayfazit_loading_line),
-                                fontSize = 11.sp,
-                                fontStyle = FontStyle.Italic,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 8.dp, start = 4.dp)
-                            )
-                            // Veraltet: bewusst KEINE gedimmte Alt-Fassung mehr zeigen
-                            // (nicht verständlich, warum sie noch da steht) – nur der
-                            // „⟳ Neu bewerten"-Chip macht den Zustand kenntlich
-                            fazit != null && !staleFazit && dayKey in expandedFazits -> Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 10.dp, bottom = 2.dp)
-                            ) {
-                                Text(
-                                    fazit.text,
-                                    fontSize = 12.sp,
-                                    lineHeight = 17.sp,
-                                    modifier = Modifier.padding(12.dp)
-                                )
-                            }
-                        }
-                    }
-                    group.entries.forEach { entry ->
-                        item(key = entry.id) {
-                            val dismissState = rememberSwipeToDismissBoxState(
-                                confirmValueChange = { value ->
-                                    if (value == SwipeToDismissBoxValue.EndToStart) {
-                                        entries = entries.filterNot { it.id == entry.id }
-                                        HistoryStore.delete(ctx, entry)
-                                        true
-                                    } else false
-                                }
-                            )
-                            SwipeToDismissBox(
-                                state = dismissState,
-                                enableDismissFromStartToEnd = false,
-                                backgroundContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            // Gleiche Rundung wie die Karte, sonst schimmert Rot an den Ecken
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .fillMaxSize()
-                                            .background(Color(0xFFD32F2F)),
-                                        contentAlignment = Alignment.CenterEnd
-                                    ) {
-                                        Text(
-                                            stringResource(R.string.history_delete_action),
-                                            color = Color.White,
-                                            fontWeight = FontWeight.SemiBold,
-                                            modifier = Modifier.padding(horizontal = 24.dp)
-                                        )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    var acc = 0f
+                    var hintShown = false
+                    detectHorizontalDragGestures(
+                        onDragEnd = { acc = 0f; hintShown = false },
+                        onDragCancel = { acc = 0f; hintShown = false }
+                    ) { _, dragAmount ->
+                        val overlayOpen = showAddCamera || showAddReview || showAddText || showAddBusyCard
+                        if (dragAmount != 0f) {
+                            acc += dragAmount
+                            if (kotlin.math.abs(acc) > 160f) {
+                                if (overlayOpen) {
+                                    if (!hintShown) {
+                                        Toast.makeText(
+                                            ctx,
+                                            ctx.getString(R.string.nacherfassen_block_hint),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        hintShown = true
                                     }
+                                    acc = 0f
+                                } else if (dragAmount > 0) {
+                                    acc = 0f
+                                    onBack()
+                                } else {
+                                    acc = 0f
                                 }
-                            ) {
-                                HistoryItem(entry, onClick = { onPick(entry) })
                             }
                         }
                     }
                 }
-
-                // Wochenfazit-Zeile: NUR am Sonntag ab 18 Uhr sichtbar (gleiche Chip-Sprache
-                // wie die Tagesfazit-Köpfe); bei Wochen-Änderungen wird das Fazit gelöscht
-                if (LocalDate.now().dayOfWeek == java.time.DayOfWeek.SUNDAY &&
-                    LocalTime.now().hour >= FAZIT_AUTO_HOUR
-                ) {
-                    item(key = "week") {
-                        WeekFazitRow(
-                            fazit = weekFazit,
-                            loading = loadingWeek,
-                            expanded = expandedWeek,
-                            onToggleExpand = { expandedWeek = !expandedWeek },
-                            onGenerate = { generateWeekFazit() }
-                        )
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (!showAddCamera && !showAddReview && !showAddText) {
+                HistoryListContent(
+                    entries = entries,
+                    fazitMap = fazitMap,
+                    loadingFazits = loadingFazits,
+                    expandedFazits = expandedFazits,
+                    weekFazit = weekFazit,
+                    loadingWeek = loadingWeek,
+                    expandedWeek = expandedWeek,
+                    onBack = onBack,
+                    onPick = onPick,
+                    onGenerateFazit = { day, groupEntries -> generateFazit(day, groupEntries) },
+                    onGenerateWeekFazit = { generateWeekFazit() },
+                    onToggleExpandWeek = { expandedWeek = !expandedWeek },
+                    onAddMealForDay = { addDialogForDay = it },
+                    onDeleteEntry = { entry ->
+                        entries = entries.filterNot { it.id == entry.id }
+                        HistoryStore.delete(ctx, entry)
                     }
-                }
+                )
             }
-            }   // if (!overlayOpen) — Verlauf-Liste nur ohne Overlay
         }
 
-        // „KI denkt"-Karte während der Nachtrage-Bewertung (identische Optik wie der
-        // Hauptpfad): zentrierter Dialog-Kardiroller mit großem Spinner, NICHT schließbar
         if (showAddBusyCard) {
-            androidx.compose.ui.window.Dialog(onDismissRequest = { /* läuft, nicht abbrechen */ }) {
-                Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(52.dp),
-                            strokeWidth = 4.dp
-                        )
-                        Text(
-                            stringResource(R.string.main_ai_working),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center
-                        )
-                        Text(
-                            stringResource(R.string.main_ai_working_sub),
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+            BackdatedBusyDialog()
+        }
+
+        NacherfassenChoiceDialog(
+            day = addDialogForDay,
+            onDismiss = { addDialogForDay = null },
+            onSelectWithPhoto = { day ->
+                addTargetDay = day
+                addDialogForDay = null
+                addNote = ""
+                showAddCamera = true
+            },
+            onSelectWithoutPhoto = { day ->
+                addTargetDay = day
+                addDialogForDay = null
+                addNote = ""
+                showAddText = true
             }
-        }
+        )
 
-        // Nachtrage-Dialog: Mit Foto / Ohne Foto (für die + Taste je Tagesleiste)
-        addDialogForDay?.let { day ->
-            AlertDialog(
-                onDismissRequest = { addDialogForDay = null },
-                title = { Text(stringResource(R.string.nacherfassen_title)) },
-                text = {
-                    Text(
-                        stringResource(R.string.nacherfassen_text) + "\n" +
-                            day.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        addTargetDay = day
-                        addDialogForDay = null
-                        addNote = ""
-                        showAddCamera = true
-                    }) { Text(stringResource(R.string.nacherfassen_with_photo)) }
-                },
-                dismissButton = {
-                    TextButton(onClick = {
-                        addTargetDay = day
-                        addDialogForDay = null
-                        addNote = ""
-                        showAddText = true
-                    }) { Text(stringResource(R.string.nacherfassen_without_photo)) }
-                }
-            )
-        }
-    }
-
-    // ---------------------------------------------------------------- Nacherfassen-Overlays
-    // Als Geschwister ÜBER der Liste (Box-Root): Die Wisch-Gesten des Listen-Layouts können
-    // die Erfassungsscreens nicht mehr durchdringen (Fix: nach links wischen während
-    // „Mit Foto"/„Ohne Foto" warf den Nutzer ungewollt zurück in die Liste).
-    if (showAddCamera) {
-        CameraCaptureScreen(
-            outputFile = addPhotoFile,
-            note = addNote,
+        BackdatedOverlays(
+            showCamera = showAddCamera,
+            showReview = showAddReview,
+            showText = showAddText,
+            showBusy = showAddBusyCard,
+            addPhotoFile = addPhotoFile,
+            addPhotoUri = addPhotoUri,
+            addNote = addNote,
+            addTargetDay = addTargetDay,
+            settings = settings,
             onNoteChange = { addNote = it },
-            onCancel = { showAddCamera = false },
+            onDismissCamera = { showAddCamera = false },
+            onDismissReview = { showAddReview = false },
+            onDismissText = { showAddText = false },
             onFallbackSystemCamera = {
                 showAddCamera = false
                 addSystemCameraLauncher.launch(addPhotoUri)
             },
+            onSaveBackdated = { ev, uri -> saveBackdatedEntry(ev, uri) },
+            onSetBusy = { showAddBusyCard = it }
+        )
+    }
+}
+
+@Composable
+private fun HistoryListContent(
+    entries: List<HistoryEntry>,
+    fazitMap: Map<String, DayFazit>,
+    loadingFazits: List<String>,
+    expandedFazits: MutableList<String>,
+    weekFazit: DayFazit?,
+    loadingWeek: Boolean,
+    expandedWeek: Boolean,
+    onBack: () -> Unit,
+    onPick: (HistoryEntry) -> Unit,
+    onGenerateFazit: (LocalDate, List<HistoryEntry>) -> Unit,
+    onGenerateWeekFazit: () -> Unit,
+    onToggleExpandWeek: () -> Unit,
+    onAddMealForDay: (LocalDate) -> Unit,
+    onDeleteEntry: (HistoryEntry) -> Unit
+) {
+    TopBarRow(
+        title = stringResource(R.string.history_title),
+        onBack = onBack,
+        trailing = { },
+        icon = Icons.Filled.DateRange
+    )
+
+    if (entries.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(R.string.history_empty),
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    } else {
+        Text(
+            stringResource(R.string.history_list_hint, entries.size),
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            groupByDay(entries).forEach { group ->
+                val dayKey = dayKeyOf(group.day)
+                val fazit = fazitMap[dayKey]
+                val loadingFazit = dayKey in loadingFazits
+                val staleFazit = fazit != null && (
+                    fazit.entryIds.toSet() != group.entries.map { it.id }.toSet() ||
+                        // geänderte erkannt-Texte (Korrekturen) machen das Fazit ebenfalls veraltet
+                        (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(group.entries))
+                    )
+                item(key = "day-$dayKey") {
+                    DayGroupHeader(
+                        date = group.day,
+                        fazit = fazit,
+                        loading = loadingFazit,
+                        stale = staleFazit,
+                        expanded = dayKey in expandedFazits,
+                        onToggleExpand = {
+                            if (dayKey in expandedFazits) expandedFazits.remove(dayKey)
+                            else expandedFazits.add(dayKey)
+                        },
+                        onGenerate = { onGenerateFazit(group.day, group.entries) },
+                        onAddMeal = { onAddMealForDay(group.day) }
+                    )
+                    when {
+                        loadingFazit -> Text(
+                            stringResource(R.string.dayfazit_loading_line),
+                            fontSize = 11.sp,
+                            fontStyle = FontStyle.Italic,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 8.dp, start = 4.dp)
+                        )
+                        // Veraltet: bewusst KEINE gedimmte Alt-Fassung mehr zeigen
+                        // (nicht verständlich, warum sie noch da steht) – nur der
+                        // „⟳ Neu bewerten"-Chip macht den Zustand kenntlich
+                        fazit != null && !staleFazit && dayKey in expandedFazits -> Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 10.dp, bottom = 2.dp)
+                        ) {
+                            Text(
+                                fazit.text,
+                                fontSize = 12.sp,
+                                lineHeight = 17.sp,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                }
+                group.entries.forEach { entry ->
+                    item(key = entry.id) {
+                        val dismissState = rememberSwipeToDismissBoxState(
+                            confirmValueChange = { value ->
+                                if (value == SwipeToDismissBoxValue.EndToStart) {
+                                    onDeleteEntry(entry)
+                                    true
+                                } else false
+                            }
+                        )
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            enableDismissFromStartToEnd = false,
+                            backgroundContent = {
+                                Box(
+                                    modifier = Modifier
+                                        // Gleiche Rundung wie die Karte, sonst schimmert Rot an den Ecken
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .fillMaxSize()
+                                        .background(Color(0xFFD32F2F)),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    Text(
+                                        stringResource(R.string.history_delete_action),
+                                        color = Color.White,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 24.dp)
+                                    )
+                                }
+                            }
+                        ) {
+                            HistoryItem(entry, onClick = { onPick(entry) })
+                        }
+                    }
+                }
+            }
+
+            // Wochenfazit-Zeile: NUR am Sonntag ab 18 Uhr sichtbar (gleiche Chip-Sprache
+            // wie die Tagesfazit-Köpfe); bei Wochen-Änderungen wird das Fazit gelöscht
+            if (LocalDate.now().dayOfWeek == java.time.DayOfWeek.SUNDAY &&
+                LocalTime.now().hour >= FAZIT_AUTO_HOUR
+            ) {
+                item(key = "week") {
+                    WeekFazitRow(
+                        fazit = weekFazit,
+                        loading = loadingWeek,
+                        expanded = expandedWeek,
+                        onToggleExpand = onToggleExpandWeek,
+                        onGenerate = onGenerateWeekFazit
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackdatedBusyDialog() {
+    androidx.compose.ui.window.Dialog(onDismissRequest = { /* läuft, nicht abbrechen */ }) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 28.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(52.dp),
+                    strokeWidth = 4.dp
+                )
+                Text(
+                    stringResource(R.string.main_ai_working),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    stringResource(R.string.main_ai_working_sub),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NacherfassenChoiceDialog(
+    day: LocalDate?,
+    onDismiss: () -> Unit,
+    onSelectWithPhoto: (LocalDate) -> Unit,
+    onSelectWithoutPhoto: (LocalDate) -> Unit
+) {
+    day?.let { targetDay ->
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text(stringResource(R.string.nacherfassen_title)) },
+            text = {
+                Text(
+                    stringResource(R.string.nacherfassen_text) + "\n" +
+                        targetDay.format(DATE_FORMATTER)
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { onSelectWithPhoto(targetDay) }) {
+                    Text(stringResource(R.string.nacherfassen_with_photo))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onSelectWithoutPhoto(targetDay) }) {
+                    Text(stringResource(R.string.nacherfassen_without_photo))
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun BackdatedOverlays(
+    showCamera: Boolean,
+    showReview: Boolean,
+    showText: Boolean,
+    showBusy: Boolean,
+    addPhotoFile: File,
+    addPhotoUri: Uri,
+    addNote: String,
+    addTargetDay: LocalDate?,
+    settings: Settings,
+    onNoteChange: (String) -> Unit,
+    onDismissCamera: () -> Unit,
+    onDismissReview: () -> Unit,
+    onDismissText: () -> Unit,
+    onFallbackSystemCamera: () -> Unit,
+    onSaveBackdated: (Evaluation, Uri?) -> Unit,
+    onSetBusy: (Boolean) -> Unit
+) {
+    val ctx = LocalContext.current
+    if (showCamera) {
+        CameraCaptureScreen(
+            outputFile = addPhotoFile,
+            note = addNote,
+            onNoteChange = onNoteChange,
+            onCancel = onDismissCamera,
+            onFallbackSystemCamera = onFallbackSystemCamera,
             onConfirm = {
-                showAddCamera = false
-                showAddBusyCard = true
+                onDismissCamera()
+                onSetBusy(true)
                 val prompts = PromptBundle(
                     intro = ctx.getString(R.string.prompt_eval_intro),
                     formatIntro = ctx.getString(R.string.prompt_eval_format),
@@ -544,26 +672,26 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                     settings = settings,
                     promptBundle = prompts,
                     onResult = {
-                        showAddBusyCard = false
-                        saveBackdatedEntry(it, addPhotoUri)
+                        onSetBusy(false)
+                        onSaveBackdated(it, addPhotoUri)
                     },
                     onError = { msg ->
-                        showAddBusyCard = false
+                        onSetBusy(false)
                         Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
                     }
                 )
             }
         )
     }
-    if (showAddReview) {
+    if (showReview) {
         AddMealReviewScreen(
             photoUri = addPhotoUri,
             note = addNote,
-            onNoteChange = { addNote = it },
-            onBack = { showAddReview = false },
-            busy = showAddBusyCard,
+            onNoteChange = onNoteChange,
+            onBack = onDismissReview,
+            busy = showBusy,
             onRate = {
-                showAddBusyCard = true
+                onSetBusy(true)
                 val prompts = PromptBundle(
                     intro = ctx.getString(R.string.prompt_eval_intro),
                     formatIntro = ctx.getString(R.string.prompt_eval_format),
@@ -582,43 +710,42 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                     settings = settings,
                     promptBundle = prompts,
                     onResult = {
-                        showAddBusyCard = false
-                        saveBackdatedEntry(it, addPhotoUri)
+                        onSetBusy(false)
+                        onSaveBackdated(it, addPhotoUri)
                     },
                     onError = { msg ->
-                        showAddBusyCard = false
+                        onSetBusy(false)
                         Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
                     }
                 )
             }
         )
     }
-    if (showAddText) {
+    if (showText) {
         AddMealNoPhotoScreen(
             day = addTargetDay,
             note = addNote,
-            onNoteChange = { addNote = it },
-            onBack = { showAddText = false },
-            busy = showAddBusyCard,
+            onNoteChange = onNoteChange,
+            onBack = onDismissText,
+            busy = showBusy,
             onSend = {
-                showAddBusyCard = true
+                onSetBusy(true)
                 ApiClient.analyzeText(
                     ctx = ctx,
                     settings = settings,
                     userDescription = addNote.trim(),
                     onResult = {
-                        showAddBusyCard = false
-                        saveBackdatedEntry(it, null)
+                        onSetBusy(false)
+                        onSaveBackdated(it, null)
                     },
                     onError = { msg ->
-                        showAddBusyCard = false
+                        onSetBusy(false)
                         Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
                     }
                 )
             }
         )
     }
-    }   // Box-Root
 }
 
 /** Wochenfazit-Zeile: Label links, Chip rechts (idle/loading/ready-farbig); kein „veraltet"-
@@ -768,7 +895,7 @@ private fun AddMealReviewScreen(
             val reviewCtx = LocalContext.current
             val bmp = remember(photoUri) {
                 try {
-                    BitmapFactory.decodeStream(reviewCtx.contentResolver.openInputStream(photoUri))
+                    reviewCtx.contentResolver.openInputStream(photoUri)?.use { BitmapFactory.decodeStream(it) }
                 } catch (e: Exception) { null }
             }
             if (bmp != null) {
@@ -837,7 +964,7 @@ private fun AddMealNoPhotoScreen(
                 icon = Icons.Filled.Add
             )
             Text(
-                (day?.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")) ?: "") +
+                (day?.format(DATE_FORMATTER) ?: "") +
                     " · " + stringResource(R.string.nacherfassen_without_photo),
                 fontSize = 14.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -901,7 +1028,7 @@ private fun DayGroupHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")),
+            date.format(DATE_FORMATTER),
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
@@ -1170,10 +1297,10 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
     ) {
         TopBarRow(
             title = if (current.backdated)
-                SimpleDateFormat("dd.MM.yyyy", Locale.getDefault()).format(Date(current.dateMillis)) +
+                SimpleDateFormat(DATE_FORMAT_PATTERN, Locale.getDefault()).format(Date(current.dateMillis)) +
                     " · " + stringResource(R.string.nacherfassen_label)
             else
-                SimpleDateFormat("dd.MM.yyyy HH:mm", Locale.getDefault()).format(Date(current.dateMillis)),
+                SimpleDateFormat("$DATE_FORMAT_PATTERN HH:mm", Locale.getDefault()).format(Date(current.dateMillis)),
             onBack = onBack,
             trailing = {
                 IconButton(onClick = { confirmDelete = true }) {

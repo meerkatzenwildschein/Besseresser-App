@@ -21,11 +21,11 @@ object Store {
 
     fun load(ctx: Context): Settings {
         val p: SharedPreferences = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val goals = p.getString("goals", "")!!.split("\n")
+        val goals = (p.getString("goals", "") ?: "").split("\n")
             .map { it.trim() }
             .filter { it.isNotBlank() }
         return Settings(
-            baseUrl = p.getString("baseUrl", "")!!,
+            baseUrl = p.getString("baseUrl", "") ?: "",
             apiKey = p.getString("apiKey", null)?.let { KeyVault.decrypt(it) } ?: "",
             model = p.getString("model", "gpt-4o-mini") ?: "gpt-4o-mini",
             goals = goals,
