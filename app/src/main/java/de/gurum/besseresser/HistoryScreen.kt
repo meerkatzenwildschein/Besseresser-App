@@ -140,15 +140,7 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
 
     LaunchedEffect(entries) {
         fazitMap = DayFazitStore.loadAll(ctx).associateBy { it.dayKey }
-        // Wochenfazit: vorhanden? Bei geänderten Wochen-Einträgen (Fingerprint) LÖSCHEN
-        val wk = weekKeyOf(System.currentTimeMillis())
-        val wf = WeekFazitStore.load(ctx, wk)
-        if (wf != null && wf.fingerprint != dayFingerprint(entries.filter { dayKeyOf(it.dateMillis) == wk })) {
-            WeekFazitStore.delete(ctx, wk)
-            weekFazit = null
-        } else {
-            weekFazit = wf
-        }
+        weekFazit = syncWeekFazit(ctx, entries)
     }
 
     // ------------------------------------------------- Nacherfassen (Essen nachtragen für einen Tag)
@@ -213,12 +205,7 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                 goals = settings.goals,
                 promptContext = profileContextLine(ctx, profile),
                 mealLines = lines,
-                prompts = FazitPromptBundle(
-                    promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
-                    promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
-                    promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
-                    promptHonesty = ctx.getString(R.string.prompt_honesty)
-                )
+                prompts = createDayFazitPrompts(ctx)
             )
             result.onSuccess { res ->
                 DayFazitStore.save(
@@ -250,12 +237,7 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
                 goals = settings.goals,
                 promptContext = profileContextLine(ctx, profile),
                 mealLines = dayFazitMealLines(ctx, entriesOfWeek),
-                prompts = FazitPromptBundle(
-                    promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
-                    promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
-                    promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
-                    promptHonesty = ctx.getString(R.string.prompt_honesty)
-                )
+                prompts = createWeekFazitPrompts(ctx)
             )
             result.onSuccess { res ->
                 WeekFazitStore.save(
@@ -274,43 +256,17 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
         }
     }
 
-    // Auto-Logik (nur die beiden neuesten Tagesgruppen):
-    //  • kein Fazit     → 1× pro Tag & App-Session automatisch (Ersatztext „KI bewertet den Tag …")
-    //  • Fazit veraltet → automatisch neu bewerten (veraltet = Entry-IDs/Fingerprint weichen ab)
-    //  • ältere Gruppen nur manuell per Chip-Tap
-    //  • AUTO erst ab 18 Uhr (`FAZIT_AUTO_HOUR`): verhindert Frühstücks-Fazits; manuell (Chip)
-    //    geht zu JEDER Zeit
-    LaunchedEffect(entries, fazitMap) {
-        if (entries.isEmpty()) return@LaunchedEffect
-        delay(1200)   // Debounce: schnelles Löschen mehrerer Einträge löst nur einen Call aus
-        val autoFazitTime = LocalTime.now().hour >= FAZIT_AUTO_HOUR
-        groupByDay(entries).take(2).forEach { group ->
-            val key = dayKeyOf(group.day)
-            if (key in loadingFazits) return@forEach
-            val fazit = fazitMap[key]
-            if (fazit == null) {
-                if (autoFazitTime && key !in DayFazitSession.attempted) {
-                    DayFazitSession.attempted.add(key)
-                    generateFazit(group.day, group.entries)
-                }
-            } else if (autoFazitTime && (
-                    fazit.entryIds.toSet() != group.entries.map { it.id }.toSet() ||
-                        (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(group.entries))
-                    )
-            ) {
-                generateFazit(group.day, group.entries)
-            }
-        }
-        // Wochenfazit: auto NUR Sonntag ≥ 18 Uhr, 1× pro Woche & Session (sonst Chip-Tipp)
-        val today = LocalDate.now()
-        if (autoFazitTime && today.dayOfWeek == java.time.DayOfWeek.SUNDAY && weekFazit == null && !loadingWeek) {
-            val wk = weekKeyOf(System.currentTimeMillis())
-            if (wk !in DayFazitSession.attemptedWeekly) {
-                DayFazitSession.attemptedWeekly.add(wk)
-                generateWeekFazit()
-            }
-        }
-    }
+    HistoryAutoFazitEffect(
+        entries = entries,
+        fazitMap = fazitMap,
+        loadingFazits = loadingFazits,
+        weekFazit = weekFazit,
+        loadingWeek = loadingWeek,
+        onGenerateFazit = { day, groupEntries -> generateFazit(day, groupEntries) },
+        onGenerateWeekFazit = { generateWeekFazit() }
+    )
+
+    val overlayOpen = showAddCamera || showAddReview || showAddText || showAddBusyCard
 
     // Root als Box: Die Nacherfassen-Overlays (Kamera/Review/Text) liegen als Geschwister
     // ÜBER der Liste — Gesten & Scroll der Liste können sie nicht durchdringen.
@@ -318,37 +274,13 @@ fun HistoryScreen(settings: Settings, profile: Profile, onPick: (HistoryEntry) -
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
-                    var acc = 0f
-                    var hintShown = false
-                    detectHorizontalDragGestures(
-                        onDragEnd = { acc = 0f; hintShown = false },
-                        onDragCancel = { acc = 0f; hintShown = false }
-                    ) { _, dragAmount ->
-                        val overlayOpen = showAddCamera || showAddReview || showAddText || showAddBusyCard
-                        if (dragAmount != 0f) {
-                            acc += dragAmount
-                            if (kotlin.math.abs(acc) > 160f) {
-                                if (overlayOpen) {
-                                    if (!hintShown) {
-                                        Toast.makeText(
-                                            ctx,
-                                            ctx.getString(R.string.nacherfassen_block_hint),
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                        hintShown = true
-                                    }
-                                    acc = 0f
-                                } else if (dragAmount > 0) {
-                                    acc = 0f
-                                    onBack()
-                                } else {
-                                    acc = 0f
-                                }
-                            }
-                        }
-                    }
-                }
+                .historySwipeHandler(
+                    isBlocked = overlayOpen,
+                    onBlocked = {
+                        Toast.makeText(ctx, ctx.getString(R.string.nacherfassen_block_hint), Toast.LENGTH_SHORT).show()
+                    },
+                    onBack = onBack
+                )
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
@@ -1399,5 +1331,104 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
                 TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.cancel)) }
             }
         )
+    }
+}
+
+private fun syncWeekFazit(ctx: Context, entries: List<HistoryEntry>): DayFazit? {
+    val wk = weekKeyOf(System.currentTimeMillis())
+    val wf = WeekFazitStore.load(ctx, wk) ?: return null
+    val currentWkEntries = entries.filter { dayKeyOf(it.dateMillis) == wk }
+    if (wf.fingerprint != dayFingerprint(currentWkEntries)) {
+        WeekFazitStore.delete(ctx, wk)
+        return null
+    }
+    return wf
+}
+
+private fun createDayFazitPrompts(ctx: Context): FazitPromptBundle = FazitPromptBundle(
+    promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
+    promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+    promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+    promptHonesty = ctx.getString(R.string.prompt_honesty)
+)
+
+private fun createWeekFazitPrompts(ctx: Context): FazitPromptBundle = FazitPromptBundle(
+    promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
+    promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
+    promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
+    promptHonesty = ctx.getString(R.string.prompt_honesty)
+)
+
+@Composable
+private fun HistoryAutoFazitEffect(
+    entries: List<HistoryEntry>,
+    fazitMap: Map<String, DayFazit>,
+    loadingFazits: List<String>,
+    weekFazit: DayFazit?,
+    loadingWeek: Boolean,
+    onGenerateFazit: (LocalDate, List<HistoryEntry>) -> Unit,
+    onGenerateWeekFazit: () -> Unit
+) {
+    LaunchedEffect(entries, fazitMap) {
+        if (entries.isEmpty()) return@LaunchedEffect
+        delay(1200)   // Debounce
+        val autoFazitTime = LocalTime.now().hour >= FAZIT_AUTO_HOUR
+        groupByDay(entries).take(2).forEach { group ->
+            val key = dayKeyOf(group.day)
+            if (key in loadingFazits) return@forEach
+            val fazit = fazitMap[key]
+            if (fazit == null) {
+                if (autoFazitTime && key !in DayFazitSession.attempted) {
+                    DayFazitSession.attempted.add(key)
+                    onGenerateFazit(group.day, group.entries)
+                }
+            } else if (autoFazitTime && isFazitOutdated(fazit, group.entries)) {
+                onGenerateFazit(group.day, group.entries)
+            }
+        }
+        val today = LocalDate.now()
+        if (autoFazitTime && today.dayOfWeek == java.time.DayOfWeek.SUNDAY && weekFazit == null && !loadingWeek) {
+            val wk = weekKeyOf(System.currentTimeMillis())
+            if (wk !in DayFazitSession.attemptedWeekly) {
+                DayFazitSession.attemptedWeekly.add(wk)
+                onGenerateWeekFazit()
+            }
+        }
+    }
+}
+
+private fun isFazitOutdated(fazit: DayFazit, entries: List<HistoryEntry>): Boolean {
+    if (fazit.entryIds.toSet() != entries.map { it.id }.toSet()) return true
+    return fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(entries)
+}
+
+private fun Modifier.historySwipeHandler(
+    isBlocked: Boolean,
+    onBlocked: () -> Unit,
+    onBack: () -> Unit
+): Modifier = pointerInput(Unit) {
+    var acc = 0f
+    var hintShown = false
+    detectHorizontalDragGestures(
+        onDragEnd = { acc = 0f; hintShown = false },
+        onDragCancel = { acc = 0f; hintShown = false }
+    ) { _, dragAmount ->
+        if (dragAmount != 0f) {
+            acc += dragAmount
+            if (kotlin.math.abs(acc) > 160f) {
+                if (isBlocked) {
+                    if (!hintShown) {
+                        onBlocked()
+                        hintShown = true
+                    }
+                    acc = 0f
+                } else if (dragAmount > 0) {
+                    acc = 0f
+                    onBack()
+                } else {
+                    acc = 0f
+                }
+            }
+        }
     }
 }

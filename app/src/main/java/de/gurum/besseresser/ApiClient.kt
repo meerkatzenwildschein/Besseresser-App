@@ -578,26 +578,37 @@ object ApiClient : BesseresserApiService {
 
             // 1) Standard: choices[0].message.content (String oder Parts-Array)
             val msg = first["message"] as? JsonObject
-            val contentFromMsg = when (val direct = msg?.get("content")) {
-                is JsonPrimitive -> direct.contentOrNull?.takeIf { it.isNotBlank() }
-                is JsonArray -> {
-                    // Manche Anbieter liefern ein Parts-Array: [{"type":"text","text":"..."}]
-                    val parts = StringBuilder()
-                    for (item in direct) {
-                        val p = item as? JsonObject ?: continue
-                        val t = p["text"]?.jsonPrimitive?.contentOrNull
-                        if (!t.isNullOrBlank()) parts.append(t)
-                    }
-                    parts.toString().takeIf { it.isNotBlank() }
-                }
-                else -> null
+            val contentFromMsg = parseMessageContent(msg?.get("content"))
+            if (!contentFromMsg.isNullOrBlank()) {
+                return contentFromMsg
             }
-            contentFromMsg
-                ?: msg?.get("reasoning_content")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
-                ?: first["text"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+            val reasoning = msg?.get("reasoning_content")?.jsonPrimitive?.contentOrNull
+            if (!reasoning.isNullOrBlank()) {
+                return reasoning
+            }
+            val text = first["text"]?.jsonPrimitive?.contentOrNull
+            if (!text.isNullOrBlank()) {
+                return text
+            }
+            null
         } catch (e: Exception) {
             null
         }
+    }
+
+    private fun parseMessageContent(contentElement: JsonElement?): String? = when (contentElement) {
+        is JsonPrimitive -> contentElement.contentOrNull?.takeIf { it.isNotBlank() }
+        is JsonArray -> {
+            // Manche Anbieter liefern ein Parts-Array: [{"type":"text","text":"..."}]
+            val parts = StringBuilder()
+            for (item in contentElement) {
+                val p = item as? JsonObject ?: continue
+                val t = p["text"]?.jsonPrimitive?.contentOrNull
+                if (!t.isNullOrBlank()) parts.append(t)
+            }
+            parts.toString().takeIf { it.isNotBlank() }
+        }
+        else -> null
     }
 
     /** Schließt abgeschnittene JSON-Antworten tolerant: offene Strings schließen,
@@ -696,20 +707,28 @@ object ApiClient : BesseresserApiService {
 
     private val RESULT_ARRAY_KEYS = listOf("bewertung", "bewertungen", "results", "ampeln", "ratings", "ziele", "goals")
 
+    private fun findDirectResultArray(obj: JsonObject): JsonArray? {
+        for (name in RESULT_ARRAY_KEYS) {
+            val arr = obj[name] as? JsonArray
+            if (arr != null && arr.isNotEmpty() && arr[0] is JsonObject) {
+                return arr
+            }
+        }
+        return null
+    }
+
     /** Findet das Ergebnis-Array, auch bei anderer Verschachtelung/Feldnamen. */
     private fun findResultArray(node: JsonElement?, depth: Int = 0): JsonArray {
         if (node == null || depth > 4) return JsonArray(emptyList())
+        if (node is JsonArray && node.isNotEmpty() && node[0] is JsonObject) {
+            return node
+        }
         if (node is JsonObject) {
-            for (name in RESULT_ARRAY_KEYS) {
-                val arr = node[name] as? JsonArray
-                if (arr != null && arr.isNotEmpty() && arr[0] is JsonObject) return arr
-            }
+            findDirectResultArray(node)?.let { return it }
             for (child in node.values) {
                 val found = findResultArray(child, depth + 1)
                 if (found.isNotEmpty()) return found
             }
-        } else if (node is JsonArray && node.isNotEmpty() && node[0] is JsonObject) {
-            return node
         }
         return JsonArray(emptyList())
     }

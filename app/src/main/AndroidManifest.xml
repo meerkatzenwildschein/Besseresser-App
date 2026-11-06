@@ -11,7 +11,8 @@
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.GesundEssen"
         android:localeConfig="@xml/locales_config"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
         android:supportsRtl="true">
 
         <activity

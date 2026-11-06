@@ -136,18 +136,7 @@ fun MainScreen(
     val triggerAnalyze: (String, Uri) -> Unit = { trimmedNote, targetUri ->
         busy = true
         error = null
-        val prompts = PromptBundle(
-            intro = ctx.getString(R.string.prompt_eval_intro),
-            formatIntro = ctx.getString(R.string.prompt_eval_format),
-            ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-            exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-            responseLanguage = ctx.getString(R.string.prompt_eval_language),
-            recognized = ctx.getString(R.string.prompt_eval_recognized),
-            honesty = ctx.getString(R.string.prompt_honesty),
-            noteHeader = if (trimmedNote.isNotBlank())
-                ctx.getString(R.string.prompt_note_header, trimmedNote)
-            else ""
-        )
+        val prompts = createAnalyzePrompts(ctx, trimmedNote)
         analyzeJob?.cancel()
         analyzeJob = coroutineScope.launch {
             val result = ApiClient.analyze(
@@ -168,41 +157,18 @@ fun MainScreen(
         }
     }
 
+    val navBlocked = busy || showCamera || showReview || (lastGoaled && !savedToHistory)
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                var acc = 0f
-                var hintShown = false
-                detectHorizontalDragGestures(
-                    onDragEnd = { acc = 0f; hintShown = false },
-                    onDragCancel = { acc = 0f; hintShown = false }
-                ) { _, dragAmount ->
-                    if (dragAmount < 0) {
-                        acc += dragAmount
-                        val blocked = busy || showCamera || showReview ||
-                            (lastGoaled && !savedToHistory)
-                        if (acc < -160f) {
-                            if (blocked) {
-                                if (!hintShown) {
-                                    Toast.makeText(
-                                        ctx,
-                                        ctx.getString(R.string.nav_blocked_hint),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                    hintShown = true
-                                }
-                                acc = 0f
-                            } else {
-                                acc = 0f
-                                onOpenHistory()
-                            }
-                        }
-                    } else {
-                        acc = 0f
-                    }
-                }
-            }
+            .mainSwipeToHistoryHandler(
+                isBlocked = navBlocked,
+                onBlocked = {
+                    Toast.makeText(ctx, ctx.getString(R.string.nav_blocked_hint), Toast.LENGTH_SHORT).show()
+                },
+                onOpenHistory = onOpenHistory
+            )
     ) {
         if (showCamera) {
             CameraCaptureScreen(
@@ -269,14 +235,9 @@ fun MainScreen(
                 onEditErkannt = { showErkanntEdit = true },
                 onSaveToHistory = {
                     savingHistory = true
-                    val ev = evaluation
-                    if (ev != null) {
-                        val stored = try {
-                            HistoryStore.add(ctx, photoUri, ev, note.trim())
-                        } catch (e: Exception) { null }
-                        savedToHistory = stored != null
-                        savedEntryId = stored?.id
-                    }
+                    val stored = saveMainEntryToHistory(ctx, photoUri, evaluation, note)
+                    savedToHistory = stored != null
+                    savedEntryId = stored?.id
                     savingHistory = false
                 },
                 onDiscard = { resetCycle() }
@@ -673,6 +634,64 @@ private fun MainFixedCtaButtons(
             } else {
                 Text(stringResource(R.string.main_take_photo), fontSize = 17.sp)
             }
+        }
+    }
+}
+
+private fun createAnalyzePrompts(ctx: Context, trimmedNote: String): PromptBundle = PromptBundle(
+    intro = ctx.getString(R.string.prompt_eval_intro),
+    formatIntro = ctx.getString(R.string.prompt_eval_format),
+    ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+    exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+    responseLanguage = ctx.getString(R.string.prompt_eval_language),
+    recognized = ctx.getString(R.string.prompt_eval_recognized),
+    honesty = ctx.getString(R.string.prompt_honesty),
+    noteHeader = if (trimmedNote.isNotBlank())
+        ctx.getString(R.string.prompt_note_header, trimmedNote)
+    else ""
+)
+
+private fun saveMainEntryToHistory(
+    ctx: Context,
+    photoUri: Uri,
+    evaluation: Evaluation?,
+    note: String
+): HistoryEntry? {
+    val ev = evaluation ?: return null
+    return try {
+        HistoryStore.add(ctx, photoUri, ev, note.trim())
+    } catch (e: Exception) {
+        null
+    }
+}
+
+private fun Modifier.mainSwipeToHistoryHandler(
+    isBlocked: Boolean,
+    onBlocked: () -> Unit,
+    onOpenHistory: () -> Unit
+): Modifier = pointerInput(Unit) {
+    var acc = 0f
+    var hintShown = false
+    detectHorizontalDragGestures(
+        onDragEnd = { acc = 0f; hintShown = false },
+        onDragCancel = { acc = 0f; hintShown = false }
+    ) { _, dragAmount ->
+        if (dragAmount < 0) {
+            acc += dragAmount
+            if (acc < -160f) {
+                if (isBlocked) {
+                    if (!hintShown) {
+                        onBlocked()
+                        hintShown = true
+                    }
+                    acc = 0f
+                } else {
+                    acc = 0f
+                    onOpenHistory()
+                }
+            }
+        } else {
+            acc = 0f
         }
     }
 }

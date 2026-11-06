@@ -141,8 +141,7 @@ fun SetupScreen(initial: Settings, firstRun: Boolean, onCancel: () -> Unit, onDo
                         showSplit = true
                     }.onFailure { e ->
                         splitting = false
-                        val debug = (e as? ApiException)?.debugReport ?: e.message ?: e.javaClass.simpleName
-                        splitDebug = debug
+                        splitDebug = extractErrorDebugReport(e)
                         splitEdited = ApiClient.splitGoalsLocally(text).joinToString("\n").ifBlank { text }
                         showSplit = true
                     }
@@ -391,7 +390,7 @@ fun ModelListScreen(url: String, apiKey: String, onPick: (String) -> Unit, onBac
             models = it
             loading = false
         }.onFailure { e ->
-            debugReport = (e as? ApiException)?.debugReport ?: e.message ?: e.javaClass.simpleName
+            debugReport = extractErrorDebugReport(e)
             loading = false
         }
     }
@@ -496,4 +495,18 @@ private fun LabelledField(
         }
         field()
     }
+}
+
+private fun extractErrorDebugReport(e: Throwable): String {
+    if (e is ApiException) {
+        val report = e.debugReport
+        if (!report.isNullOrBlank()) {
+            return report
+        }
+    }
+    val msg = e.message
+    if (!msg.isNullOrBlank()) {
+        return msg
+    }
+    return e.javaClass.simpleName
 }
