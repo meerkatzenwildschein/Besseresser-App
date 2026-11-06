@@ -546,6 +546,19 @@ class RepositoriesAndFakesTest {
         assertEquals("Mittagessen", vm.uiState.value.entries[1].erkannt)
         assertEquals("Frühstück", vm.uiState.value.entries[2].erkannt)
 
+        // Save a DayFazit for this day before reordering
+        val initialDayEntries = vm.uiState.value.entries
+        val dayFazit = DayFazit(
+            dayKey = dayKeyOf(day),
+            ampel = TrafficLight.GREEN,
+            text = "Ausgewogener Tag",
+            entryIds = initialDayEntries.map { it.id },
+            fingerprint = dayFingerprint(initialDayEntries)
+        )
+        histRepo.saveDayFazit(dayFazit)
+        advanceUntilIdle()
+        assertNotNull(histRepo.loadDayFazit(dayKeyOf(day)))
+
         // Move Frühstück (index 2) to top (index 0)
         vm.moveEntryWithinDay(day = day, fromIndex = 2, toIndex = 0)
         advanceUntilIdle()
@@ -557,5 +570,10 @@ class RepositoriesAndFakesTest {
         // Timestamps must stay strictly descending
         assertTrue(reordered[0].dateMillis > reordered[1].dateMillis)
         assertTrue(reordered[1].dateMillis > reordered[2].dateMillis)
+
+        // Existing DayFazit must still be present and NOT outdated after reordering
+        val loadedFazitAfterReorder = histRepo.loadDayFazit(dayKeyOf(day))
+        assertNotNull(loadedFazitAfterReorder)
+        assertFalse(isFazitOutdated(loadedFazitAfterReorder!!, reordered))
     }
 }

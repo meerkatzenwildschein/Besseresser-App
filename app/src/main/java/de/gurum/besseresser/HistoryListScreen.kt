@@ -41,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -54,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -191,7 +193,7 @@ fun HistoryListContent(
                         )
                     } else {
                         ReorderableDayMealBox(
-                            day = group.day,
+                            entryId = entry.id,
                             currentIndexOnDay = indexOnDay,
                             totalCountOnDay = group.entries.size,
                             onMove = { from, to -> onMoveEntryWithinDay(group.day, from, to) }
@@ -401,12 +403,14 @@ fun HistoryItem(
 }
 
 /**
- * Ermöglicht das vertikale Verschieben einer Mahlzeiten-Karte innerhalb desselben Tages per Long-Press.
- * Beim Gedrückthalten vibriert das Gerät kurz und die Karte hebt sich visuell an.
+ * Ermöglicht das flüssige vertikale Verschieben einer Mahlzeiten-Karte über beliebig viele
+ * Einträge innerhalb desselben Tages per Long-Press.
+ * Wichtig: pointerInput ist nur an [entryId] gebunden (nicht an [currentIndexOnDay]), damit die
+ * laufende Zieh-Geste beim Platztausch nicht abgebrochen wird, sondern nahtlos weiterläuft.
  */
 @Composable
 private fun ReorderableDayMealBox(
-    day: LocalDate,
+    entryId: Long,
     currentIndexOnDay: Int,
     totalCountOnDay: Int,
     onMove: (fromIndex: Int, toIndex: Int) -> Unit,
@@ -419,23 +423,36 @@ private fun ReorderableDayMealBox(
 
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
-    val slotHeightPx = remember(density) { with(density) { 88.dp.toPx() } }
+    val spacingPx = remember(density) { with(density) { 10.dp.toPx() } }
+    val defaultCardHeightPx = remember(density) { with(density) { 88.dp.toPx() } }
+    val edgeRubberBandPx = remember(density) { with(density) { 10.dp.toPx() } }
 
-    var isDragging by remember { mutableStateOf(false) }
-    var dragAccumY by remember { mutableFloatStateOf(0f) }
+    var cardHeightPx by remember { mutableFloatStateOf(defaultCardHeightPx) }
+    var isDragging by remember(entryId) { mutableStateOf(false) }
+    var dragAccumY by remember(entryId) { mutableFloatStateOf(0f) }
 
-    val currentDragOffset by animateFloatAsState(
-        targetValue = if (isDragging) dragAccumY else 0f,
-        animationSpec = tween(durationMillis = 100),
-        label = "reorder-drag-y"
+    val latestIndex by rememberUpdatedState(currentIndexOnDay)
+    val latestTotal by rememberUpdatedState(totalCountOnDay)
+    val latestOnMove by rememberUpdatedState(onMove)
+
+    val settleOffset by animateFloatAsState(
+        targetValue = 0f,
+        animationSpec = tween(durationMillis = 140),
+        label = "reorder-settle-y"
     )
+    val displayOffsetY = if (isDragging) dragAccumY else settleOffset
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .zIndex(if (isDragging) 10f else 0f)
-            .offset { IntOffset(0, currentDragOffset.roundToInt()) }
-            .pointerInput(day, currentIndexOnDay, totalCountOnDay) {
+            .onGloballyPositioned { coords ->
+                if (coords.size.height > 0) {
+                    cardHeightPx = coords.size.height.toFloat()
+                }
+            }
+            .offset { IntOffset(0, displayOffsetY.roundToInt()) }
+            .pointerInput(entryId) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -452,17 +469,33 @@ private fun ReorderableDayMealBox(
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
+                        val stepPx = (cardHeightPx + spacingPx).coerceAtLeast(1f)
+                        val thresholdPx = stepPx * 0.55f
+
+                        var localIdx = latestIndex
+                        val total = latestTotal
                         dragAccumY += dragAmount.y
-                        // Wenn um ca. eine Kartenhöhe nach oben oder unten gezogen wurde: Platz tauschen
-                        val slotsMoved = (dragAccumY / slotHeightPx).roundToInt()
-                        if (slotsMoved != 0) {
-                            val targetIndex = (currentIndexOnDay + slotsMoved).coerceIn(0, totalCountOnDay - 1)
-                            if (targetIndex != currentIndexOnDay) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onMove(currentIndexOnDay, targetIndex)
-                                dragAccumY -= (targetIndex - currentIndexOnDay) * slotHeightPx
-                            }
+
+                        // Flüssig auch über mehrere Nachbarkarten hinweg weiterrücken
+                        while (dragAccumY > thresholdPx && localIdx < total - 1) {
+                            val nextIdx = localIdx + 1
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            latestOnMove(localIdx, nextIdx)
+                            dragAccumY -= stepPx
+                            localIdx = nextIdx
                         }
+                        while (dragAccumY < -thresholdPx && localIdx > 0) {
+                            val prevIdx = localIdx - 1
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            latestOnMove(localIdx, prevIdx)
+                            dragAccumY += stepPx
+                            localIdx = prevIdx
+                        }
+
+                        // Harte Tagesgrenzen: am ersten und letzten Eintrag des Tages sanft stoppen
+                        val minDrag = if (localIdx <= 0) -edgeRubberBandPx else -stepPx
+                        val maxDrag = if (localIdx >= total - 1) edgeRubberBandPx else stepPx
+                        dragAccumY = dragAccumY.coerceIn(minDrag, maxDrag)
                     }
                 )
             }

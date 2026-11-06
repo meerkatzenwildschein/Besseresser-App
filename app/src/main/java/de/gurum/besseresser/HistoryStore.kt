@@ -208,7 +208,8 @@ object HistoryStore {
         return duplicated
     }
 
-    /** Aktualisiert die Zeitstempel der übergebenen Einträge (für Umsortierung innerhalb eines Tages). */
+    /** Aktualisiert die Zeitstempel der übergebenen Einträge (für Umsortierung innerhalb eines Tages).
+     *  Bestehende Tages- und Wochenfazits bleiben unverändert gültig (keine Neuberechnung nötig). */
     fun reorderEntries(ctx: Context, reordered: List<HistoryEntry>) {
         if (reordered.isEmpty()) return
         ensureMigrated(ctx)
@@ -216,9 +217,6 @@ object HistoryStore {
         kotlinx.coroutines.runBlocking {
             AppDatabase.getInstance(ctx).historyDao().insertAll(entities)
         }
-        val first = reordered.first()
-        DayFazitStore.deleteForEntry(ctx, first)
-        WeekFazitStore.deleteForEntry(ctx, first)
     }
 
     /** Foto downgesampelt (<1024px) speichern, JPEG-Qualitaet Schritt fuer Schritt bis < 100 KB. */
