@@ -149,18 +149,26 @@ Besseresser-App/
 │       ├── main/
 │       │   ├── AndroidManifest.xml
 │       │   ├── java/de/gurum/besseresser/
-│       │   │   ├── ApiClient.kt        ← OpenAI-Netzwerk-Client, Prompts, tolerantes Parsing
-│       │   │   ├── CameraScreen.kt     ← CameraX-Live-Preview & Foto-Review
-│       │   │   ├── CommonUi.kt         ← Wiederverwendbare UI-Elemente (TopBars, Dialoge, Badges)
-│       │   │   ├── Data.kt             ← Domänenmodelle, Enums (TrafficLight, Gender), AppJson
-│       │   │   ├── HistoryScreen.kt    ← Verlaufs-Liste, Detailansicht, Nacherfassung
-│       │   │   ├── HistoryStore.kt     ← Persistenz für Mahlzeiten, Tages- und Wochenfazits
-│       │   │   ├── KeyVault.kt         ← Keystore-Verschlüsselung für API-Keys
-│       │   │   ├── MainActivity.kt     ← App-Einstiegspunkt, Theme, Root-Navigation
-│       │   │   ├── MainScreen.kt       ← Hauptbildschirm, CTA-Handling, Auswertungsansicht
-│       │   │   ├── ProfileScreen.kt    ← Nutzerprofil-Verwaltung
-│       │   │   ├── SetupScreen.kt      ← Ersteinrichtung, Provider- & Modell-Auswahl
-│       │   │   └── Store.kt            ← SharedPreferences-Speicher (Settings, Profile, RecentNotes)
+│       │   │   ├── ApiClient.kt            ← OpenAI-Netzwerk-Koordinator, BesseresserApiService
+│       │   │   ├── CameraScreen.kt         ← CameraX-Live-Preview & Foto-Review
+│       │   │   ├── CommonUi.kt             ← Wiederverwendbare UI-Elemente (TopBars, Dialoge, Badges)
+│       │   │   ├── Data.kt                 ← Domänenmodelle, Enums (TrafficLight, Gender), AppJson
+│       │   │   ├── DayFazitCard.kt         ← Tages- und Wochenfazit-Karten, Auto-Fazit-Trigger
+│       │   │   ├── DayGroupHeader.kt       ← Tagesgruppen-Header, Score-Badges, Ziele-Preview
+│       │   │   ├── HistoryDetailScreen.kt  ← Detailansicht einzelner Mahlzeiten, Re-Evaluation
+│       │   │   ├── HistoryListScreen.kt    ← Verlaufslisten-UI, Swipe-To-Dismiss, HistoryItem
+│       │   │   ├── HistoryScreen.kt        ← Haupt-Verlaufsansicht & Navigation
+│       │   │   ├── HistoryStore.kt         ← Persistenz für Mahlzeiten, Tages- und Wochenfazits
+│       │   │   ├── ImagePreprocessor.kt    ← Bildskalierung & Base64-Data-URI-Aufbereitung
+│       │   │   ├── KeyVault.kt             ← Keystore-Verschlüsselung für API-Keys
+│       │   │   ├── MainActivity.kt         ← App-Einstiegspunkt, Theme, Root-Navigation
+│       │   │   ├── MainScreen.kt           ← Hauptbildschirm, CTA-Handling, Auswertungsansicht
+│       │   │   ├── ManualEntryDialog.kt    ← Dialoge & Overlays zur Nacherfassung (mit/ohne Foto)
+│       │   │   ├── OpenAiChatClient.kt     ← Reiner HTTP-Netzwerktransport & tolerantes JSON-Parsing
+│       │   │   ├── ProfileScreen.kt        ← Nutzerprofil-Verwaltung
+│       │   │   ├── PromptBuilder.kt        ← Dynamische Prompt-Generierung (Analyse, Fazit, Ziele)
+│       │   │   ├── SetupScreen.kt          ← Ersteinrichtung, Provider- & Modell-Auswahl
+│       │   │   └── Store.kt                ← SharedPreferences-Speicher (Settings, Profile, RecentNotes)
 │       │   └── res/
 │       │       ├── values/             ← strings.xml (EN Default), themes.xml, colors.xml
 │       │       ├── values-de/          ← strings.xml (DE Übersetzung)
