@@ -10,6 +10,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 /** Eine gemeinsame Prefs-Datei für Einstellungen UND Profil (lokal auf dem Gerät). */
@@ -128,14 +129,18 @@ object RecentNotesStore {
             val unstarred = parsed.filter { !it.starred }.take(MAX_UNSTARRED)
             starred + unstarred
         } else {
-            val capped = parsed.partition { it.starred }
-            // Positionen BLIEBEN; die 5er-Grenze für unmarkierte greift trotzdem
-            val keepLast = capped.second.take(MAX_UNSTARRED)
-            capped.first + keepLast
+            var unstarredCount = 0
+            parsed.filter {
+                if (it.starred) true
+                else {
+                    unstarredCount++
+                    unstarredCount <= MAX_UNSTARRED
+                }
+            }
         }
     }.getOrDefault(emptyList())
 
-    private fun parseRecentNotes(raw: String): List<RecentNote> {
+    internal fun parseRecentNotes(raw: String): List<RecentNote> {
         return try {
             AppJson.decodeFromString<List<RecentNote>>(raw)
         } catch (e: Exception) {
@@ -144,10 +149,13 @@ object RecentNotesStore {
                 if (element is JsonArray) {
                     element.mapNotNull { item ->
                         when (item) {
-                            is JsonPrimitive -> item.contentOrNull?.takeIf { it.isNotBlank() }?.let { RecentNote(it, false) }
+                            is JsonPrimitive -> item.contentOrNull?.trim()?.takeIf { it.isNotBlank() }?.let { RecentNote(it, false) }
                             is JsonObject -> {
-                                val text = item["t"]?.jsonPrimitive?.contentOrNull ?: ""
-                                val starred = item["s"]?.jsonPrimitive?.booleanOrNull ?: false
+                                val text = ((item["t"] ?: item["text"])?.jsonPrimitive?.contentOrNull ?: "").trim()
+                                val sPrimitive = (item["s"] ?: item["starred"])?.jsonPrimitive
+                                val starred = sPrimitive?.booleanOrNull
+                                    ?: (sPrimitive?.intOrNull == 1)
+                                    ?: (sPrimitive?.contentOrNull?.equals("true", ignoreCase = true) == true)
                                 if (text.isNotBlank()) RecentNote(text, starred) else null
                             }
                             else -> null
@@ -161,14 +169,25 @@ object RecentNotesStore {
     }
 
     /** Nach vorne stellen (Dedup); unmarkierte rotieren max. 5 nach MRU, älteste fliegt raus.
-     *  Sternchen-Einträge bleiben immer erhalten (bis abgewählt). */
+     *  Sternchen-Einträge bleiben dauerhaft erhalten (bis abgewählt) und verlieren ihren Stern
+     *  auch bei erneuter Nutzung / Speicherung keinesfalls. */
     fun push(ctx: Context, note: String) {
         val t = note.trim()
         if (t.isBlank()) return
-        val all = load(ctx)
-        val starred = all.filter { it.starred && it.text != t }
-        val unstarred = listOf(RecentNote(t, false)) + all.filter { !it.starred && it.text != t }
-        write(ctx, starred + unstarred.take(MAX_UNSTARRED))
+        val all = load(ctx, sortStarredFirst = false)
+        val isStarred = all.firstOrNull { it.text == t }?.starred == true
+
+        if (isStarred) {
+            // Bereits favorisiert: bleibt favorisiert und rückt bei den Favoriten ganz nach oben
+            val starred = listOf(RecentNote(t, true)) + all.filter { it.starred && it.text != t }
+            val unstarred = all.filter { !it.starred && it.text != t }
+            write(ctx, starred + unstarred.take(MAX_UNSTARRED))
+        } else {
+            // Unmarkiert: rückt in den MRU-Bereich nach oben, älteste unmarkierte fliegt ab 5 raus
+            val starred = all.filter { it.starred }
+            val unstarred = listOf(RecentNote(t, false)) + all.filter { !it.starred && it.text != t }
+            write(ctx, starred + unstarred.take(MAX_UNSTARRED))
+        }
     }
 
     /** Sternchen umschalten (beim Antippen des Sterns im Dropdown) — OHNE Neusortierung:
@@ -177,7 +196,7 @@ object RecentNotesStore {
     fun toggleStar(ctx: Context, noteText: String) {
         val t = noteText.trim()
         if (t.isBlank()) return
-        val list = load(ctx).map {
+        val list = load(ctx, sortStarredFirst = false).map {
             if (it.text == t) RecentNote(it.text, !it.starred) else it
         }
         write(ctx, list)
@@ -189,10 +208,14 @@ object RecentNotesStore {
     }
 
     private fun write(ctx: Context, notes: List<RecentNote>) {
-        val items = notes.distinctBy { it.text }.take(MAX_TOTAL)
+        val items = notes
+            .map { it.copy(text = it.text.trim()) }
+            .filter { it.text.isNotBlank() }
+            .distinctBy { it.text }
+            .take(MAX_TOTAL)
         val json = AppJson.encodeToString(items)
         ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
             .putString(KEY, json)
-            .apply()
+            .commit()
     }
 }

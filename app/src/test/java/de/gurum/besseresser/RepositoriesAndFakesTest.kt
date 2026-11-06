@@ -49,8 +49,9 @@ class FakeSettingsRepository(
     override fun pushRecentNote(note: String) {
         val t = note.trim()
         if (t.isBlank()) return
+        val wasStarred = recentNotesList.firstOrNull { it.text == t }?.starred == true
         recentNotesList.removeAll { it.text == t }
-        recentNotesList.add(0, RecentNote(t, false))
+        recentNotesList.add(0, RecentNote(t, wasStarred))
     }
 
     override fun toggleStarRecentNote(noteText: String) {
@@ -240,6 +241,11 @@ class RepositoriesAndFakesTest {
         repo.toggleStarRecentNote("Tee")
         val starred = repo.loadRecentNotes(sortStarredFirst = true)
         assertTrue(starred[0].starred)
+
+        // Erneutes Nutzen/Pushen einer favorisierten Notiz darf den Stern NIE löschen
+        repo.pushRecentNote("Tee")
+        val stillStarred = repo.loadRecentNotes(sortStarredFirst = true)
+        assertTrue(stillStarred.first { it.text == "Tee" }.starred)
     }
 
     @Test
