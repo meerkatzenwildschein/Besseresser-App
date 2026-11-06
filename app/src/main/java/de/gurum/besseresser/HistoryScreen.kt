@@ -101,6 +101,7 @@ fun HistoryScreen(
                 onGenerateFazit = { day, list -> viewModel.generateFazit(ctx, day, list, settings, profile) },
                 onGenerateWeekFazit = { viewModel.generateWeekFazit(ctx, settings, profile) },
                 onToggleExpandWeek = { viewModel.toggleWeekExpanded() },
+                onToggleExpandFazit = { viewModel.toggleFazitExpanded(it) },
                 onAddMealForDay = { day -> viewModel.setAddDialogForDay(day) },
                 onDeleteEntry = { entry -> viewModel.deleteEntry(ctx, entry) }
             )

@@ -1,5 +1,6 @@
 package de.gurum.besseresser
 
+import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast

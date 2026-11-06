@@ -84,15 +84,15 @@ class SetupViewModel(
         val state = _uiState.value
         _uiState.update { it.copy(splitting = true) }
         val req = splitRequest ?: SplitGoalsRequest(
+            baseUrl = state.url.trim(),
+            apiKey = state.key.trim(),
+            model = state.model.trim(),
             rawGoals = rawGoals,
-            splitIntro = ctx?.getString(R.string.split_intro) ?: "Ziele zerlegen:",
-            splitRules = ctx?.getString(R.string.split_rules) ?: "Regeln"
+            splitIntro = ctx?.getString(R.string.prompt_split_intro) ?: "Split the following free text containing health goals into individual goals.",
+            splitRules = ctx?.getString(R.string.prompt_split_rules) ?: "Rules: one goal per item, concise (max. 8 words), no numbering."
         )
         viewModelScope.launch {
             val result = apiService.splitGoals(
-                baseUrl = state.url,
-                apiKey = state.key,
-                model = state.model,
                 request = req
             )
             result.onSuccess { splitList ->

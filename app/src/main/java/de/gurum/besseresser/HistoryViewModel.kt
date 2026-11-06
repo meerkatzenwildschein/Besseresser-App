@@ -224,7 +224,7 @@ class HistoryViewModel(
             val result = apiService.dayFazit(
                 settings = settings,
                 goals = settings.goals,
-                profile = profile,
+                promptContext = ctx?.let { profileContextLine(it, profile) },
                 mealLines = lines,
                 prompts = promptBundle
             )
@@ -271,7 +271,7 @@ class HistoryViewModel(
             val result = apiService.dayFazit(
                 settings = settings,
                 goals = settings.goals,
-                profile = profile,
+                promptContext = ctx?.let { profileContextLine(it, profile) },
                 mealLines = lines,
                 prompts = promptBundle
             )

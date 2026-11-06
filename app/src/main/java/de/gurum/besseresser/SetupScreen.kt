@@ -117,7 +117,7 @@ fun SetupScreen(
             initial.goalsWereSplit && !uiState.goalsDirty -> doSave(
                 text.split("\n").map { it.trim() }.filter { it.isNotBlank() }, true
             )
-            else -> viewModel.startSplitGoals(ctx, text, onDone)
+            else -> viewModel.startSplitGoals(ctx, text, onDone = onDone)
         }
     }
 

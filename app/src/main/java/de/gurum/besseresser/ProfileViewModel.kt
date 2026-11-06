@@ -33,7 +33,8 @@ class ProfileViewModel(
         _uiState.update {
             it.copy(
                 birthDate = profile.birthDate,
-                weightText = profile.weightKg?.toString()?.replace('.', ',') ?: "",
+                // Anzeige ohne unnötige Nachkommastelle; Dezimaltrenner wie im Eingabefeld (Komma)
+                weightText = profile.weightKg?.toString()?.removeSuffix(".0")?.replace('.', ',') ?: "",
                 heightText = profile.heightCm?.toString() ?: "",
                 notesText = profile.notes,
                 gender = profile.gender
