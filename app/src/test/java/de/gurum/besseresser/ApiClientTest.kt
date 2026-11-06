@@ -1,8 +1,18 @@
 package de.gurum.besseresser
 
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -21,7 +31,7 @@ class ApiClientTest {
 
     @Test
     fun testSplitGoalsLocallyEmptyOrShort() {
-        val raw = " , ; ! "
+        val raw = " , ; ! ab "
         val split = ApiClient.splitGoalsLocally(raw)
         assertTrue(split.isEmpty())
     }
@@ -68,10 +78,71 @@ class ApiClientTest {
     }
 
     @Test
+    fun testPromptBuilderCreateDayFazitPrompt() {
+        val goals = listOf("Blutdruck senken", "Weniger Zucker")
+        val mealLines = listOf("08:00 · Haferflocken", "12:30 · Gemüse-Curry")
+        val bundle = FazitPromptBundle(
+            promptIntro = "Bewerte den Tag:",
+            promptRules = "Kleine Snacks fair gewichten.",
+            promptLanguage = "Antworte auf Deutsch.",
+            promptHonesty = "Nichts erfinden."
+        )
+        val promptWithCtx = PromptBuilder.createDayFazitPrompt(
+            goals = goals,
+            promptContext = "Nutzerprofil: 35 Jahre · 75 kg",
+            mealLines = mealLines,
+            prompts = bundle
+        )
+        assertTrue(promptWithCtx.contains("1. Blutdruck senken"))
+        assertTrue(promptWithCtx.contains("2. Weniger Zucker"))
+        assertTrue(promptWithCtx.contains("Nutzerprofil: 35 Jahre · 75 kg"))
+        assertTrue(promptWithCtx.contains("08:00 · Haferflocken"))
+        assertTrue(promptWithCtx.contains("12:30 · Gemüse-Curry"))
+        assertTrue(promptWithCtx.contains("Kleine Snacks fair gewichten."))
+        assertTrue(promptWithCtx.contains("Nichts erfinden."))
+        assertTrue(promptWithCtx.contains("Antworte auf Deutsch."))
+
+        val promptWithoutCtx = PromptBuilder.createDayFazitPrompt(
+            goals = goals,
+            promptContext = null,
+            mealLines = mealLines,
+            prompts = bundle
+        )
+        assertFalse(promptWithoutCtx.contains("Nutzerprofil"))
+    }
+
+    @Test
+    fun testPromptBuilderCreateSplitGoalsPrompt() {
+        val req = SplitGoalsRequest(
+            baseUrl = "https://api.openai.com/v1",
+            apiKey = "sk-123",
+            model = "gpt-4o-mini",
+            rawGoals = "Weniger Salz, mehr Proteine",
+            splitIntro = "Teile Ziele auf:",
+            splitRules = "Max 8 Wörter"
+        )
+        val prompt = PromptBuilder.createSplitGoalsPrompt(req)
+        assertTrue(prompt.contains("Teile Ziele auf:"))
+        assertTrue(prompt.contains("Max 8 Wörter"))
+        assertTrue(prompt.contains("Weniger Salz, mehr Proteine"))
+        assertTrue(prompt.contains("""{"ziele":["Goal 1","Goal 2"]}"""))
+    }
+
+    @Test
     fun testOpenAiChatClientCloseJson() {
         val incomplete = """{"ampel":"gruen","text":"Guter Tag"""
         val closed = OpenAiChatClient.closeJson(incomplete)
         assertEquals("""{"ampel":"gruen","text":"Guter Tag"}""", closed)
+
+        // Nested arrays & objects + trailing comma
+        val nestedIncomplete = """{"bewertung":[{"ziel":"Z1","ampel":"gelb"},"""
+        val closedNested = OpenAiChatClient.closeJson(nestedIncomplete)
+        assertEquals("""{"bewertung":[{"ziel":"Z1","ampel":"gelb"}]}""", closedNested)
+
+        // Escaped quotes inside string
+        val escapedIncomplete = """{"text":"Er sagte \"Hallo"""
+        val closedEscaped = OpenAiChatClient.closeJson(escapedIncomplete)
+        assertEquals("""{"text":"Er sagte \"Hallo"}""", closedEscaped)
     }
 
     @Test
@@ -80,5 +151,165 @@ class ApiClientTest {
         val obj = OpenAiChatClient.tolerantJson(markdownJson)
         assertEquals("rot", obj["ampel"]?.jsonPrimitive?.contentOrNull)
         assertEquals("Zu viel Zucker", obj["text"]?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
+    fun testOpenAiChatClientExtractContentFormats() {
+        // 1. Standard string content
+        val standardResp = AppJson.parseToJsonElement(
+            """{"choices":[{"message":{"content":"Hallo Welt"}}]}"""
+        ).jsonObject
+        assertEquals("Hallo Welt", OpenAiChatClient.extractContent(standardResp))
+
+        // 2. Parts array content
+        val partsResp = AppJson.parseToJsonElement(
+            """{"choices":[{"message":{"content":[{"type":"text","text":"Teil 1 "},{"type":"text","text":"Teil 2"}]}}]}"""
+        ).jsonObject
+        assertEquals("Teil 1 Teil 2", OpenAiChatClient.extractContent(partsResp))
+
+        // 3. Fallback to reasoning_content when content is empty
+        val reasoningResp = AppJson.parseToJsonElement(
+            """{"choices":[{"message":{"content":"","reasoning_content":"Gedanke"}}]}"""
+        ).jsonObject
+        assertEquals("Gedanke", OpenAiChatClient.extractContent(reasoningResp))
+
+        // 4. Fallback to choices[0].text
+        val legacyTextResp = AppJson.parseToJsonElement(
+            """{"choices":[{"text":"Direkter Text"}]}"""
+        ).jsonObject
+        assertEquals("Direkter Text", OpenAiChatClient.extractContent(legacyTextResp))
+
+        // 5. Empty or missing choices
+        val emptyResp = AppJson.parseToJsonElement("""{"choices":[]}""").jsonObject
+        assertNull(OpenAiChatClient.extractContent(emptyResp))
+    }
+
+    @Test
+    fun testOpenAiChatClientChatBodyReasoningExclusion() {
+        val msgs = buildJsonArray {
+            add(buildJsonObject { put("role", "user"); put("content", "Hi") })
+        }
+
+        // Standard OpenAI -> no reasoning block
+        val openaiBody = OpenAiChatClient.chatBody("gpt-4o-mini", "https://api.openai.com/v1", 0.2, 1000, msgs)
+        assertFalse(openaiBody.containsKey("reasoning"))
+
+        // OpenRouter -> reasoning.exclude = true
+        val openRouterBody = OpenAiChatClient.chatBody("gpt-4o-mini", "https://openrouter.ai/api/v1", 0.2, 1000, msgs)
+        assertTrue(openRouterBody.containsKey("reasoning"))
+        assertEquals(true, openRouterBody["reasoning"]?.jsonObject?.get("exclude")?.jsonPrimitive?.booleanOrNull)
+
+        // DeepSeek model -> reasoning.exclude = true
+        val deepseekBody = OpenAiChatClient.chatBody("deepseek-reasoner", "https://api.example.com/v1", 0.2, 1000, msgs)
+        assertTrue(deepseekBody.containsKey("reasoning"))
+    }
+
+    @Test
+    fun testStripErkanntIntroPatterns() {
+        assertEquals(
+            "200 g Spaghetti Bolognese",
+            ApiClient.stripErkanntIntro("Auf dem Foto ist zu sehen: 200 g Spaghetti Bolognese")
+        )
+        assertEquals(
+            "Ein bunter Salat mit Hähnchen",
+            ApiClient.stripErkanntIntro("Zu sehen sind ein bunter Salat mit Hähnchen")
+        )
+        assertEquals(
+            "150 g Lachsfilet mit Reis",
+            ApiClient.stripErkanntIntro("Das Bild zeigt 150 g Lachsfilet mit Reis")
+        )
+        assertEquals(
+            "One bowl of oatmeal with berries",
+            ApiClient.stripErkanntIntro("The photo shows: one bowl of oatmeal with berries")
+        )
+        assertEquals(
+            "Two slices of wholegrain bread",
+            ApiClient.stripErkanntIntro("In the image i can see two slices of wholegrain bread")
+        )
+    }
+
+    @Test
+    fun testParseEvaluationStandardAndAliases() {
+        val goals = listOf("Blutdruck senken", "Gesünder ernähren", "Weniger Zucker")
+
+        // Standard German schema
+        val rawStandard = """
+            {
+              "bewertung": [
+                {"ziel": "Blutdruck senken", "ampel": "gruen", "begruendung": "Wenig Salz"},
+                {"ziel": "Gesuender ernaehren", "ampel": "gelb", "begruendung": "Viel Fett"},
+                {"ziel": "Weniger Zucker", "ampel": "rot", "begruendung": "Süßes Dessert"}
+              ],
+              "zusatz": "Insgesamt solide.",
+              "erkannt": "Auf dem Foto ist zu sehen: 250 g Gemüsepfanne"
+            }
+        """.trimIndent()
+
+        val ev = ApiClient.parseEvaluation(rawStandard, goals)
+        assertEquals(3, ev.goalResults.size)
+        assertEquals(TrafficLight.GREEN, ev.goalResults[0].ampel)
+        // Matched despite umlaut difference ("Gesünder ernähren" vs "Gesuender ernaehren")
+        assertEquals(TrafficLight.YELLOW, ev.goalResults[1].ampel)
+        assertEquals("Viel Fett", ev.goalResults[1].begruendung)
+        assertEquals(TrafficLight.RED, ev.goalResults[2].ampel)
+        assertEquals("Insgesamt solide.", ev.summary)
+        assertEquals("250 g Gemüsepfanne", ev.erkannt)
+
+        // English alias schema + positional fallback when goal names don't match
+        val rawAliases = """
+            {
+              "results": [
+                {"goal": "Goal #1", "rating": "green", "reason": "Low sodium"},
+                {"goal": "Goal #2", "rating": "yellow", "reason": "Okay"},
+                {"goal": "Goal #3", "rating": "red", "reason": "Sweet"}
+              ],
+              "summary": "Balanced meal",
+              "detected": "The image shows 100 g salad"
+            }
+        """.trimIndent()
+
+        val evAlias = ApiClient.parseEvaluation(rawAliases, goals)
+        assertEquals(3, evAlias.goalResults.size)
+        assertEquals(TrafficLight.GREEN, evAlias.goalResults[0].ampel)
+        assertEquals("Low sodium", evAlias.goalResults[0].begruendung)
+        assertEquals(TrafficLight.YELLOW, evAlias.goalResults[1].ampel)
+        assertEquals(TrafficLight.RED, evAlias.goalResults[2].ampel)
+        assertEquals("Balanced meal", evAlias.summary)
+        assertEquals("100 g salad", evAlias.erkannt)
+    }
+
+    @Test
+    fun testParseModelsAndFilterVision() {
+        // 1. OpenRouter format with explicit architecture.input_modalities
+        val openRouterModelsJson = """
+            {
+              "data": [
+                {"id": "meta/llama-3-8b", "architecture": {"input_modalities": ["text"]}},
+                {"id": "custom/multimodal-x", "architecture": {"input_modalities": ["text", "image"]}}
+              ]
+            }
+        """.trimIndent()
+        val arr1 = ApiClient.parseModelsArray(openRouterModelsJson)
+        val entries1 = ApiClient.parseModelEntries(arr1)
+        val res1 = ApiClient.filterVisionModels(entries1)
+        assertEquals(listOf("custom/multimodal-x"), res1.vision)
+        assertEquals(listOf("custom/multimodal-x", "meta/llama-3-8b"), res1.all)
+
+        // 2. Standard OpenAI format without modalities -> heuristic pattern matching
+        val openAiModelsJson = """
+            {
+              "data": [
+                {"id": "gpt-3.5-turbo"},
+                {"id": "gpt-4o-mini"},
+                {"id": "claude-3-5-sonnet"},
+                {"id": "text-embedding-3-small"}
+              ]
+            }
+        """.trimIndent()
+        val arr2 = ApiClient.parseModelsArray(openAiModelsJson)
+        val entries2 = ApiClient.parseModelEntries(arr2)
+        val res2 = ApiClient.filterVisionModels(entries2)
+        assertEquals(listOf("claude-3-5-sonnet", "gpt-4o-mini"), res2.vision)
+        assertEquals(4, res2.all.size)
     }
 }
