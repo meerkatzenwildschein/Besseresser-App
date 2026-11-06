@@ -4,8 +4,9 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -13,25 +14,33 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /** Eine gespeicherte Foto-Bewertung. */
+@Serializable
 data class HistoryEntry(
-    val id: Long,
-    val dateMillis: Long,
-    val photoFile: String,          // Dateiname in filesDir/history ("" = kein Foto)
-    val goalResults: List<GoalResult>,
-    val summary: String,
+    val id: Long = 0L,
+    @SerialName("datum")
+    val dateMillis: Long = 0L,
+    @SerialName("foto")
+    val photoFile: String = "",          // Dateiname in filesDir/history ("" = kein Foto)
+    @SerialName("ziele")
+    val goalResults: List<GoalResult> = emptyList(),
+    @SerialName("zusatz")
+    val summary: String = "",
+    @SerialName("anmerkung")
     val note: String = "",          // Nutzer-Anmerkung zum Foto (WhatsApp-Stil)
+    @SerialName("erkannt")
     val erkannt: String = "",       // Was die KI auf dem Foto erkannt zu haben meint
+    @SerialName("nacherfasst")
     val backdated: Boolean = false  // nachträglich erfasst (keine echte Uhrzeit bekannt)
 ) {
     /** Ampel-Score 0..100 (gruen=100, gelb=50, rot=0, grau ausgeschlossen); -1 = nicht bewertbar. */
     val score: Int
         get() {
-            val known = goalResults.filter { it.ampel != "unbekannt" }
+            val known = goalResults.filter { it.ampel != TrafficLight.UNKNOWN }
             if (known.isEmpty()) return -1
             val avg = known.sumOf {
                 when (it.ampel) {
-                    "gruen" -> 100.0
-                    "gelb" -> 50.0
+                    TrafficLight.GREEN -> 100.0
+                    TrafficLight.YELLOW -> 50.0
                     else -> 0.0
                 }
             } / known.size
@@ -78,36 +87,21 @@ object HistoryStore {
             goalResults = ev.goalResults, summary = ev.summary,
             note = note, erkannt = ev.erkannt, backdated = backdated
         )
-        File(dir(ctx), "$id.json").writeText(toJson(entry).toString())
+        File(dir(ctx), "$id.json").writeText(AppJson.encodeToString(entry))
         return entry
     }
 
     fun entries(ctx: Context): List<HistoryEntry> {
-        val files = dir(ctx).listFiles {
-            f -> f.extension == "json" && !f.name.startsWith("day_") && !f.name.startsWith("week_")
+        val files = dir(ctx).listFiles { f ->
+            f.extension == "json" && !f.name.startsWith("day_") && !f.name.startsWith("week_")
         } ?: return emptyList()
         return files.mapNotNull { f ->
             try {
-                val o = JSONObject(f.readText())
-                val arr = o.optJSONArray("ziele") ?: JSONArray()
-                val goals = (0 until arr.length()).mapNotNull { i ->
-                    val g = arr.optJSONObject(i) ?: return@mapNotNull null
-                    GoalResult(
-                        goal = g.optString("ziel"),
-                        ampel = g.optString("ampel", "unbekannt"),
-                        begruendung = g.optString("begruendung")
-                    )
-                }
-                HistoryEntry(
-                    id = o.optLong("id", f.nameWithoutExtension.toLongOrNull() ?: 0L),
-                    dateMillis = o.optLong("datum", 0L),
-                    photoFile = o.optString("foto"),
-                    goalResults = goals,
-                    summary = o.optString("zusatz"),
-                    note = o.optString("anmerkung"),
-                    erkannt = o.optString("erkannt"),
-                    backdated = o.optBoolean("nacherfasst", false)
-                )
+                val raw = f.readText()
+                val entry = AppJson.decodeFromString<HistoryEntry>(raw)
+                if (entry.id == 0L) {
+                    entry.copy(id = f.nameWithoutExtension.toLongOrNull() ?: 0L)
+                } else entry
             } catch (e: Exception) {
                 null
             }
@@ -129,9 +123,9 @@ object HistoryStore {
         val f = File(dir(ctx), "$id.json")
         if (!f.exists()) return
         try {
-            val o = JSONObject(f.readText())
-            o.put("erkannt", newText.trim())
-            f.writeText(o.toString())
+            val entry = AppJson.decodeFromString<HistoryEntry>(f.readText())
+            val updated = entry.copy(erkannt = newText.trim())
+            f.writeText(AppJson.encodeToString(updated))
         } catch (e: Exception) {
             // Snapshot unverändert lassen, wenn das Umschreiben scheitert
         }
@@ -142,21 +136,9 @@ object HistoryStore {
         val f = File(dir(ctx), "$id.json")
         if (!f.exists()) return
         try {
-            val o = JSONObject(f.readText())
-            o.put(
-                "ziele",
-                JSONArray().also { arr ->
-                    goalResults.forEach { g ->
-                        arr.put(JSONObject().apply {
-                            put("ziel", g.goal)
-                            put("ampel", g.ampel)
-                            put("begruendung", g.begruendung)
-                        })
-                    }
-                }
-            )
-            o.put("zusatz", summary)
-            f.writeText(o.toString())
+            val entry = AppJson.decodeFromString<HistoryEntry>(f.readText())
+            val updated = entry.copy(goalResults = goalResults, summary = summary)
+            f.writeText(AppJson.encodeToString(updated))
         } catch (e: Exception) {
             // bei Fehler bleibt der alte Stand bestehen
         }
@@ -165,8 +147,6 @@ object HistoryStore {
     /** Foto downgesampelt (<1024px) speichern, JPEG-Qualitaet Schritt fuer Schritt bis < 100 KB. */
     private fun saveScaledJpeg(ctx: Context, uri: Uri, out: File) {
         val res = ctx.contentResolver
-        // Wichtig: decodeStream mit inJustDecodeBounds liefert IMMER null Bitmap –
-        // nur die out*-Felder nutzen, nicht den Rueckgabewert pruefen!
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         res.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return
@@ -182,28 +162,6 @@ object HistoryStore {
             quality -= 15
         }
         bmp.recycle()
-    }
-
-    private fun toJson(e: HistoryEntry): JSONObject = JSONObject().apply {
-        put("id", e.id)
-        put("datum", e.dateMillis)
-        put("foto", e.photoFile)
-        put("zusatz", e.summary)
-        put("anmerkung", e.note)
-        put("nacherfasst", e.backdated)
-        put("erkannt", e.erkannt)
-        put(
-            "ziele",
-            JSONArray().also { arr ->
-                e.goalResults.forEach { g ->
-                    arr.put(JSONObject().apply {
-                        put("ziel", g.goal)
-                        put("ampel", g.ampel)
-                        put("begruendung", g.begruendung)
-                    })
-                }
-            }
-        )
     }
 }
 
@@ -241,12 +199,19 @@ fun weekKeyOf(millis: Long): String {
 }
 
 /** KI-generiertes Fazit eines Tages (Text-Ampel statt rechnerischem Tagesscore). */
+@Serializable
 data class DayFazit(
-    val dayKey: String,
-    val ampel: String,              // "gruen" | "gelb" | "rot" (grau nur im Fehlerfall-Fallback)
-    val text: String,
-    val entryIds: List<Long>,       // Snapshot der zugrunde liegenden Einträge (= Veraltetscheck)
-    val createdAt: Long,
+    @SerialName("tag")
+    val dayKey: String = "",
+    @SerialName("ampel")
+    val ampel: TrafficLight = TrafficLight.UNKNOWN,              // GREEN | YELLOW | RED
+    @SerialName("text")
+    val text: String = "",
+    @SerialName("eintrage")
+    val entryIds: List<Long> = emptyList(),       // Snapshot der zugrunde liegenden Einträge (= Veraltetscheck)
+    @SerialName("erstellt")
+    val createdAt: Long = 0L,
+    @SerialName("fp")
     val fingerprint: String = ""    // Hash-Mix aus ID+erkannt je Eintrag (Text-Korrekturen → veraltet)
 )
 
@@ -260,7 +225,7 @@ object DayFazitStore {
         val f = file(ctx, dayKey)
         if (!f.exists()) return null
         return try {
-            dayFazitFromJson(JSONObject(f.readText()))
+            AppJson.decodeFromString<DayFazit>(f.readText())
         } catch (e: Exception) {
             null
         }
@@ -271,7 +236,7 @@ object DayFazitStore {
             .listFiles { f -> f.name.startsWith("day_") && f.extension == "json" } ?: return emptyList()
         return files.mapNotNull { f ->
             try {
-                dayFazitFromJson(JSONObject(f.readText()))
+                AppJson.decodeFromString<DayFazit>(f.readText())
             } catch (e: Exception) {
                 null
             }
@@ -279,40 +244,13 @@ object DayFazitStore {
     }
 
     fun save(ctx: Context, fazit: DayFazit) {
-        val o = JSONObject().apply {
-            put("tag", fazit.dayKey)
-            put("ampel", fazit.ampel)
-            put("text", fazit.text)
-            put("erstellt", fazit.createdAt)
-            put("fp", fazit.fingerprint)
-            put(
-                "eintrage",
-                JSONArray().also { arr -> fazit.entryIds.forEach { arr.put(it) } }
-            )
-        }
-        file(ctx, fazit.dayKey).writeText(o.toString())
+        file(ctx, fazit.dayKey).writeText(AppJson.encodeToString(fazit))
     }
 
     /** Fazit-Datei eines Tags löschen (z. B. weil ein Eintrag des Tages gelöscht wurde). */
     fun deleteForEntry(ctx: Context, entry: HistoryEntry) {
         file(ctx, dayKeyOf(entry.dateMillis)).delete()
     }
-}
-
-/** Gemeinsamer JSON-Reader für Tages- und Wochen-Fazit-Dateien. */
-private fun dayFazitFromJson(o: JSONObject): DayFazit {
-    val ids = mutableListOf<Long>()
-    o.optJSONArray("eintrage")?.let { arr ->
-        (0 until arr.length()).forEach { ids.add(arr.optLong(it)) }
-    }
-    return DayFazit(
-        dayKey = o.optString("tag"),
-        ampel = o.optString("ampel"),
-        text = o.optString("text"),
-        entryIds = ids,
-        createdAt = o.optLong("erstellt", 0L),
-        fingerprint = o.optString("fp")
-    )
 }
 
 /** Fazit-Speicher für die WOCHE (file-Prefix week_, Typ & Struktur wie das Tagesfazit).
@@ -326,22 +264,14 @@ object WeekFazitStore {
         val f = file(ctx, weekKey)
         if (!f.exists()) return null
         return try {
-            dayFazitFromJson(JSONObject(f.readText()))
+            AppJson.decodeFromString<DayFazit>(f.readText())
         } catch (e: Exception) {
             null
         }
     }
 
     fun save(ctx: Context, fazit: DayFazit) {
-        val o = JSONObject().apply {
-            put("tag", fazit.dayKey)
-            put("ampel", fazit.ampel)
-            put("text", fazit.text)
-            put("erstellt", fazit.createdAt)
-            put("fp", fazit.fingerprint)
-            put("eintrage", JSONArray().also { arr -> fazit.entryIds.forEach { arr.put(it) } })
-        }
-        file(ctx, fazit.dayKey).writeText(o.toString())
+        file(ctx, fazit.dayKey).writeText(AppJson.encodeToString(fazit))
     }
 
     /** Wochen-Fazit löschen (nachträglicher Eintrag in derselben Woche). */

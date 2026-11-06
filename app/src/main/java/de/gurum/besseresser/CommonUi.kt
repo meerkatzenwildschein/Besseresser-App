@@ -302,7 +302,7 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
 
 @Composable
 fun GoalRow(goal: String, res: GoalResult?) {
-    val color = ampelColor(res?.ampel ?: "unbekannt")
+    val color = res?.ampel?.color() ?: TrafficLight.UNKNOWN.color()
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -319,7 +319,7 @@ fun GoalRow(goal: String, res: GoalResult?) {
                 Text(goal, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 if (res != null) {
                     Text(
-                        "${ampelLabel(res.ampel)} – ${res.begruendung}",
+                        "${res.ampel.label()} – ${res.begruendung}",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

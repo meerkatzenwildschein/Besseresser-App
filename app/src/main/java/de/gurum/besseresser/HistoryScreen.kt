@@ -1050,10 +1050,10 @@ private fun zielePreview(entry: HistoryEntry, emptyText: String, moreText: Strin
 
 /** Farbskala für Ampel-Scores (auch der Tagesscore): grau = nichts bewertbar, sonst Ampel. */
 private fun scoreColor(score: Int): Color = when {
-    score < 0 -> ampelColor("unbekannt")
-    score >= 80 -> ampelColor("gruen")
-    score >= 50 -> ampelColor("gelb")
-    else -> ampelColor("rot")
+    score < 0 -> TrafficLight.UNKNOWN.color()
+    score >= 80 -> TrafficLight.GREEN.color()
+    score >= 50 -> TrafficLight.YELLOW.color()
+    else -> TrafficLight.RED.color()
 }
 
 /** Farbiges Kreis-Badge mit Score (Long-Press-Erklärung via Tooltip). */

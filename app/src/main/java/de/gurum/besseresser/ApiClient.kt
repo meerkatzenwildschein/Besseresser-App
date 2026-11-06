@@ -7,8 +7,19 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -38,7 +49,7 @@ object ApiClient {
 
     /** Reiner Post an /chat/completions; wirft ChatHttpException (mit Code + Roh-Body) bei Fehler,
      *  liefert sonst den Antwort-Body als String. */
-    private fun postChat(url: String, apiKey: String, body: JSONObject): String {
+    private fun postChat(url: String, apiKey: String, body: JsonObject): String {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15000
@@ -65,8 +76,8 @@ object ApiClient {
         baseUrl: String,
         temperature: Double,
         maxTokens: Int,
-        messages: JSONArray
-    ): JSONObject = JSONObject().apply {
+        messages: JsonArray
+    ): JsonObject = buildJsonObject {
         put("model", model.trim())
         put("temperature", temperature)
         // Budget großzügig: Reasoning-Modelle „denken“ vom selben Konto —
@@ -75,19 +86,25 @@ object ApiClient {
         if (baseUrl.contains("openrouter", true) || baseUrl.contains("deepseek", true) ||
             model.contains("deepseek", true)
         ) {
-            put("reasoning", JSONObject().put("exclude", true))
+            putJsonObject("reasoning") {
+                put("exclude", true)
+            }
         }
         put("messages", messages)
     }
 
     /** Toleranter JSON-Parser für KI-Antworten: Code-Fences strippen, {…}-Block suchen, closeJson-Reparatur. */
-    private fun tolerantJson(content: String): JSONObject {
-        val cleaned = content.replace("```json", "", true).replace("```", "").trim()
+    private fun tolerantJson(content: String): JsonObject {
+        val cleaned = content.replace("```json", "", ignoreCase = true).replace("```", "").trim()
         val start = cleaned.indexOf('{')
         val end = cleaned.lastIndexOf('}')
         if (start < 0 || end <= start) throw IllegalStateException("KI-Antwort ohne JSON")
         val jsonStr = cleaned.substring(start, end + 1)
-        return try { JSONObject(jsonStr) } catch (e: Exception) { JSONObject(closeJson(jsonStr)) }
+        return try {
+            AppJson.parseToJsonElement(jsonStr).jsonObject
+        } catch (e: Exception) {
+            AppJson.parseToJsonElement(closeJson(jsonStr)).jsonObject
+        }
     }
 
     // ---------------------------------------------------------------- Foto bewerten
@@ -137,40 +154,44 @@ object ApiClient {
                     baseUrl = settings.baseUrl,
                     temperature = 0.3,
                     maxTokens = 4096,
-                    messages = JSONArray().put(
-                        JSONObject().apply {
-                            put("role", "user")
-                            put(
-                                "content",
-                                JSONArray()
-                                    .put(JSONObject().put("type", "text").put("text", prompt))
-                                    .put(
-                                        JSONObject().put("type", "image_url").put(
-                                            "image_url",
-                                            JSONObject().put("url", dataUri)
-                                        )
-                                    )
-                            )
-                        }
-                    )
+                    messages = buildJsonArray {
+                        add(
+                            buildJsonObject {
+                                put("role", "user")
+                                putJsonArray("content") {
+                                    add(buildJsonObject {
+                                        put("type", "text")
+                                        put("text", prompt)
+                                    })
+                                    add(buildJsonObject {
+                                        put("type", "image_url")
+                                        putJsonObject("image_url") {
+                                            put("url", dataUri)
+                                        }
+                                    })
+                                }
+                            }
+                        )
+                    }
                 )
 
                 val url = settings.baseUrl.trim().trimEnd('/') + "/chat/completions"
                 val text = postChat(url, settings.apiKey, body)
 
                 // Antwort parsen
-                val resp = JSONObject(text)
+                val resp = AppJson.parseToJsonElement(text).jsonObject
                 val rawContent = extractContent(resp)
 
                 if (rawContent.isNullOrBlank()) {
-                    val modelName = try { resp.optString("model").takeIf { it.isNotBlank() } ?: "unbekannt" } catch (e: Exception) { "unbekannt" }
+                    val modelName = try { resp["model"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "unbekannt" } catch (e: Exception) { "unbekannt" }
                     val finish = try {
-                        resp.optJSONArray("choices")?.optJSONObject(0)?.optString("finish_reason")
+                        val choices = resp["choices"]?.jsonArray
+                        choices?.firstOrNull()?.jsonObject?.get("finish_reason")?.jsonPrimitive?.contentOrNull
                     } catch (e: Exception) { null }
-                    var hint = when {
+                    val hint = when {
                         finish == "length" &&
-                            (resp.optString("model").contains("deepseek", true) ||
-                                resp.optString("model").contains("reason", true)) ->
+                            (modelName.contains("deepseek", true) ||
+                                modelName.contains("reason", true)) ->
                             "Das Reasoning des Modells hat das Token-Budget verbraucht, bevor ein Antworttext kam. Erneut versuchen – die App setzt für den nächsten Versuch ein deutlich höheres Budget."
                         finish == "length" ->
                             "Die Antwort wurde durch das Token-Limit abgeschnitten. Erneut versuchen oder ein weniger aufwendiges Modell wählen."
@@ -202,7 +223,7 @@ object ApiClient {
         promptRules: String,
         promptLanguage: String,
         promptHonesty: String = "",
-        onOk: (ampel: String, text: String) -> Unit,
+        onOk: (ampel: TrafficLight, text: String) -> Unit,
         onError: (String) -> Unit
     ) {
         executor.execute {
@@ -229,23 +250,25 @@ object ApiClient {
                     baseUrl = settings.baseUrl,
                     temperature = 0.3,
                     maxTokens = 3000,
-                    messages = JSONArray().put(
-                        JSONObject().put("role", "user").put("content", prompt)
-                    )
+                    messages = buildJsonArray {
+                        add(buildJsonObject {
+                            put("role", "user")
+                            put("content", prompt)
+                        })
+                    }
                 )
 
                 val url = settings.baseUrl.trim().trimEnd('/') + "/chat/completions"
                 val respText = postChat(url, settings.apiKey, body)
 
-                val respObj = JSONObject(respText)
+                val respObj = AppJson.parseToJsonElement(respText).jsonObject
                 val rawContent = extractContent(respObj)
                 if (rawContent.isNullOrBlank()) {
-                    // Diagnose statt Rate: Modell + finish_reason + Rohauszug in den Fehler,
-                    // damit der Toast sagt, WARUM leer kam (length / content_filter / ...)
                     val finish = try {
-                        respObj.optJSONArray("choices")?.optJSONObject(0)?.optString("finish_reason")
+                        val choices = respObj["choices"]?.jsonArray
+                        choices?.firstOrNull()?.jsonObject?.get("finish_reason")?.jsonPrimitive?.contentOrNull
                     } catch (e: Exception) { null }
-                    val modelName = try { respObj.optString("model").takeIf { it.isNotBlank() } ?: "?" } catch (e: Exception) { "?" }
+                    val modelName = try { respObj["model"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: "?" } catch (e: Exception) { "?" }
                     val hint = when (finish) {
                         "length" -> "Das Token-Budget wurde verbraucht, bevor ein Antworttext kam – Modell erneut versuchen."
                         "content_filter" -> "Der Anbieter hat die Antwort gefiltert (Inhalt blockiert). Versuch es erneut oder mit anderem Modell."
@@ -258,9 +281,9 @@ object ApiClient {
 
                 // tolerantes JSON-Parsing (Code-Fences, closeJson)
                 val obj = tolerantJson(rawContent)
-                val ampel = normalizeAmpel(obj.optString("ampel", obj.optString("rating", "")))
-                val fazitText = obj.optString("text", obj.optString("fazit", obj.optString("summary", "")))
-                // Ampel "unbekannt" ist okay (grauer Chip) – nur ganz ohne Text ist ein echter Fehler.
+                val ampel = TrafficLight.fromString(pickString(obj, listOf("ampel", "rating", "status", "farbe")))
+                val fazitText = pickString(obj, listOf("text", "fazit", "summary"))
+                // Ampel UNKNOWN ist okay (grauer Chip) – nur ganz ohne Text ist ein echter Fehler.
                 if (fazitText.isBlank()) throw IllegalStateException("KI-Antwort ohne Fazit-Text (Roh: ${rawContent.take(200)})")
                 main.post { onOk(ampel, fazitText.trim()) }
             } catch (e: Exception) {
@@ -298,23 +321,23 @@ object ApiClient {
                     baseUrl = settings.baseUrl,
                     temperature = 0.3,
                     maxTokens = 4096,
-                    messages = JSONArray().put(
-                        JSONObject().put("role", "user").put("content", prompt)
-                    )
+                    messages = buildJsonArray {
+                        add(buildJsonObject {
+                            put("role", "user")
+                            put("content", prompt)
+                        })
+                    }
                 )
+
                 val url = settings.baseUrl.trim().trimEnd('/') + "/chat/completions"
                 val text = postChat(url, settings.apiKey, body)
-                val resp = JSONObject(text)
+
+                val resp = AppJson.parseToJsonElement(text).jsonObject
                 val rawContent = extractContent(resp)
                 if (rawContent.isNullOrBlank()) {
-                    val finish = try {
-                        resp.optJSONArray("choices")?.optJSONObject(0)?.optString("finish_reason")
-                    } catch (e: Exception) { null }
-                    val modelName = try { resp.optString("model").takeIf { it.isNotBlank() } ?: "?" } catch (e: Exception) { "?" }
-                    throw IllegalStateException(
-                        "Die KI hat keinen Text geliefert (Modell: $modelName, finish: $finish). Roh: ${text.take(300)}"
-                    )
+                    throw IllegalStateException("Die KI hat keinen Text geliefert. Roh-Antwort: ${text.take(300)}")
                 }
+
                 val results = parseEvaluation(rawContent, settings.goals)
                 main.post { onResult(results) }
             } catch (e: Exception) {
@@ -323,8 +346,10 @@ object ApiClient {
         }
     }
 
-    /** Ziele-Freitext von der KI in einzelne prägnante Ziele zerlegen lassen.
-     *  onError bekommt einen mehrzeiligen Debug-Report inkl. Rohantwort. */
+    // ---------------------------------------------------------------- Ziele aufteilen (KI-Assistenz)
+
+    /** KI teilt Freitext („kein Zucker, 2l Wasser, Intervallfasten") in saubere Einzel-Ziele.
+     *  onError liefert einen mehrzeiligen Debug-Report (wie beim Modellabruf) inkl. Rohantwort. */
     fun splitGoals(
         baseUrl: String,
         apiKey: String,
@@ -351,24 +376,28 @@ object ApiClient {
                     baseUrl = baseUrl,
                     temperature = 0.1,
                     maxTokens = 1600,
-                    messages = JSONArray().put(JSONObject().put("role", "user").put("content", prompt))
+                    messages = buildJsonArray {
+                        add(buildJsonObject {
+                            put("role", "user")
+                            put("content", prompt)
+                        })
+                    }
                 )
                 val respBody = postChat(requestUrl, apiKey, req)
 
-                val content = JSONObject(respBody).getJSONArray("choices")
-                    .getJSONObject(0).getJSONObject("message").getString("content")
+                val content = extractContent(AppJson.parseToJsonElement(respBody).jsonObject)
+                    ?: throw IllegalStateException("Kein Antwortinhalt")
                 val obj = tolerantJson(content)
-                val rawArr = obj.optJSONArray("ziele")
-                    ?: obj.optJSONArray("goals")
-                    ?: obj.optJSONArray("ziel_liste")
+                val rawArr = obj["ziele"]?.takeIf { it is JsonArray }?.jsonArray
+                    ?: obj["goals"]?.takeIf { it is JsonArray }?.jsonArray
+                    ?: obj["ziel_liste"]?.takeIf { it is JsonArray }?.jsonArray
                     ?: run {
                         // Fallback: irgendein String-Array im Objekt
-                        obj.keys().asSequence().mapNotNull { obj.optJSONArray(it) }.firstOrNull {
-                            arr -> arr.length() > 0 && arr.optString(0).isNotBlank()
-                        } ?: JSONArray()
+                        obj.values.asSequence().mapNotNull { it as? JsonArray }.firstOrNull { arr ->
+                            arr.isNotEmpty() && arr[0].jsonPrimitive.contentOrNull?.isNotBlank() == true
+                        } ?: JsonArray(emptyList())
                     }
-                val goals = (0 until rawArr.length())
-                    .mapNotNull { rawArr.optString(it).trim().takeIf { s -> s.isNotBlank() } }
+                val goals = rawArr.mapNotNull { it.jsonPrimitive.contentOrNull?.trim()?.takeIf { s -> s.isNotBlank() } }
                 if (goals.isEmpty()) throw IllegalStateException("KI lieferte keine Ziele")
                 main.post { onOk(goals) }
             } catch (e: Exception) {
@@ -429,34 +458,34 @@ object ApiClient {
 
                 // Antwort robust auswerten: {"data":[…]}, {"models":[…]} oder direkt [ … ]
                 val trimmed = body.trim()
-                val arr: JSONArray = when {
-                    trimmed.startsWith("[") -> JSONArray(trimmed)
+                val arr: JsonArray = when {
+                    trimmed.startsWith("[") -> try { AppJson.parseToJsonElement(trimmed).jsonArray } catch (e: Exception) { JsonArray(emptyList()) }
                     trimmed.startsWith("{") -> {
-                        val root = JSONObject(trimmed)
-                        root.optJSONArray("data")
-                            ?: root.optJSONArray("models")
-                            ?: root.optJSONArray("model_list")
-                            ?: JSONArray()
+                        val root = try { AppJson.parseToJsonElement(trimmed).jsonObject } catch (e: Exception) { JsonObject(emptyMap()) }
+                        root["data"]?.takeIf { it is JsonArray }?.jsonArray
+                            ?: root["models"]?.takeIf { it is JsonArray }?.jsonArray
+                            ?: root["model_list"]?.takeIf { it is JsonArray }?.jsonArray
+                            ?: JsonArray(emptyList())
                     }
-                    else -> JSONArray()
+                    else -> JsonArray(emptyList())
                 }
-                if (arr.length() == 0) {
+                if (arr.isEmpty()) {
                     throw IllegalStateException("Antwort enthält keine Modell-Liste")
                 }
-                val entries = (0 until arr.length()).mapNotNull { index ->
-                    val obj = arr.optJSONObject(index) ?: return@mapNotNull null
-                    val id = obj.optString("id").takeIf { it.isNotBlank() }
-                        ?: obj.optString("name").takeIf { it.isNotBlank() }
+                val entries = arr.mapNotNull { element ->
+                    val obj = element as? JsonObject ?: return@mapNotNull null
+                    val id = obj["id"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                        ?: obj["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
                         ?: return@mapNotNull null
                     // Exakte Info, falls der Provider sie liefert (z. B. OpenRouter)
-                    val modalities = obj.optJSONObject("architecture")?.optJSONArray("input_modalities")
-                    val supportsImage = modalities != null && (0 until modalities.length()).any {
-                        modalities.optString(it).equals("image", ignoreCase = true)
+                    val modalities = (obj["architecture"] as? JsonObject)?.get("input_modalities") as? JsonArray
+                    val supportsImage = modalities != null && modalities.any {
+                        it.jsonPrimitive.contentOrNull?.equals("image", ignoreCase = true) == true
                     }
                     id to supportsImage
                 }
                 if (entries.isEmpty()) {
-                    throw IllegalStateException("Modell-Liste enthielt ${arr.length()} Einträge, aber keine nutzbare Modell-IDs")
+                    throw IllegalStateException("Modell-Liste enthielt ${arr.size} Einträge, aber keine nutzbare Modell-IDs")
                 }
                 main.post { onOk(filterVisionModels(entries)) }
             } catch (e: Exception) {
@@ -487,30 +516,30 @@ object ApiClient {
     // ---------------------------------------------------------------- Parsing-Helfer
 
     /** Holt den Antworttext tolerant aus verschiedenen Provider-Formaten. */
-    private fun extractContent(resp: JSONObject): String? {
+    private fun extractContent(resp: JsonObject): String? {
         return try {
-            val choices = resp.optJSONArray("choices") ?: return null
-            val first = choices.optJSONObject(0) ?: return null
+            val choices = resp["choices"]?.takeIf { it is JsonArray }?.jsonArray ?: return null
+            val first = choices.firstOrNull()?.takeIf { it is JsonObject }?.jsonObject ?: return null
 
             // 1) Standard: choices[0].message.content (String)
-            val msg = first.optJSONObject("message")
-            val direct = msg?.opt("content")
+            val msg = first["message"]?.takeIf { it is JsonObject }?.jsonObject
+            val direct = msg?.get("content")
             when (direct) {
-                is String -> if (direct.isNotBlank()) direct else null
-                is JSONArray -> {
+                is JsonPrimitive -> direct.contentOrNull?.takeIf { it.isNotBlank() }
+                is JsonArray -> {
                     // Manche Anbieter liefern ein Parts-Array: [{"type":"text","text":"..."}]
                     val parts = StringBuilder()
-                    for (i in 0 until direct.length()) {
-                        val p = direct.optJSONObject(i) ?: continue
-                        val t = p.optString("text")
-                        if (t.isNotBlank()) parts.append(t)
+                    for (item in direct) {
+                        val p = item as? JsonObject ?: continue
+                        val t = p["text"]?.jsonPrimitive?.contentOrNull
+                        if (!t.isNullOrBlank()) parts.append(t)
                     }
                     parts.toString().takeIf { it.isNotBlank() }
                 }
                 else -> null
             }
-                ?: msg?.optString("reasoning_content")?.takeIf { it.isNotBlank() }
-                ?: first.optString("text").takeIf { it.isNotBlank() }
+                ?: msg?.get("reasoning_content")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+                ?: first["text"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
         } catch (e: Exception) {
             null
         }
@@ -546,23 +575,7 @@ object ApiClient {
     }
 
     private fun parseEvaluation(content: String, goals: List<String>): Evaluation {
-        // JSON aus der Antwort extrahieren (auch trotz Code-Fences)
-        val cleaned = content
-            .replace("```json", "", ignoreCase = true)
-            .replace("```", "")
-            .trim()
-        val start = cleaned.indexOf('{')
-        val end = cleaned.lastIndexOf('}')
-        if (start < 0 || end <= start) {
-            throw IllegalStateException("Die KI hat kein JSON geliefert: ${cleaned.take(300)}")
-        }
-        val json = cleaned.substring(start, end + 1)
-        // Abgehackte Antworten reparieren: fehlende schließende Klammern/Anführungszeichen ergänzen
-        val obj = try {
-            JSONObject(json)
-        } catch (e: Exception) {
-            JSONObject(closeJson(json))
-        }
+        val obj = tolerantJson(content)
         val arr = findResultArray(obj)
         val list = mutableListOf<GoalResult>()
         for ((goalIndex, goal) in goals.withIndex()) {
@@ -571,17 +584,17 @@ object ApiClient {
                 list.add(
                     GoalResult(
                         goal = goal,
-                        ampel = normalizeAmpel(pick(m, AMP_KEYS)),
+                        ampel = TrafficLight.fromString(pick(m, AMP_KEYS)),
                         begruendung = pick(m, BEG_KEYS)
                     )
                 )
             } else {
-                list.add(GoalResult(goal, "unbekannt", "Keine Bewertung erhalten."))
+                list.add(GoalResult(goal, TrafficLight.UNKNOWN, "Keine Bewertung erhalten."))
             }
         }
-        val summary = obj.optString("zusatz", obj.optString("summary", ""))
+        val summary = pickString(obj, listOf("zusatz", "summary"))
         val erkannt = stripErkanntIntro(
-            obj.optString("erkannt", obj.optString("detected", obj.optString("food", obj.optString("meal", ""))))
+            pickString(obj, listOf("erkannt", "detected", "food", "meal"))
         )
         return Evaluation(list, summary, erkannt)
     }
@@ -627,30 +640,39 @@ object ApiClient {
     }
 
     /** Findet das Ergebnis-Array, auch bei anderer Verschachtelung/Feldnamen. */
-    private fun findResultArray(node: Any?, depth: Int = 0): JSONArray {
-        if (node == null || depth > 4) return JSONArray()
-        if (node is JSONObject) {
+    private fun findResultArray(node: JsonElement?, depth: Int = 0): JsonArray {
+        if (node == null || depth > 4) return JsonArray(emptyList())
+        if (node is JsonObject) {
             for (name in listOf("bewertung", "bewertungen", "results", "ampeln", "ratings", "ziele", "goals")) {
-                node.optJSONArray(name)?.takeIf { it.length() > 0 && it.optJSONObject(0) != null }?.let { return it }
+                val arr = node[name] as? JsonArray
+                if (arr != null && arr.isNotEmpty() && arr[0] is JsonObject) return arr
             }
-            node.keys().forEach { k ->
-                val found = findResultArray(node.opt(k), depth + 1)
-                if (found.length() > 0) return found
+            node.values.forEach { child ->
+                val found = findResultArray(child, depth + 1)
+                if (found.isNotEmpty()) return found
             }
-        } else if (node is JSONArray) {
-            if (node.length() > 0 && node.optJSONObject(0) != null) return node
+        } else if (node is JsonArray) {
+            if (node.isNotEmpty() && node[0] is JsonObject) return node
         }
-        return JSONArray()
+        return JsonArray(emptyList())
     }
 
     /** Feld per Name holen, case-insensitive, auch mit Unter-/Bindestrichen. */
-    private fun pick(item: JSONObject, keys: List<String>): String {
-        for (k in item.keys()) {
+    private fun pick(item: JsonObject, keys: List<String>): String {
+        for ((k, v) in item) {
             val norm = k.lowercase().replace("_", "").replace("-", "")
             if (keys.contains(norm)) {
-                val v = item.opt(k)?.toString() ?: ""
-                if (v.isNotBlank()) return v
+                val s = v.jsonPrimitive.contentOrNull ?: v.toString()
+                if (s.isNotBlank()) return s
             }
+        }
+        return ""
+    }
+
+    private fun pickString(item: JsonObject, keys: List<String>): String {
+        for (k in keys) {
+            val v = item[k]?.jsonPrimitive?.contentOrNull
+            if (!v.isNullOrBlank()) return v
         }
         return ""
     }
@@ -660,10 +682,10 @@ object ApiClient {
         .replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")
         .filter { it.isLetterOrDigit() }
 
-    private fun findItemForGoal(arr: JSONArray, goal: String, goalCount: Int, goalIndex: Int): JSONObject? {
-        val items = (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }
+    private fun findItemForGoal(arr: JsonArray, goal: String, goalCount: Int, goalIndex: Int): JsonObject? {
+        val items = arr.mapNotNull { it as? JsonObject }
         val nGoal = normalizeText(goal)
-        var best: JSONObject? = null
+        var best: JsonObject? = null
         var bestScore = -1
         for (item in items) {
             val z = normalizeText(pick(item, ZIEL_KEYS))
@@ -679,21 +701,5 @@ object ApiClient {
         // Weniger gut: gleiche Anzahl => Zuordnung per Reihenfolge
         if (items.size == goalCount && goalIndex in items.indices) return items[goalIndex]
         return null
-    }
-
-    private fun normalizeAmpel(s: String): String {
-        if (s.isBlank()) return "unbekannt"
-        val has = { needle: String -> s.contains(needle, ignoreCase = true) }
-        if (has("grün") || has("gruen") || s.contains("🟢") || s.contains("✅") || has("green")) return "gruen"
-        if (has("gelb") || s.contains("🟡") || s.contains("🟠") || has("yellow") || has("orange") || has("amber")) return "gelb"
-        if (has("rot") || s.contains("🔴") || has("red")) return "rot"
-        val n = normalizeText(s)
-        return when {
-            n.contains("gruen") || n.contains("green") -> "gruen"
-            n.contains("gelb") || n.contains("yellow") || n.contains("orange") || n.contains("amber") -> "gelb"
-            n.contains("rot") && !n.contains("prot") -> "rot"
-            n.contains("red") -> "rot"
-            else -> "unbekannt"
-        }
     }
 }
