@@ -208,6 +208,19 @@ object HistoryStore {
         return duplicated
     }
 
+    /** Aktualisiert die Zeitstempel der übergebenen Einträge (für Umsortierung innerhalb eines Tages). */
+    fun reorderEntries(ctx: Context, reordered: List<HistoryEntry>) {
+        if (reordered.isEmpty()) return
+        ensureMigrated(ctx)
+        val entities = reordered.map { it.toEntity() }
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).historyDao().insertAll(entities)
+        }
+        val first = reordered.first()
+        DayFazitStore.deleteForEntry(ctx, first)
+        WeekFazitStore.deleteForEntry(ctx, first)
+    }
+
     /** Foto downgesampelt (<1024px) speichern, JPEG-Qualitaet Schritt fuer Schritt bis < 100 KB. */
     private fun saveScaledJpeg(ctx: Context, uri: Uri, out: File) {
         val res = ctx.contentResolver
