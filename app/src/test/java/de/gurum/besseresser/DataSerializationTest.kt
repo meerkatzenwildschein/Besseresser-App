@@ -158,6 +158,38 @@ class DataSerializationTest {
     }
 
     @Test
+    fun testRecentNotesParsingRobustness() {
+        // 1. Legacy format: plain string array
+        val legacy = """["Apfel", "Birne"]"""
+        val parsedLegacy = RecentNotesStore.parseRecentNotes(legacy)
+        assertEquals(2, parsedLegacy.size)
+        assertEquals("Apfel", parsedLegacy[0].text)
+        assertFalse(parsedLegacy[0].starred)
+
+        // 2. Integer boolean: 1 = true, 0 = false
+        val intBool = """[{"t":"Suppe","s":1},{"t":"Brot","s":0}]"""
+        val parsedInt = RecentNotesStore.parseRecentNotes(intBool)
+        assertEquals(2, parsedInt.size)
+        assertEquals("Suppe", parsedInt[0].text)
+        assertTrue(parsedInt[0].starred)
+        assertEquals("Brot", parsedInt[1].text)
+        assertFalse(parsedInt[1].starred)
+
+        // 3. String boolean: "true"
+        val strBool = """[{"t":"Tee","s":"true"}]"""
+        val parsedStr = RecentNotesStore.parseRecentNotes(strBool)
+        assertEquals(1, parsedStr.size)
+        assertTrue(parsedStr[0].starred)
+
+        // 4. Full property names: text / starred
+        val fullNames = """[{"text":"Salat","starred":true}]"""
+        val parsedFull = RecentNotesStore.parseRecentNotes(fullNames)
+        assertEquals(1, parsedFull.size)
+        assertEquals("Salat", parsedFull[0].text)
+        assertTrue(parsedFull[0].starred)
+    }
+
+    @Test
     fun testProfileModel() {
         val emptyProfile = Profile()
         assertTrue(emptyProfile.isEmpty)

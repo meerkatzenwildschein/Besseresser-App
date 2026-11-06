@@ -224,15 +224,16 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
     val ctx = LocalContext.current
     var recent by remember { mutableStateOf(RecentNotesStore.load(ctx)) }
     var open by remember { mutableStateOf(false) }
+    val isEnabled = remember(open) { RecentNotesStore.load(ctx).isNotEmpty() }
     Box {
         IconButton(
             onClick = {
                 // Anzeigereihenfolge NUR beim Öffnen: Sternchen nach oben (in-place-Toggling
                 // darf nicht hüpfen), unmarkierte behalten ihre MRU-Reihenfolge
-                recent = RecentNotesStore.load(ctx).sortedByDescending { it.starred }
+                recent = RecentNotesStore.load(ctx, sortStarredFirst = true)
                 open = true
             },
-            enabled = recent.isNotEmpty(),
+            enabled = isEnabled,
             modifier = Modifier.size(24.dp)
         ) {
             Icon(
