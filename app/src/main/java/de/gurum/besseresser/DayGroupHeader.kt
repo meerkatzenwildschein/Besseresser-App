@@ -156,7 +156,7 @@ fun zielePreview(entry: HistoryEntry, emptyText: String, moreText: String): Stri
     return when {
         list.isEmpty() -> emptyText
         list.size <= 2 -> list.joinToString(", ")
-        else -> list.take(2).joinToString(", ") + moreText
+        else -> list.take(2).joinToString(", ") + (if (moreText.startsWith(" ")) moreText else " $moreText")
     }
 }
 

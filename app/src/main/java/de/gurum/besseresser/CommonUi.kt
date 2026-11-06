@@ -176,7 +176,7 @@ fun CollapsibleSummaryBlock(
     Surface(
         onClick = { if (extraCount > 0) expanded = !expanded },
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -390,13 +390,9 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
 fun GoalRow(goal: String, res: GoalResult?) {
     val isRated = res != null && res.ampel != TrafficLight.UNKNOWN
     val color = res?.ampel?.color() ?: TrafficLight.UNKNOWN.color()
-    val containerColor = if (isRated) {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f)
-    }
+    val containerColor = MaterialTheme.colorScheme.surfaceVariant
     val borderStroke = if (isRated) {
-        BorderStroke(1.dp, color.copy(alpha = 0.35f))
+        BorderStroke(1.dp, color.copy(alpha = 0.4f))
     } else {
         BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
     }

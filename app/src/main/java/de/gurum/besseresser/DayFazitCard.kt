@@ -104,7 +104,7 @@ fun FazitExpandedCard(fazit: DayFazit) {
     val accent = ampelColor(fazit.ampel)
     Surface(
         shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+        color = MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(1.dp, accent.copy(alpha = 0.45f)),
         modifier = Modifier
             .fillMaxWidth()
