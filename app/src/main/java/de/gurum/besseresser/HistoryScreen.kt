@@ -1374,26 +1374,45 @@ private fun HistoryAutoFazitEffect(
         delay(1200)   // Debounce
         val autoFazitTime = LocalTime.now().hour >= FAZIT_AUTO_HOUR
         groupByDay(entries).take(2).forEach { group ->
-            val key = dayKeyOf(group.day)
-            if (key in loadingFazits) return@forEach
-            val fazit = fazitMap[key]
-            if (fazit == null) {
-                if (autoFazitTime && key !in DayFazitSession.attempted) {
-                    DayFazitSession.attempted.add(key)
-                    onGenerateFazit(group.day, group.entries)
-                }
-            } else if (autoFazitTime && isFazitOutdated(fazit, group.entries)) {
-                onGenerateFazit(group.day, group.entries)
-            }
+            handleAutoDayFazit(group, fazitMap, loadingFazits, autoFazitTime, onGenerateFazit)
         }
-        val today = LocalDate.now()
-        if (autoFazitTime && today.dayOfWeek == java.time.DayOfWeek.SUNDAY && weekFazit == null && !loadingWeek) {
-            val wk = weekKeyOf(System.currentTimeMillis())
-            if (wk !in DayFazitSession.attemptedWeekly) {
-                DayFazitSession.attemptedWeekly.add(wk)
-                onGenerateWeekFazit()
-            }
+        handleAutoWeekFazit(autoFazitTime, weekFazit, loadingWeek, onGenerateWeekFazit)
+    }
+}
+
+private fun handleAutoDayFazit(
+    group: DayGroup,
+    fazitMap: Map<String, DayFazit>,
+    loadingFazits: List<String>,
+    autoFazitTime: Boolean,
+    onGenerateFazit: (LocalDate, List<HistoryEntry>) -> Unit
+) {
+    val key = dayKeyOf(group.day)
+    if (key in loadingFazits || !autoFazitTime) return
+    val fazit = fazitMap[key]
+    if (fazit == null) {
+        if (key !in DayFazitSession.attempted) {
+            DayFazitSession.attempted.add(key)
+            onGenerateFazit(group.day, group.entries)
         }
+    } else if (isFazitOutdated(fazit, group.entries)) {
+        onGenerateFazit(group.day, group.entries)
+    }
+}
+
+private fun handleAutoWeekFazit(
+    autoFazitTime: Boolean,
+    weekFazit: DayFazit?,
+    loadingWeek: Boolean,
+    onGenerateWeekFazit: () -> Unit
+) {
+    if (!autoFazitTime || LocalDate.now().dayOfWeek != java.time.DayOfWeek.SUNDAY || weekFazit != null || loadingWeek) {
+        return
+    }
+    val wk = weekKeyOf(System.currentTimeMillis())
+    if (wk !in DayFazitSession.attemptedWeekly) {
+        DayFazitSession.attemptedWeekly.add(wk)
+        onGenerateWeekFazit()
     }
 }
 
@@ -1402,33 +1421,50 @@ private fun isFazitOutdated(fazit: DayFazit, entries: List<HistoryEntry>): Boole
     return fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(entries)
 }
 
+private class HistorySwipeBackState(
+    private val isBlocked: Boolean,
+    private val onBlocked: () -> Unit,
+    private val onBack: () -> Unit
+) {
+    private var acc = 0f
+    private var hintShown = false
+
+    fun reset() {
+        acc = 0f
+        hintShown = false
+    }
+
+    fun onDrag(dragAmount: Float) {
+        if (dragAmount == 0f) return
+        acc += dragAmount
+        if (kotlin.math.abs(acc) <= 160f) return
+
+        acc = 0f
+        if (isBlocked) {
+            handleBlocked()
+        } else if (dragAmount > 0) {
+            onBack()
+        }
+    }
+
+    private fun handleBlocked() {
+        if (!hintShown) {
+            onBlocked()
+            hintShown = true
+        }
+    }
+}
+
 private fun Modifier.historySwipeHandler(
     isBlocked: Boolean,
     onBlocked: () -> Unit,
     onBack: () -> Unit
 ): Modifier = pointerInput(Unit) {
-    var acc = 0f
-    var hintShown = false
+    val state = HistorySwipeBackState(isBlocked, onBlocked, onBack)
     detectHorizontalDragGestures(
-        onDragEnd = { acc = 0f; hintShown = false },
-        onDragCancel = { acc = 0f; hintShown = false }
+        onDragEnd = { state.reset() },
+        onDragCancel = { state.reset() }
     ) { _, dragAmount ->
-        if (dragAmount != 0f) {
-            acc += dragAmount
-            if (kotlin.math.abs(acc) > 160f) {
-                if (isBlocked) {
-                    if (!hintShown) {
-                        onBlocked()
-                        hintShown = true
-                    }
-                    acc = 0f
-                } else if (dragAmount > 0) {
-                    acc = 0f
-                    onBack()
-                } else {
-                    acc = 0f
-                }
-            }
-        }
+        state.onDrag(dragAmount)
     }
 }
