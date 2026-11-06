@@ -1,55 +1,59 @@
 # 🥗 Besseresser
 
-**Kein Kalorienzählen. Keine endlosen Lebensmitteltabellen. Einfach fotografieren und sofort wissen, ob dein Essen zu deinen Zielen passt.**
+**No calorie counting. No endless food databases. Just snap a photo and immediately see how well your meal fits your personal goals.**
 
-**Besseresser** ist dein persönlicher KI-Ernährungsbegleiter für Android. Du legst einmal fest, worauf du achten möchtest – zum Beispiel *„Blutdruck senken"*, *„Weniger Zucker"*, *„Gewicht verlieren"* oder *„Mehr Eiweiß"* –, machst ein Foto von deinem Teller und erhältst in Sekunden eine ehrliche **Ampel-Bewertung (🟢 Grün · 🟡 Gelb · 🔴 Rot)** für jedes einzelne Ziel.
+**Besseresser** is your personal AI nutrition companion for Android. Define what matters to you once – such as *"Lower blood pressure"*, *"Less sugar"*, *"Lose weight"*, or *"More protein"* –, take a photo of your plate, and get an honest **traffic-light rating (🟢 Green · 🟡 Yellow · 🔴 Red)** for each individual goal within seconds.
+
+🌍 **Available in English and German** – both the app interface and the AI evaluations/summaries automatically adapt to your language (on Android 13+, you can also switch the app language independently in system settings).
 
 ---
 
-## 📸 Einblicke
+## 📸 Screenshots
 
-| Start & Ziele | Mahlzeiten-Auswertung | Verlauf & Tagesfazit |
+| Home & Goals | Meal Evaluation | History & Daily Summary |
 | :---: | :---: | :---: |
-| <img src="screenshots/Start.jpg" width="250" alt="Startbildschirm mit persönlichen Zielen" /> | <img src="screenshots/Details.jpg" width="250" alt="Detailansicht einer ausgewerteten Mahlzeit" /> | <img src="screenshots/Verlaufsansicht.jpg" width="250" alt="Verlaufsansicht mit Ampelschnitt und Tagesfazit" /> |
+| <img src="screenshots/Start.jpg" width="250" alt="Home screen with personal goals" /> | <img src="screenshots/Details.jpg" width="250" alt="Detailed view of a rated meal" /> | <img src="screenshots/Verlaufsansicht.jpg" width="250" alt="History view with traffic-light average and daily summary" /> |
 
 ---
 
-## ✨ Warum Besseresser?
+## ✨ Why Besseresser?
 
-- **🎯 Deine Ziele, deine Maßstäbe:**
-  Statt starrer Diätprogramme formulierst du deine eigenen Gesundheits- oder Ernährungsziele einfach als Freitext. Auf Wunsch hilft dir die KI beim Einrichten sogar dabei, längere Sätze in klare Einzelziele aufzuteilen.
-- **📷 Fotografieren, ergänzen, fertig:**
-  Knipse dein Essen direkt in der App. Falls man etwas auf dem Bild nicht sieht (z. B. *„mit Olivenöl zubereitet"* oder *„nur die halbe Portion"*), gibst du kurz einen Hinweis dazu – häufig genutzte Notizen lassen sich mit einem ⭐ als Favorit speichern.
-- **🚦 Klare Ampeln statt Zahlenwüsten:**
-  Zu jedem deiner Ziele zeigt dir Besseresser sofort Grün, Gelb oder Rot mit einer kurzen, verständlichen Begründung, einer Mengenschätzung der erkannten Speisen und einem Gesamt-Ampelschnitt (0–100).
-- **✏️ Jederzeit korrigierbar:**
-  Hat die KI einmal Tofu für Feta gehalten? Ein Tipp auf das Stift-Symbol genügt, um das erkannte Essen anzupassen – die Bewertung wird sofort passend aktualisiert.
-- **📅 Tages- & Wochenfazit mit Augenmaß:**
-  Ein einzelnes Stück Schokolade macht noch keinen schlechten Tag. Abends (oder jederzeit auf Fingertipp) zieht Besseresser ein ausgewogenes **Tagesfazit** über alle Mahlzeiten hinweg – und sonntags ein **Wochenfazit**.
-- **➕ Vergessenes Essen nachtragen & duplizieren:**
-  Kein Foto gemacht? Über das **„+"** am jeweiligen Tag kannst du Mahlzeiten jederzeit nachträglich erfassen – mit Foto oder rein per Textbeschreibung. Wiederkehrende Lieblingsgerichte (wie dein Standard-Frühstück) lassen sich aus der Detailansicht mit einem Tipp auf jeden beliebigen Kalendertag **duplizieren**.
-- **👤 Optionales persönliches Profil:**
-  Wenn du möchtest, kannst du Alter, Gewicht, Größe oder Besonderheiten (z. B. Diabetes, Unverträglichkeiten, Medikamente) hinterlegen. Diese Angaben fließen automatisch in dein Tages- und Wochenfazit ein.
-- **🔒 Volle Kontrolle & Datenschutz (Bring Your Own AI):**
-  Kein Abo-Zwang, kein fremder Cloud-Account: Alle deine Mahlzeiten, Fotos, Ziele und dein Profil bleiben **lokal auf deinem Smartphone**. Dein API-Schlüssel wird hardwaregeschützt im Android-Keystore verschlüsselt.
-
----
-
-## 🚀 In 2 Minuten startklar
-
-1. **Einrichten:** Beim ersten Start trägst du deine persönlichen Ziele ein und wählst deinen bevorzugten KI-Anbieter.
-2. **KI-Anbieter verbinden:** Besseresser funktioniert mit nahezu jedem OpenAI-kompatiblen Dienst – eine Schnellauswahl ist direkt integriert:
-   - **Google Gemini** *(bietet ein kostenloses Kontingent)*
-   - **OpenRouter** *(Zugriff auf hunderte Modelle über einen Account)*
-   - **OpenAI**, **Mistral**, **Groq**, **xAI (Grok)**, **Anthropic** u. v. m.
-   - Über *„Modelle laden & auswählen"* zeigt dir die App automatisch alle bildfähigen Modelle deines Anbieters an.
-3. **Loslegen:** Essen fotografieren, Ampeln prüfen und bei Gefallen im Verlauf speichern!
+- **🎯 Your Goals, Your Rules:**
+  Instead of rigid diet plans, simply write your own health or nutrition goals as free text. If you like, the AI can even split longer descriptions into concise individual goals during setup.
+- **📷 Snap, Add a Note, Done:**
+  Take a photo right inside the app. If something isn't obvious from the picture (e.g. *"cooked with olive oil"* or *"only ate half the portion"*), add a quick note – frequently used notes can be starred (⭐) as favorites for one-tap reuse.
+- **🚦 Clear Traffic Lights Instead of Number Overload:**
+  For every goal, Besseresser gives you a clear Green, Yellow, or Red rating with a short explanation, an estimated portion size of the recognized food, and an overall traffic-light score (0–100).
+- **✏️ Easily Correctable Anytime:**
+  Did the AI mistake tofu for feta? Tap the pencil icon to adjust the recognized dish and Besseresser will immediately re-evaluate the meal for you.
+- **📅 Balanced Daily & Weekly Summaries:**
+  A single piece of chocolate doesn't ruin an otherwise healthy day. In the evening (or anytime on tap), Besseresser creates a balanced **daily summary** across all your meals – plus a **weekly summary** on Sundays.
+- **➕ Log Retroactively & Duplicate Favorites:**
+  Forgot to take a photo? Tap the **"+"** button on any day to log a meal retroactively – with a photo or by text description alone. Recurring meals (like your go-to breakfast) can be **duplicated** from the detail view to any calendar date in two taps.
+- **👤 Optional Personal Profile:**
+  Optionally add your age, weight, height, or health notes (e.g. diabetes, intolerances, medication). These details are automatically factored into your daily and weekly summaries.
+- **🌐 Bilingual (German & English) + Light & Dark Mode:**
+  Full support for **German** and **English**, complete with a custom emerald/sage design for both Light and Dark Mode.
+- **🔒 Full Privacy & Control (Bring Your Own AI):**
+  No subscription lock-in, no third-party cloud account: all your meals, photos, goals, and profile data stay **locally on your device**. Your API key is encrypted using the hardware-backed Android Keystore.
 
 ---
 
-## 📦 Installation & Bauen
+## 🚀 Up and Running in 2 Minutes
 
-Du kannst die App direkt aus dem Quellcode mit Android Studio oder über die Kommandozeile auf deinem Android-Smartphone (ab Android 8.0) installieren:
+1. **Set Up:** On first launch, enter your personal goals and pick your preferred AI provider.
+2. **Connect an AI Provider:** Besseresser works with almost any OpenAI-compatible service – quick presets are built right in:
+   - **Google Gemini** *(offers a free tier)*
+   - **OpenRouter** *(access hundreds of models with a single account)*
+   - **OpenAI**, **Mistral**, **Groq**, **xAI (Grok)**, **Anthropic**, and more
+   - Tap *"Load and pick models"* to automatically list all vision-capable models from your provider.
+3. **Start Snapping:** Photograph your meal, check your traffic lights, and save it to your history!
+
+---
+
+## 📦 Installation & Build
+
+You can install the app onto your Android phone (Android 8.0 / API 26 or newer) directly from source using Android Studio or the command line:
 
 ```bash
 ./gradlew installDebug
@@ -57,6 +61,6 @@ Du kannst die App direkt aus dem Quellcode mit Android Studio oder über die Kom
 
 ---
 
-## 📄 Lizenz
+## 📄 License
 
-Veröffentlicht unter der [GNU General Public License v3.0 (GPL-3.0)](LICENSE).
+Released under the [GNU General Public License v3.0 (GPL-3.0)](LICENSE).
