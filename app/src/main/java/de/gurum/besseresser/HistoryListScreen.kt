@@ -1,10 +1,15 @@
 package de.gurum.besseresser
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,27 +28,35 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.text.SimpleDateFormat
@@ -52,6 +66,7 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /** Ein Kalendertag mit allen gespeicherten Bewertungen desselben Tages. */
 data class DayGroup(
@@ -71,6 +86,7 @@ fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
 @Composable
 fun HistoryListContent(
     entries: List<HistoryEntry>,
+    pendingDeleteIds: Set<Long> = emptySet(),
     fazitMap: Map<String, DayFazit>,
     loadingFazits: List<String>,
     expandedFazits: List<String>,
@@ -84,7 +100,8 @@ fun HistoryListContent(
     onToggleExpandWeek: () -> Unit,
     onToggleExpandFazit: (String) -> Unit,
     onAddMealForDay: (LocalDate) -> Unit,
-    onDeleteEntry: (HistoryEntry) -> Unit
+    onDeleteEntry: (HistoryEntry) -> Unit,
+    onUndoDeleteEntry: (HistoryEntry) -> Unit = {}
 ) {
     TopBarRow(
         title = stringResource(R.string.history_title),
@@ -158,50 +175,18 @@ fun HistoryListContent(
             }
             group.entries.forEach { entry ->
                 item(key = entry.id) {
-                    val dismissState = rememberSwipeToDismissBoxState(
-                        confirmValueChange = { value ->
-                            if (value == SwipeToDismissBoxValue.EndToStart) {
-                                onDeleteEntry(entry)
-                                true
-                            } else false
+                    val isPendingDelete = entry.id in pendingDeleteIds
+                    if (isPendingDelete) {
+                        PendingDeleteHistoryItem(
+                            entry = entry,
+                            onUndo = { onUndoDeleteEntry(entry) }
+                        )
+                    } else {
+                        ShortSwipeToDeleteBox(
+                            onTriggerDelete = { onDeleteEntry(entry) }
+                        ) {
+                            HistoryItem(entry, onClick = { onPick(entry) })
                         }
-                    )
-                    SwipeToDismissBox(
-                        state = dismissState,
-                        enableDismissFromStartToEnd = false,
-                        backgroundContent = {
-                            val isSwiping = dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .fillMaxSize()
-                                    .background(if (isSwiping) Color(0xFFD32F2F) else Color.Transparent),
-                                contentAlignment = Alignment.CenterEnd
-                            ) {
-                                if (isSwiping) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 22.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Delete,
-                                            contentDescription = null,
-                                            tint = Color.White,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(
-                                            stringResource(R.string.delete),
-                                            color = Color.White,
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    ) {
-                        HistoryItem(entry, onClick = { onPick(entry) })
                     }
                 }
             }
@@ -372,6 +357,204 @@ fun HistoryItem(entry: HistoryEntry, onClick: () -> Unit) {
             }
             Spacer(Modifier.width(8.dp))
             ScoreBadge(entry)
+        }
+    }
+}
+
+/**
+ * Begrenztes Links-Schieben mit festem kurzem Anschlag (~96dp):
+ * Die Karte lässt sich nur so weit nach links schieben, bis das rote Mülleimer-Feld sichtbar ist.
+ * Wird die Karte am Anschlag losgelassen, löst [onTriggerDelete] den deaktivierten „Rückgängig"-Zustand aus.
+ */
+@Composable
+private fun ShortSwipeToDeleteBox(
+    onTriggerDelete: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val density = LocalDensity.current
+    val maxSwipePx = remember(density) { with(density) { 96.dp.toPx() } }
+    val triggerPx = maxSwipePx * 0.72f
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    val animatedOffset by animateFloatAsState(
+        targetValue = dragOffset,
+        animationSpec = tween(durationMillis = 150),
+        label = "short-swipe-offset"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .pointerInput(maxSwipePx) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        val shouldDelete = dragOffset <= -triggerPx
+                        dragOffset = 0f
+                        if (shouldDelete) {
+                            onTriggerDelete()
+                        }
+                    },
+                    onDragCancel = {
+                        dragOffset = 0f
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        // Nur Links-Schieben (oder Zurückschieben aus bereits geöffneter Position) abfangen
+                        if (dragAmount < 0f || dragOffset < 0f) {
+                            change.consume()
+                            dragOffset = (dragOffset + dragAmount).coerceIn(-maxSwipePx, 0f)
+                        }
+                    }
+                )
+            }
+    ) {
+        if (animatedOffset < -2f) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFD32F2F)),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .width(96.dp)
+                        .padding(horizontal = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Delete,
+                        contentDescription = stringResource(R.string.delete),
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        stringResource(R.string.delete),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.5.sp
+                    )
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset { IntOffset(animatedOffset.roundToInt(), 0) }
+        ) {
+            content()
+        }
+    }
+}
+
+/**
+ * Deaktivierte Darstellung eines zum Löschen vorgemerkten Eintrags direkt an seinem Listenplatz:
+ * Gedimmter Inhalt mit durchgestrichenem Text, „Rückgängig"-Button und 5-Sekunden-Ablaufleiste.
+ */
+@Composable
+fun PendingDeleteHistoryItem(
+    entry: HistoryEntry,
+    onUndo: () -> Unit
+) {
+    val ctx = LocalContext.current
+    val progress = remember(entry.id) { Animatable(1f) }
+    LaunchedEffect(entry.id) {
+        progress.animateTo(
+            targetValue = 0f,
+            animationSpec = tween(
+                durationMillis = UNDO_DELETE_DELAY_MS.toInt(),
+                easing = LinearEasing
+            )
+        )
+    }
+
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val thumb = remember(entry.id) {
+                    HistoryStore.photoFileOf(ctx, entry)?.let { decodeThumb(it) }
+                }
+                Box(modifier = Modifier.alpha(0.32f)) {
+                    if (thumb != null) {
+                        Image(
+                            bitmap = thumb.asImageBitmap(),
+                            contentDescription = stringResource(R.string.photo_of_meal),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.6f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("🍽️", fontSize = 22.sp)
+                        }
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .alpha(0.48f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.history_deleted_label) + " · " +
+                            if (entry.backdated)
+                                stringResource(R.string.nacherfassen_label)
+                            else
+                                SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(entry.dateMillis)),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    if (entry.erkannt.isNotBlank()) {
+                        Text(
+                            entry.erkannt,
+                            fontSize = 12.5.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textDecoration = TextDecoration.LineThrough,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.width(10.dp))
+                FilledTonalButton(
+                    onClick = onUndo,
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.history_undo_delete),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            LinearProgressIndicator(
+                progress = { progress.value },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = Color.Transparent
+            )
         }
     }
 }

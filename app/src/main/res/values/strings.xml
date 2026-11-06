@@ -185,6 +185,8 @@
     <string name="score_tooltip_ok">Average of the rated goals: 🟢 100 · 🟡 50 · 🔴 0</string>
     <string name="score_tooltip_unknown">No average: no rating received</string>
     <string name="history_entry_delete">Delete entry</string>
+    <string name="history_deleted_label">Deleted</string>
+    <string name="history_undo_delete">↩ Undo</string>
     <string name="history_entry_duplicate">Duplicate entry</string>
     <string name="history_duplicate_pick_date_title">Duplicate meal to date</string>
     <string name="history_duplicate_done">Meal duplicated to %1$s</string>

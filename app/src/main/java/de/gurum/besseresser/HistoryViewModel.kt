@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,8 +14,11 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.ZoneId
 
+const val UNDO_DELETE_DELAY_MS = 5000L
+
 data class HistoryUiState(
     val entries: List<HistoryEntry> = emptyList(),
+    val pendingDeleteIds: Set<Long> = emptySet(),
     val fazitMap: Map<String, DayFazit> = emptyMap(),
     val loadingFazits: Set<String> = emptySet(),
     val expandedFazits: Set<String> = emptySet(),
@@ -39,6 +44,8 @@ class HistoryViewModel(
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
 
     private var dbObserving = false
+    private val pendingDeleteJobs = mutableMapOf<Long, Job>()
+    private val pendingDeleteEntries = mutableMapOf<Long, HistoryEntry>()
 
     private fun getHistoryRepo(ctx: Context?): HistoryRepository? =
         historyRepository ?: ctx?.let { RepositoryProvider.getHistoryRepository(it) }
@@ -184,11 +191,61 @@ class HistoryViewModel(
     }
 
     fun deleteEntry(ctx: Context? = null, entry: HistoryEntry) {
+        pendingDeleteJobs.remove(entry.id)?.cancel()
+        pendingDeleteEntries.remove(entry.id)
+        _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds - entry.id) }
         val histRepo = getHistoryRepo(ctx)
         viewModelScope.launch {
             histRepo?.delete(entry)
             histRepo?.deleteDayFazitForEntry(entry)
             histRepo?.deleteWeekFazitForEntry(entry)
+        }
+    }
+
+    /** Markiert einen Eintrag zunächst als „vorgemerkt zum Löschen" (deaktiviert + Rückgängig-Option)
+     *  und führt das endgültige Löschen erst nach [delayMs] (Standard: 5 Sekunden) aus. */
+    fun requestDeleteEntry(
+        ctx: Context? = null,
+        entry: HistoryEntry,
+        delayMs: Long = UNDO_DELETE_DELAY_MS
+    ) {
+        pendingDeleteJobs.remove(entry.id)?.cancel()
+        pendingDeleteEntries[entry.id] = entry
+        _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds + entry.id) }
+        pendingDeleteJobs[entry.id] = viewModelScope.launch {
+            if (delayMs > 0L) delay(delayMs)
+            pendingDeleteJobs.remove(entry.id)
+            pendingDeleteEntries.remove(entry.id)
+            _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds - entry.id) }
+            val histRepo = getHistoryRepo(ctx)
+            histRepo?.delete(entry)
+            histRepo?.deleteDayFazitForEntry(entry)
+            histRepo?.deleteWeekFazitForEntry(entry)
+        }
+    }
+
+    /** Bricht das vorgemerkte Löschen ab und stellt den Eintrag sofort wieder aktiv her. */
+    fun undoDeleteEntry(entryId: Long) {
+        pendingDeleteJobs.remove(entryId)?.cancel()
+        pendingDeleteEntries.remove(entryId)
+        _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds - entryId) }
+    }
+
+    /** Führt alle noch offenen Löschvorgänge sofort endgültig aus (z. B. beim Verlassen des Verlaufs). */
+    fun flushPendingDeletes(ctx: Context? = null) {
+        val toDelete = pendingDeleteEntries.values.toList()
+        if (toDelete.isEmpty()) return
+        pendingDeleteJobs.values.forEach { it.cancel() }
+        pendingDeleteJobs.clear()
+        pendingDeleteEntries.clear()
+        _uiState.update { it.copy(pendingDeleteIds = emptySet()) }
+        val histRepo = getHistoryRepo(ctx)
+        viewModelScope.launch {
+            toDelete.forEach { entry ->
+                histRepo?.delete(entry)
+                histRepo?.deleteDayFazitForEntry(entry)
+                histRepo?.deleteWeekFazitForEntry(entry)
+            }
         }
     }
 

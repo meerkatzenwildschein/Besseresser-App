@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -34,12 +35,22 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = viewModel()
 ) {
     val ctx = LocalContext.current
-    BackHandler(onBack = onBack)
+    val handleBack = {
+        viewModel.flushPendingDeletes(ctx)
+        onBack()
+    }
+    BackHandler(onBack = handleBack)
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.startObserving(ctx)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.flushPendingDeletes(ctx)
+        }
     }
 
     val addPhotoFile = remember {
@@ -80,7 +91,7 @@ fun HistoryScreen(
                 onBlocked = {
                     Toast.makeText(ctx, ctx.getString(R.string.history_swipe_blocked_overlay), Toast.LENGTH_SHORT).show()
                 },
-                onBack = onBack
+                onBack = handleBack
             )
     ) {
         Column(
@@ -90,20 +101,25 @@ fun HistoryScreen(
         ) {
             HistoryListContent(
                 entries = uiState.entries,
+                pendingDeleteIds = uiState.pendingDeleteIds,
                 fazitMap = uiState.fazitMap,
                 loadingFazits = uiState.loadingFazits.toList(),
                 expandedFazits = uiState.expandedFazits.toList(),
                 weekFazit = uiState.weekFazit,
                 loadingWeek = uiState.loadingWeek,
                 expandedWeek = uiState.expandedWeek,
-                onBack = onBack,
-                onPick = onPick,
+                onBack = handleBack,
+                onPick = { entry ->
+                    viewModel.flushPendingDeletes(ctx)
+                    onPick(entry)
+                },
                 onGenerateFazit = { day, list -> viewModel.generateFazit(ctx, day, list, settings, profile) },
                 onGenerateWeekFazit = { viewModel.generateWeekFazit(ctx, settings, profile) },
                 onToggleExpandWeek = { viewModel.toggleWeekExpanded() },
                 onToggleExpandFazit = { viewModel.toggleFazitExpanded(it) },
                 onAddMealForDay = { day -> viewModel.setAddDialogForDay(day) },
-                onDeleteEntry = { entry -> viewModel.deleteEntry(ctx, entry) }
+                onDeleteEntry = { entry -> viewModel.requestDeleteEntry(ctx, entry) },
+                onUndoDeleteEntry = { entry -> viewModel.undoDeleteEntry(entry.id) }
             )
         }
 

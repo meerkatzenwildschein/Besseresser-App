@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -467,5 +468,49 @@ class RepositoriesAndFakesTest {
         vm.setGender(Gender.NONE)
         assertTrue(vm.save())
         assertTrue(profileRepo.load().isEmpty)
+    }
+
+    @Test
+    fun testHistoryViewModelPendingDeleteAndUndo() = runTest(testDispatcher) {
+        val histRepo = FakeHistoryRepository()
+        val vm = HistoryViewModel(
+            apiService = FakeApiService(),
+            historyRepository = histRepo,
+            settingsRepository = FakeSettingsRepository()
+        )
+        vm.startObserving()
+
+        val e1 = histRepo.add(null, Evaluation(erkannt = "Mahlzeit 1"), dateOverride = 1000L)
+        val e2 = histRepo.add(null, Evaluation(erkannt = "Mahlzeit 2"), dateOverride = 2000L)
+        val e3 = histRepo.add(null, Evaluation(erkannt = "Mahlzeit 3"), dateOverride = 3000L)
+        advanceUntilIdle()
+        assertEquals(3, vm.uiState.value.entries.size)
+
+        // 1. Request delete on e1, then undo before 5s elapses -> entry stays!
+        vm.requestDeleteEntry(entry = e1, delayMs = 5000L)
+        assertTrue(e1.id in vm.uiState.value.pendingDeleteIds)
+        advanceTimeBy(2000L)
+        vm.undoDeleteEntry(e1.id)
+        assertFalse(e1.id in vm.uiState.value.pendingDeleteIds)
+        advanceUntilIdle()
+        assertEquals(3, vm.uiState.value.entries.size)
+
+        // 2. Request delete on e2 and let 5s timer expire -> entry is permanently deleted!
+        vm.requestDeleteEntry(entry = e2, delayMs = 5000L)
+        assertTrue(e2.id in vm.uiState.value.pendingDeleteIds)
+        advanceTimeBy(5100L)
+        advanceUntilIdle()
+        assertFalse(e2.id in vm.uiState.value.pendingDeleteIds)
+        assertEquals(2, vm.uiState.value.entries.size)
+        assertFalse(vm.uiState.value.entries.any { it.id == e2.id })
+
+        // 3. Request delete on e3 and flush immediately (simulating leaving History screen)
+        vm.requestDeleteEntry(entry = e3, delayMs = 5000L)
+        assertTrue(e3.id in vm.uiState.value.pendingDeleteIds)
+        vm.flushPendingDeletes()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.pendingDeleteIds.isEmpty())
+        assertEquals(1, vm.uiState.value.entries.size)
+        assertEquals(e1.id, vm.uiState.value.entries.first().id)
     }
 }
