@@ -124,6 +124,11 @@ class DomainLogicAndFingerprintTest {
         // Next Monday 2026-11-09 has new week key "20261109"
         val nextMonday = LocalDate.of(2026, 11, 9).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         assertEquals("20261109", weekKeyOf(nextMonday))
+
+        // Calendar week calculation (ISO-8601)
+        assertEquals(45, calendarWeekOf(LocalDate.of(2026, 11, 2)))
+        assertEquals(45, calendarWeekOf(LocalDate.of(2026, 11, 8)))
+        assertEquals(46, calendarWeekOf(LocalDate.of(2026, 11, 9)))
     }
 
     @Test

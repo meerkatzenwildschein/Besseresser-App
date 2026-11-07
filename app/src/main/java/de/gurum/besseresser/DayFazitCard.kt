@@ -39,8 +39,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
@@ -180,7 +182,7 @@ fun WeekFazitRow(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    stringResource(R.string.weekfazit_row_label),
+                    stringResource(R.string.weekfazit_row_label_kw, calendarWeekOf()),
                     fontSize = 15.5.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -230,8 +232,8 @@ fun WeekFazitRow(
     }
 }
 
-/** Mahlzeiten-Zeilen für den Tagesfazit-Prompt: „HH:mm · Erkanntes mit Menge · Anmerkung“;
- *  nachgetragene Einträge ohne echte Uhrzeit → Label „nachträglich erfasst“. */
+/** Mahlzeiten-Zeilen für den Tagesfazit-Prompt: „HH:mm · Erkanntes mit Menge · Anmerkung";
+ *  nachgetragene Einträge ohne echte Uhrzeit → Label „nachträglich erfasst". */
 fun dayFazitMealLines(ctx: Context, entriesOfDay: List<HistoryEntry>): List<String> =
     entriesOfDay.sortedBy { it.dateMillis }.map { e ->
         val time = if (e.backdated)
@@ -245,6 +247,21 @@ fun dayFazitMealLines(ctx: Context, entriesOfDay: List<HistoryEntry>): List<Stri
         line
     }
 
+/** Mahlzeiten-Zeilen für den Wochenfazit-Prompt: „dd.MM.yyyy · Erkanntes mit Menge · Anmerkung"
+ *  (chronologisch aufsteigend, mit Tagesdatum statt Uhrzeit). */
+fun weekFazitMealLines(ctx: Context, entriesOfWeek: List<HistoryEntry>): List<String> =
+    entriesOfWeek.sortedBy { it.dateMillis }.map { e ->
+        val dateStr = Instant.ofEpochMilli(e.dateMillis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .format(DATE_FORMATTER)
+        val recog = e.erkannt.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
+        var line = "$dateStr · $recog"
+        e.note.takeIf { it.isNotBlank() }
+            ?.let { line += " · " + ctx.getString(R.string.dayfazit_line_note, it.trim()) }
+        line
+    }
+
 fun createDayFazitPrompts(ctx: Context): FazitPromptBundle = FazitPromptBundle(
     promptIntro = ctx.getString(R.string.prompt_dayfazit_intro),
     promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
@@ -252,8 +269,8 @@ fun createDayFazitPrompts(ctx: Context): FazitPromptBundle = FazitPromptBundle(
     promptHonesty = ctx.getString(R.string.prompt_honesty)
 )
 
-fun createWeekFazitPrompts(ctx: Context): FazitPromptBundle = FazitPromptBundle(
-    promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
+fun createWeekFazitPrompts(ctx: Context, calendarWeek: Int = calendarWeekOf()): FazitPromptBundle = FazitPromptBundle(
+    promptIntro = ctx.getString(R.string.prompt_weekfazit_intro, calendarWeek),
     promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
     promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
     promptHonesty = ctx.getString(R.string.prompt_honesty)
@@ -262,7 +279,7 @@ fun createWeekFazitPrompts(ctx: Context): FazitPromptBundle = FazitPromptBundle(
 fun syncWeekFazit(ctx: Context, entries: List<HistoryEntry>): DayFazit? {
     val wk = weekKeyOf(System.currentTimeMillis())
     val wf = WeekFazitStore.load(ctx, wk) ?: return null
-    val currentWkEntries = entries.filter { dayKeyOf(it.dateMillis) == wk }
+    val currentWkEntries = entries.filter { weekKeyOf(it.dateMillis) == wk }
     if (wf.fingerprint != dayFingerprint(currentWkEntries)) {
         WeekFazitStore.delete(ctx, wk)
         return null
