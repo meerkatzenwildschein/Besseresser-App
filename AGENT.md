@@ -73,6 +73,12 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
 - **Notiz-Schnellauswahl (`RecentNotesStore`):**
   - MRU-Speicher (max. 5 unmarkierte Einträge) plus dauerhafte Favoriten mit Sternchen (`RecentNote`).
 
+### 7. Konfiguration & Datensicherung (`ConfigScreen.kt`, `BackupStore.kt`)
+- Im Burger-Menü ganz unten eingehängt (`Icons.Filled.Build`), zusätzlich beim Erststart direkt im `SetupScreen` erreichbar („Backup aus Datei importieren").
+- **JSON-Export:** Speichert sämtliche App-Daten (Einstellungen inkl. entschlüsseltem API-Key, Ziele, Profil, Favoriten-Notizen sowie alle Verlaufseinträge mit Base64-codierten JPEG-Fotos, Tages- und Wochenfazits) als JSON-Datei direkt in den öffentlichen Ordner `Downloads` (`MediaStore.Downloads`).
+- **JSON-Import:** Öffnet den System-Dateipicker (Startordner `Downloads`) und stellt alle Daten wieder her; doppelte oder vorhandene Einträge/Einstellungen werden überschrieben.
+- **Verlaufsdaten zurücksetzen:** Löscht alle Mahlzeiten, Fotos, Tages- und Wochenfazits (mit Bestätigungsdialog), während Einstellungen, API-Key, Ziele, Profil und Notiz-Favoriten erhalten bleiben.
+
 ---
 
 ## KI-Schnittstelle & Prompt-Kontrakt
@@ -153,8 +159,10 @@ Besseresser-App/
 │       │   ├── java/de/gurum/besseresser/
 │       │   │   ├── ApiClient.kt            ← OpenAI-Netzwerk-Koordinator, BesseresserApiService
 │       │   │   ├── AppDatabase.kt          ← Room SQLite-Datenbank, Entities, DAOs & TypeConverters
+│       │   │   ├── BackupStore.kt          ← Vollständiger JSON-Export/Import (inkl. API-Key & Base64-Fotos)
 │       │   │   ├── CameraScreen.kt         ← CameraX-Live-Preview & Foto-Review
 │       │   │   ├── CommonUi.kt             ← Wiederverwendbare UI-Elemente (TopBars, Dialoge, Badges)
+│       │   │   ├── ConfigScreen.kt         ← Konfigurations-Screen (Datensicherung & Verlauf löschen)
 │       │   │   ├── Data.kt                 ← Domänenmodelle, Enums (TrafficLight, Gender), AppJson
 │       │   │   ├── DayGroupHeader.kt       ← Tagesgruppen-Header, Score-Badges, Ziele-Preview
 │       │   │   ├── FazitCard.kt            ← Tages- und Wochenfazit-Karten, Chips & Auto-Fazit-Trigger

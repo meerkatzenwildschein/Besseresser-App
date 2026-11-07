@@ -50,7 +50,7 @@ data class HistoryEntry(
 
 /** Persistenz der Historie: Room SQLite-Datenbank + <id>.jpg in filesDir/history. */
 object HistoryStore {
-    private fun dir(ctx: Context) =
+    internal fun dir(ctx: Context) =
         File(ctx.filesDir, "history").apply { mkdirs() }
 
     private var migrationChecked = false
@@ -219,6 +219,33 @@ object HistoryStore {
         }
     }
 
+    /** Speichert/überschreibt mehrere Verlaufseinträge (z. B. beim Backup-Import). */
+    fun saveAll(ctx: Context, entries: List<HistoryEntry>) {
+        if (entries.isEmpty()) return
+        ensureMigrated(ctx)
+        val entities = entries.map { it.toEntity() }
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).historyDao().insertAll(entities)
+        }
+    }
+
+    /** Löscht alle Verlaufsdaten (Einträge, Fotos, Tages- und Wochenfazits) komplett. */
+    fun clearAll(ctx: Context) {
+        ensureMigrated(ctx)
+        DayFazitStore.ensureMigrated(ctx)
+        WeekFazitStore.ensureMigrated(ctx)
+        val d = dir(ctx)
+        d.listFiles()?.forEach { runCatching { it.delete() } }
+        val db = AppDatabase.getInstance(ctx)
+        kotlinx.coroutines.runBlocking {
+            db.historyDao().deleteAll()
+            db.dayFazitDao().deleteAll()
+            db.weekFazitDao().deleteAll()
+        }
+        DayFazitSession.attempted.clear()
+        DayFazitSession.attemptedWeekly.clear()
+    }
+
     /** Foto downgesampelt (<1024px) speichern, JPEG-Qualitaet Schritt fuer Schritt bis < 100 KB. */
     private fun saveScaledJpeg(ctx: Context, uri: Uri, out: File) {
         val res = ctx.contentResolver
@@ -336,6 +363,14 @@ object DayFazitStore {
         }
     }
 
+    fun saveAll(ctx: Context, fazits: List<DayFazit>) {
+        if (fazits.isEmpty()) return
+        ensureMigrated(ctx)
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).dayFazitDao().insertAll(fazits.map { it.toEntity() })
+        }
+    }
+
     /** Fazit eines Tags löschen (z. B. weil ein Eintrag des Tages gelöscht wurde). */
     fun deleteForEntry(ctx: Context, entry: HistoryEntry) {
         val key = dayKeyOf(entry.dateMillis)
@@ -375,10 +410,25 @@ object WeekFazitStore {
         }
     }
 
+    fun loadAll(ctx: Context): List<DayFazit> {
+        ensureMigrated(ctx)
+        return kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).weekFazitDao().getAll().map { it.toDomain() }
+        }
+    }
+
     fun save(ctx: Context, fazit: DayFazit) {
         ensureMigrated(ctx)
         kotlinx.coroutines.runBlocking {
             AppDatabase.getInstance(ctx).weekFazitDao().insert(fazit.toWeekEntity())
+        }
+    }
+
+    fun saveAll(ctx: Context, fazits: List<DayFazit>) {
+        if (fazits.isEmpty()) return
+        ensureMigrated(ctx)
+        kotlinx.coroutines.runBlocking {
+            AppDatabase.getInstance(ctx).weekFazitDao().insertAll(fazits.map { it.toWeekEntity() })
         }
     }
 

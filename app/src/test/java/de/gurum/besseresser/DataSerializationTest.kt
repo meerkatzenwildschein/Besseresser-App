@@ -205,4 +205,120 @@ class DataSerializationTest {
         assertFalse(filledProfile.isEmpty)
         assertEquals(Gender.MALE, filledProfile.gender)
     }
+
+    @Test
+    fun testAppBackupRoundTripAndBase64Photos() {
+        val samplePhotoBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 1, 2, 3, 4)
+        val encodedPhoto = BackupStore.encodePhotoBase64(samplePhotoBytes)
+
+        val backup = AppBackup(
+            version = 1,
+            exportedAtMillis = 1730900000000L,
+            settings = Settings(
+                baseUrl = "https://openrouter.ai/api/v1",
+                apiKey = "sk-or-v1-secret-key",
+                model = "google/gemini-2.5-flash",
+                goals = listOf("Weniger Zucker", "Mehr Gemüse"),
+                goalsWereSplit = true
+            ),
+            profile = Profile(
+                birthDate = "1985-03-10",
+                weightKg = 78.5,
+                heightCm = 182,
+                notes = "Bluthochdruck",
+                gender = Gender.MALE
+            ),
+            recentNotes = listOf(
+                RecentNote("Haferflocken mit Beeren", starred = true),
+                RecentNote("Espresso", starred = false)
+            ),
+            historyEntries = listOf(
+                BackupHistoryEntry(
+                    entry = HistoryEntry(
+                        id = 1001L,
+                        dateMillis = 1730890000000L,
+                        photoFile = "1001.jpg",
+                        goalResults = listOf(
+                            GoalResult("Weniger Zucker", TrafficLight.GREEN, "Kein zugesetzter Zucker")
+                        ),
+                        summary = "Gesundes Frühstück",
+                        note = "Haferflocken mit Beeren",
+                        erkannt = "250 g Haferflocken mit Beeren",
+                        backdated = false
+                    ),
+                    photoBase64 = encodedPhoto
+                )
+            ),
+            dayFazits = listOf(
+                DayFazit(
+                    dayKey = "20261106",
+                    ampel = TrafficLight.GREEN,
+                    text = "Sehr guter Tag",
+                    entryIds = listOf(1001L),
+                    createdAt = 1730895000000L,
+                    fingerprint = "fp_day"
+                )
+            ),
+            weekFazits = listOf(
+                DayFazit(
+                    dayKey = "20261102",
+                    ampel = TrafficLight.YELLOW,
+                    text = "Solide Woche",
+                    entryIds = listOf(1001L),
+                    createdAt = 1730896000000L,
+                    fingerprint = "fp_week"
+                )
+            )
+        )
+
+        val json = BackupStore.serializeBackup(backup)
+        assertTrue(json.contains("sk-or-v1-secret-key"))
+        assertTrue(json.contains(encodedPhoto))
+
+        val restored = BackupStore.deserializeBackup(json)
+        assertEquals(backup, restored)
+
+        val decodedBytes = BackupStore.decodePhotoBase64(restored.historyEntries.first().photoBase64!!)
+        org.junit.Assert.assertArrayEquals(samplePhotoBytes, decodedBytes)
+    }
+
+    @Test
+    fun testBackupMergeOverwritesDuplicates() {
+        val existingSettings = Settings(
+            baseUrl = "https://api.openai.com/v1",
+            apiKey = "old-key",
+            model = "gpt-4o-mini",
+            goals = listOf("Altes Ziel"),
+            goalsWereSplit = false
+        )
+        val importedSettings = Settings(
+            baseUrl = "https://openrouter.ai/api/v1",
+            apiKey = "new-imported-key",
+            model = "google/gemini-2.5-flash",
+            goals = listOf("Neues Ziel 1", "Neues Ziel 2"),
+            goalsWereSplit = true
+        )
+        val mergedSettings = BackupStore.mergeSettings(existingSettings, importedSettings)
+        assertEquals(importedSettings, mergedSettings)
+
+        val existingProfile = Profile(birthDate = "1980-01-01", weightKg = 90.0, heightCm = 175, notes = "Alt", gender = Gender.FEMALE)
+        val importedProfile = Profile(birthDate = "1990-05-20", weightKg = 74.0, heightCm = 180, notes = "Neu", gender = Gender.MALE)
+        val mergedProfile = BackupStore.mergeProfile(existingProfile, importedProfile)
+        assertEquals(importedProfile, mergedProfile)
+
+        val existingNotes = listOf(
+            RecentNote("Salat", starred = false),
+            RecentNote("Nur lokal", starred = true)
+        )
+        val importedNotes = listOf(
+            RecentNote("Salat", starred = true),
+            RecentNote("Müsli", starred = false)
+        )
+        val mergedNotes = BackupStore.mergeRecentNotes(existingNotes, importedNotes)
+        assertEquals(3, mergedNotes.size)
+        // Imported "Salat" overwrote existing unstarred "Salat" with starred = true
+        assertEquals(RecentNote("Salat", starred = true), mergedNotes[0])
+        assertEquals(RecentNote("Müsli", starred = false), mergedNotes[1])
+        assertEquals(RecentNote("Nur lokal", starred = true), mergedNotes[2])
+    }
 }

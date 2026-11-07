@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
@@ -86,6 +87,7 @@ fun MainScreen(
     onEditSettings: () -> Unit,
     onOpenProfile: () -> Unit,
     onOpenHistory: () -> Unit,
+    onOpenConfig: () -> Unit = {},
     viewModel: MainViewModel = viewModel()
 ) {
     val ctx = LocalContext.current
@@ -191,6 +193,7 @@ fun MainScreen(
                 onOpenProfile = onOpenProfile,
                 onOpenHistory = onOpenHistory,
                 onEditSettings = onEditSettings,
+                onOpenConfig = onOpenConfig,
                 onEditErkannt = { viewModel.setShowErkanntEdit(true) },
                 onTakePhoto = {
                     if (!uiState.isBusy) {
@@ -378,6 +381,7 @@ private fun MainReportView(
     onOpenProfile: () -> Unit,
     onOpenHistory: () -> Unit,
     onEditSettings: () -> Unit,
+    onOpenConfig: () -> Unit,
     onEditErkannt: () -> Unit,
     onTakePhoto: () -> Unit,
     onSaveToHistory: () -> Unit,
@@ -397,7 +401,8 @@ private fun MainReportView(
             onMenuToggle = onMenuToggle,
             onOpenProfile = onOpenProfile,
             onOpenHistory = onOpenHistory,
-            onEditSettings = onEditSettings
+            onEditSettings = onEditSettings,
+            onOpenConfig = onOpenConfig
         )
 
         if (!lastGoaled) {
@@ -600,7 +605,8 @@ private fun MainTopBar(
     onMenuToggle: (Boolean) -> Unit,
     onOpenProfile: () -> Unit,
     onOpenHistory: () -> Unit,
-    onEditSettings: () -> Unit
+    onEditSettings: () -> Unit,
+    onOpenConfig: () -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -703,6 +709,17 @@ private fun MainTopBar(
                         leadingIcon = {
                             Icon(Icons.Filled.Settings, contentDescription = null)
                         }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.menu_config)) },
+                        onClick = {
+                            onMenuToggle(false)
+                            onOpenConfig()
+                        },
+                        leadingIcon = {
+                            Icon(Icons.Filled.Build, contentDescription = null)
+                        },
+                        enabled = menuEnabled
                     )
                 }
             }

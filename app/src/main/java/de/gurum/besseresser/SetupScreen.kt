@@ -1,5 +1,8 @@
 package de.gurum.besseresser
 
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -22,12 +25,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -52,7 +58,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // ----------------------------------------------------------------- Gängige Anbieter
 
@@ -87,11 +95,41 @@ fun SetupScreen(
     firstRun: Boolean,
     onCancel: () -> Unit,
     onDone: (Settings) -> Unit,
+    onBackupImported: ((Settings, Profile) -> Unit)? = null,
     viewModel: SetupViewModel = viewModel()
 ) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     val defaultGoals = remember { ctx.resources.getStringArray(R.array.default_goals).toList() }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    var importingBackup by remember { mutableStateOf(false) }
+    var importError by remember { mutableStateOf<String?>(null) }
+
+    val backupImportLauncher = rememberLauncherForActivityResult(OpenBackupDocumentContract()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        importingBackup = true
+        importError = null
+        scope.launch {
+            val res = withContext(Dispatchers.IO) {
+                BackupStore.importFromUri(ctx, uri)
+            }
+            res.onSuccess { summary ->
+                val updatedSettings = Store.load(ctx)
+                val updatedProfile = ProfileStore.load(ctx)
+                importingBackup = false
+                Toast.makeText(
+                    ctx,
+                    ctx.getString(R.string.config_import_success, summary.entriesCount, summary.photosCount),
+                    Toast.LENGTH_LONG
+                ).show()
+                viewModel.init(updatedSettings, defaultGoals)
+                onBackupImported?.invoke(updatedSettings, updatedProfile)
+            }.onFailure { e ->
+                importingBackup = false
+                importError = e.message ?: ctx.getString(R.string.config_import_failed)
+            }
+        }
+    }
 
     LaunchedEffect(initial) {
         viewModel.init(initial, defaultGoals)
@@ -169,6 +207,34 @@ fun SetupScreen(
                             lineHeight = 18.sp,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
                         )
+                        if (onBackupImported != null) {
+                            Spacer(Modifier.height(6.dp))
+                            OutlinedButton(
+                                onClick = { backupImportLauncher.launch(arrayOf("*/*")) },
+                                enabled = !importingBackup && !uiState.splitting,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (importingBackup) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                } else {
+                                    Icon(
+                                        Icons.Filled.Build,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                Text(
+                                    stringResource(R.string.setup_import_backup_button),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
                     } else {
                         Text(
                             stringResource(R.string.setup_edit_title),
@@ -184,6 +250,10 @@ fun SetupScreen(
                         )
                     }
                 }
+            }
+
+            importError?.let { msg ->
+                ErrorBanner(msg)
             }
 
             SectionCard(title = stringResource(R.string.setup_section_api)) {

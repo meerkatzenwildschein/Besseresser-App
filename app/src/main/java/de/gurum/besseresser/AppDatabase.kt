@@ -160,6 +160,9 @@ interface HistoryDao {
     @Query("DELETE FROM history_entries WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("DELETE FROM history_entries")
+    suspend fun deleteAll()
+
     @Query("UPDATE history_entries SET erkannt = :erkannt WHERE id = :id")
     suspend fun updateErkannt(id: Long, erkannt: String)
 
@@ -186,12 +189,18 @@ interface DayFazitDao {
 
     @Query("DELETE FROM day_fazits WHERE dayKey = :dayKey")
     suspend fun delete(dayKey: String)
+
+    @Query("DELETE FROM day_fazits")
+    suspend fun deleteAll()
 }
 
 @Dao
 interface WeekFazitDao {
     @Query("SELECT * FROM week_fazits")
     fun getAllFlow(): Flow<List<WeekFazitEntity>>
+
+    @Query("SELECT * FROM week_fazits")
+    suspend fun getAll(): List<WeekFazitEntity>
 
     @Query("SELECT * FROM week_fazits WHERE weekKey = :weekKey")
     suspend fun getByKey(weekKey: String): WeekFazitEntity?
@@ -204,6 +213,9 @@ interface WeekFazitDao {
 
     @Query("DELETE FROM week_fazits WHERE weekKey = :weekKey")
     suspend fun delete(weekKey: String)
+
+    @Query("DELETE FROM week_fazits")
+    suspend fun deleteAll()
 }
 
 // ----------------------------------------------------------------- Database

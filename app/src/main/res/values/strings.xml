@@ -193,4 +193,26 @@
     <string name="history_duplicate_done">Meal duplicated to %1$s</string>
     <string name="history_delete_confirm_title">Delete entry?</string>
     <string name="history_delete_confirm_text">Photo and rating will be removed irreversibly.</string>
+
+    <!-- Configuration / Backup -->
+    <string name="menu_config">Configuration</string>
+    <string name="setup_import_backup_button">Import backup from file</string>
+    <string name="config_intro_title">Backup &amp; Data Management</string>
+    <string name="config_intro_text">Back up all app data before reinstalling, restore an existing backup, or clear your history.</string>
+    <string name="config_busy_hint">Please wait, processing data …</string>
+    <string name="config_section_backup">Data Backup (Export &amp; Import)</string>
+    <string name="config_backup_desc">Exports or imports all app data (settings including API key, goals, profile, favorite notes, and all meals with Base64-encoded photos, daily and weekly summaries) as a JSON file in your \"Downloads\" folder. Existing or duplicate entries are overwritten on import.</string>
+    <string name="config_export_button">Export data (to Downloads)</string>
+    <string name="config_import_button">Import data (from file)</string>
+    <string name="config_export_success">Backup saved to Downloads/%1$s (%2$d meals, %3$d photos).</string>
+    <string name="config_export_failed">Export failed.</string>
+    <string name="config_import_success">Backup imported successfully (%1$d meals, %2$d photos, settings &amp; profile restored).</string>
+    <string name="config_import_failed">Import failed.</string>
+    <string name="config_section_history_clear">Reset History Data</string>
+    <string name="config_clear_history_desc">Permanently deletes all saved meals, photos, and daily/weekly summaries from this device. Settings, API key, goals, profile, and favorite notes are kept.</string>
+    <string name="config_clear_history_button">Delete all history data</string>
+    <string name="config_clear_confirm_title">Delete all history data?</string>
+    <string name="config_clear_confirm_text">All meals, photos, and daily and weekly summaries will be permanently deleted. Your settings, goals, and profile will be kept.</string>
+    <string name="config_clear_success">All history data has been deleted.</string>
+    <string name="config_clear_failed">Deletion failed.</string>
 </resources>

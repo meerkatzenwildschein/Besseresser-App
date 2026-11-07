@@ -35,6 +35,7 @@ interface HistoryRepository {
     suspend fun updateEvaluation(id: Long, goalResults: List<GoalResult>, summary: String)
     suspend fun reorderEntries(reordered: List<HistoryEntry>)
     suspend fun delete(entry: HistoryEntry)
+    suspend fun clearAll()
     suspend fun saveDayFazit(fazit: DayFazit)
     suspend fun loadDayFazit(dayKey: String): DayFazit?
     suspend fun deleteDayFazitForEntry(entry: HistoryEntry)
@@ -108,6 +109,10 @@ class DefaultHistoryRepository(
 
     override suspend fun delete(entry: HistoryEntry) = withContext(Dispatchers.IO) {
         HistoryStore.delete(context, entry)
+    }
+
+    override suspend fun clearAll() = withContext(Dispatchers.IO) {
+        HistoryStore.clearAll(context)
     }
 
     override suspend fun saveDayFazit(fazit: DayFazit) = withContext(Dispatchers.IO) {
