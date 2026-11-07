@@ -189,6 +189,12 @@ Besseresser-App/
 │               ├── DomainLogicAndFingerprintTest.kt ← Unit-Tests für Fingerprints, Tages-/Wochenkeys, Alter & Scores
 │               ├── RepositoriesAndFakesTest.kt   ← Unit-Tests für Fake-Repositories & isolierte ViewModel-Logik
 │               └── RoomDatabaseAndViewModelTest.kt ← Unit-Tests für Room-Converter, Mappings & ViewModels
+├── fastlane/
+│   └── metadata/android/            ← Store-Metadaten (fdroidserver-kompatibel)
+│       ├── en-US/                   ← Titel, Kurz-/Langbeschreibung, changelogs/, images/phoneScreenshots/
+│       └── de-DE/                   ← deutsche Lokalisierung (Beschreibung + Changelogs)
+└── metadata/
+    └── de.gurum.besseresser.yml     ← F-Droid-Buildmetadata-Draft für das fdroiddata-MR
 
 ---
 
@@ -200,7 +206,44 @@ Besseresser-App/
 
 # Debug-APK kompilieren
 .\gradlew.bat assembleDebug
+
+# Release-APK kompilieren (signiert, siehe unten)
+.\gradlew.bat assembleRelease
 ```
+
+### Release-Signierung
+
+- Die App wird über eine Gradle `signingConfigs.release`-Konfiguration in `app/build.gradle.kts` signiert,
+  die optional eine Credentials-Datei einliest: **`../AndroidKeys/keystore.properties`** (relativ zum Repo-Root,
+  also eine Ebene oberhalb des Repos).
+- `keystore.properties` folgt dem Muster: `storeFile=<pfad>/AndroidKeys/besseresser-release.jks`,
+  `storePassword=<pw>`, `keyAlias=besseresser`, `keyPassword=<pw>`. Keystore und Properties-Datei liegen
+  **außerhalb** des Repos und dürfen nie committet, kopiert oder gepusht werden.
+- Fehlen die Dateien → bleibt der Release-Build lauffähig, aber **unsigniert**
+  (`app-release-unsigned.apk`, nicht installierbar).
+- Signatur-Verifikation (mit den Android Build-Tools desselben SDKs, dort liegen `apksigner.bat`/`aapt2.exe`):
+  `"apksigner.bat" verify --print-certs app\build\outputs\apk\release\app-release.apk` – der erwartete
+  Signatur-SHA-256-Fingerprint lautet `175b37e4ef1a54aad66c980f39ebfed9cba67389f28f6dd7a09691bb941b8230`
+  (Alias `besseresser`).
+
+### Versionsanhebung & Release-Build
+
+1. `appVersion` und `versionCode` in `app/build.gradle.kts` erhöhen und committen
+   (`versionCode = 4 ↔ 1.3.0`, `5 ↔ 1.4.0`, …).
+2. Tag `vX.Y.Z` auf den Versionsbump-Commit setzen und mit `git push --tags` pushen.
+3. `.\gradlew.bat assembleRelease` → signierte APK liegt unter `app\build\outputs\apk\release\app-release.apk`.
+4. APK als Release-Asset zum GitHub-Release des Tags hochladen (Name: `Besseresser-X.Y.Z.apk`),
+   alternativ über die GitHub-API (Token aus dem Git Credential Manager ziehen; nie ausgeben).
+
+### Hinweise zur Reproduzierbarkeit
+
+- `BUILD_TIME` in `app/build.gradle.kts` wird **deterministisch** aus dem Commit-Datum des git-HEAD
+  (Unix-Sekunden, UTC) abgeleitet. Nicht durch `LocalDateTime.now()` oder Ähnliches ersetzen,
+  sonst sind Builds desselben Commits nicht mehr bitidentisch.
+- Die fastlane-Metadaten (Lokalisierungen, Screenshots, Changelogs) liegen unter
+  `fastlane/metadata/android/{en-US,de-DE}/`; README und F-Droid nutzen dieselben Screenshots aus
+  `fastlane/metadata/android/en-US/images/phoneScreenshots/`.
+- Der F-Droid-Buildmetadata-Draft liegt in `metadata/de.gurum.besseresser.yml`.
 
 ---
 
