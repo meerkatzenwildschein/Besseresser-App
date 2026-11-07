@@ -101,7 +101,7 @@ private val BesseresserShapes = Shapes(
 // ----------------------------------------------------------------- Activity & Navigation
 
 /** Reihenfolge für Animationsrichtung: vor = nach rechts tiefer, zurück = nach links höher. */
-enum class AppScreen(val order: Int) { Main(0), Profile(1), History(1), Detail(2) }
+enum class AppScreen(val order: Int) { Main(0), Profile(1), History(1), Config(1), Detail(2) }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -129,7 +129,9 @@ fun GesundEssenApp() {
             var showHistory by remember { mutableStateOf(false) }
             var historyEntry by remember { mutableStateOf<HistoryEntry?>(null) }
             var showProfile by remember { mutableStateOf(false) }
+            var showConfig by remember { mutableStateOf(false) }
             var profile by remember { mutableStateOf(Profile()) }
+            val mainViewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 
             LaunchedEffect(Unit) {
                 settings = Store.load(ctx)
@@ -162,12 +164,22 @@ fun GesundEssenApp() {
                         showSetup = false
                         // Nach dem ERSTEN Erfassen der KI-Zugangsdaten einmalig das Profil öffnen
                         if (firstRun) showProfile = true
+                    },
+                    onBackupImported = { importedSettings, importedProfile ->
+                        settings = importedSettings
+                        profile = importedProfile
+                        mainViewModel.loadRecentNotes(ctx)
+                        if (importedSettings.isComplete) {
+                            showSetup = false
+                            showProfile = false
+                        }
                     }
                 )
                 else -> {
                     val target = when {
                         historyEntry != null -> AppScreen.Detail
                         showProfile -> AppScreen.Profile
+                        showConfig -> AppScreen.Config
                         showHistory -> AppScreen.History
                         else -> AppScreen.Main
                     }
@@ -199,7 +211,9 @@ fun GesundEssenApp() {
                                 onOpenHistory = {
                                     showHistory = true
                                     historyEntry = null
-                                }
+                                },
+                                onOpenConfig = { showConfig = true },
+                                viewModel = mainViewModel
                             )
                             AppScreen.Profile -> ProfileScreen(
                                 initial = profile,
@@ -208,6 +222,18 @@ fun GesundEssenApp() {
                                     ProfileStore.save(ctx, p.birthDate, p.weightKg, p.heightCm, p.notes, p.gender)
                                     profile = p
                                     showProfile = false
+                                }
+                            )
+                            AppScreen.Config -> ConfigScreen(
+                                onBack = { showConfig = false },
+                                onDataImported = { importedSettings, importedProfile ->
+                                    settings = importedSettings
+                                    profile = importedProfile
+                                    mainViewModel.loadRecentNotes(ctx)
+                                },
+                                onHistoryCleared = {
+                                    historyEntry = null
+                                    mainViewModel.reset()
                                 }
                             )
                             AppScreen.History -> HistoryScreen(

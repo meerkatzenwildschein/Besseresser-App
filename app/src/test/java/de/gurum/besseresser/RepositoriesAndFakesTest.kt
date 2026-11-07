@@ -131,6 +131,12 @@ class FakeHistoryRepository : HistoryRepository {
         entriesFlow.update { list -> list.filter { it.id != entry.id } }
     }
 
+    override suspend fun clearAll() {
+        entriesFlow.value = emptyList()
+        dayFazitsFlow.value = emptyMap()
+        weekFazitsFlow.value = emptyMap()
+    }
+
     override suspend fun reorderEntries(reordered: List<HistoryEntry>) {
         val reorderedMap = reordered.associateBy { it.id }
         entriesFlow.update { list ->
@@ -576,5 +582,12 @@ class RepositoriesAndFakesTest {
         val loadedFazitAfterReorder = histRepo.loadDayFazit(dayKeyOf(day))
         assertNotNull(loadedFazitAfterReorder)
         assertFalse(isFazitOutdated(loadedFazitAfterReorder!!, reordered))
+
+        // Clear all history data -> entries, dayFazits, weekFazits become empty
+        histRepo.clearAll()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.entries.isEmpty())
+        assertTrue(vm.uiState.value.fazitMap.isEmpty())
+        assertNull(vm.uiState.value.weekFazit)
     }
 }

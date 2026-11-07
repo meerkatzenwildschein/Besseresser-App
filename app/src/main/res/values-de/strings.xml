@@ -193,4 +193,26 @@
     <string name="history_duplicate_done">Essen auf %1$s dupliziert</string>
     <string name="history_delete_confirm_title">Eintrag löschen?</string>
     <string name="history_delete_confirm_text">Foto und Bewertung werden unwiderruflich entfernt.</string>
+
+    <!-- Konfiguration / Backup -->
+    <string name="menu_config">Konfiguration</string>
+    <string name="setup_import_backup_button">Backup aus Datei importieren</string>
+    <string name="config_intro_title">Datensicherung &amp; Verwaltung</string>
+    <string name="config_intro_text">Hier kannst du sämtliche App-Daten vor einer Neuinstallation sichern, wiederherstellen oder den Verlauf leeren.</string>
+    <string name="config_busy_hint">Bitte warten, Daten werden verarbeitet …</string>
+    <string name="config_section_backup">Datensicherung (Export &amp; Import)</string>
+    <string name="config_backup_desc">Exportiert bzw. importiert alle App-Daten (Einstellungen inkl. API-Key, Ziele, Profil, Notiz-Favoriten sowie alle Mahlzeiten mit Base64-codierten Fotos, Tages- und Wochenfazits) als JSON-Datei im Ordner „Downloads“. Vorhandene oder doppelte Einträge werden beim Import überschrieben.</string>
+    <string name="config_export_button">Daten exportieren (nach Downloads)</string>
+    <string name="config_import_button">Daten importieren (aus Datei)</string>
+    <string name="config_export_success">Backup gespeichert unter Downloads/%1$s (%2$d Mahlzeiten, %3$d Fotos).</string>
+    <string name="config_export_failed">Export fehlgeschlagen.</string>
+    <string name="config_import_success">Backup erfolgreich importiert (%1$d Mahlzeiten, %2$d Fotos, Einstellungen &amp; Profil wiederhergestellt).</string>
+    <string name="config_import_failed">Import fehlgeschlagen.</string>
+    <string name="config_section_history_clear">Verlaufsdaten zurücksetzen</string>
+    <string name="config_clear_history_desc">Löscht alle gespeicherten Mahlzeiten, Fotos sowie Tages- und Wochenfazits unwiderruflich von diesem Gerät. Einstellungen, API-Key, Ziele, Profil und Notiz-Favoriten bleiben erhalten.</string>
+    <string name="config_clear_history_button">Alle Verlaufsdaten löschen</string>
+    <string name="config_clear_confirm_title">Alle Verlaufsdaten löschen?</string>
+    <string name="config_clear_confirm_text">Sämtliche Mahlzeiten, Fotos sowie Tages- und Wochenfazits werden unwiderruflich gelöscht. Deine Einstellungen, Ziele und dein Profil bleiben erhalten.</string>
+    <string name="config_clear_success">Alle Verlaufsdaten wurden gelöscht.</string>
+    <string name="config_clear_failed">Löschen fehlgeschlagen.</string>
 </resources>

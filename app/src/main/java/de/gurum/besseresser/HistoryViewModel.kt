@@ -108,7 +108,11 @@ class HistoryViewModel(
         viewModelScope.launch {
             repo.getWeekFazitsFlow().collect { map ->
                 val currentWk = weekKeyOf(System.currentTimeMillis())
-                val currentWf = map[currentWk] ?: return@collect
+                val currentWf = map[currentWk]
+                if (currentWf == null) {
+                    _uiState.update { it.copy(weekFazit = null) }
+                    return@collect
+                }
                 val currentWkEntries = _uiState.value.entries.filter { weekKeyOf(it.dateMillis) == currentWk }
                 if (currentWf.fingerprint == dayFingerprint(currentWkEntries)) {
                     _uiState.update { it.copy(weekFazit = currentWf) }
