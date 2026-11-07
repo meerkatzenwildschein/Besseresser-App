@@ -156,8 +156,8 @@ Besseresser-App/
 │       │   │   ├── CameraScreen.kt         ← CameraX-Live-Preview & Foto-Review
 │       │   │   ├── CommonUi.kt             ← Wiederverwendbare UI-Elemente (TopBars, Dialoge, Badges)
 │       │   │   ├── Data.kt                 ← Domänenmodelle, Enums (TrafficLight, Gender), AppJson
-│       │   │   ├── DayFazitCard.kt         ← Tages- und Wochenfazit-Karten, Auto-Fazit-Trigger
 │       │   │   ├── DayGroupHeader.kt       ← Tagesgruppen-Header, Score-Badges, Ziele-Preview
+│       │   │   ├── FazitCard.kt            ← Tages- und Wochenfazit-Karten, Chips & Auto-Fazit-Trigger
 │       │   │   ├── HistoryDetailScreen.kt  ← Detailansicht einzelner Mahlzeiten, Re-Evaluation
 │       │   │   ├── HistoryListScreen.kt    ← Verlaufslisten-UI, Swipe-To-Dismiss, HistoryItem
 │       │   │   ├── HistoryScreen.kt        ← Haupt-Verlaufsansicht & Navigation
