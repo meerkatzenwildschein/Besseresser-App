@@ -1,5 +1,7 @@
+import java.io.FileInputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -13,6 +15,15 @@ val buildTime: String =
     LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"))
 
 val appVersion = "1.3.0"
+
+// Optional release signing: the keystore lives outside the repo (in
+// <repo>/../AndroidKeys/) and is never committed. Without the file, release
+// builds stay unsigned.
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("../AndroidKeys/keystore.properties")
+    if (f.exists()) FileInputStream(f).use { load(it) }
+}
+val hasSigningConfig = keystoreProps.getProperty("storeFile") != null
 
 val composeBomVersion = "2024.09.02"
 val coreKtxVersion = "1.13.1"
@@ -37,10 +48,24 @@ android {
         buildConfigField("String", "APP_VERSION", "\"$appVersion\"")
     }
 
+    signingConfigs {
+        if (hasSigningConfig) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (hasSigningConfig) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
