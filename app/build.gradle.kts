@@ -1,5 +1,7 @@
 import java.io.FileInputStream
-import java.time.LocalDateTime
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Properties
 
@@ -11,8 +13,17 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-val buildTime: String =
-    LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"))
+// Deterministic build timestamp: taken from the current git HEAD commit date
+// (UTC), so builds of the same commit are reproducible across machines.
+val buildTime: String = run {
+    val epochSeconds = providers.exec {
+        commandLine("git", "log", "-1", "--format=%cd", "--date=unix")
+    }.standardOutput.asText.get().trim().toLongOrNull()
+    if (epochSeconds == null) return@run "unknown"
+    Instant.ofEpochSecond(epochSeconds)
+        .atZone(ZoneOffset.UTC)
+        .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"))
+}
 
 val appVersion = "1.3.0"
 
