@@ -331,4 +331,39 @@ class ApiClientTest {
         assertEquals(listOf("claude-3-5-sonnet", "gpt-4o-mini"), res2.vision)
         assertEquals(4, res2.all.size)
     }
+
+    @Test
+    fun testRunWithOneRetryBehavior() {
+        // 1. First attempt succeeds -> called once, no retry
+        var calls1 = 0
+        val res1 = ApiClient.runWithOneRetry { isRetry ->
+            calls1++
+            assertFalse(isRetry)
+            "OK"
+        }
+        assertTrue(res1.isSuccess)
+        assertEquals("OK", res1.getOrNull())
+        assertEquals(1, calls1)
+
+        // 2. First attempt fails, second attempt succeeds -> called twice, returns success without error
+        var calls2 = 0
+        val res2 = ApiClient.runWithOneRetry { isRetry ->
+            calls2++
+            if (!isRetry) throw IllegalStateException("First attempt failed")
+            "Recovered on retry"
+        }
+        assertTrue(res2.isSuccess)
+        assertEquals("Recovered on retry", res2.getOrNull())
+        assertEquals(2, calls2)
+
+        // 3. Both attempts fail -> called twice, returns failure from second attempt
+        var calls3 = 0
+        val res3 = ApiClient.runWithOneRetry<String> { isRetry ->
+            calls3++
+            throw IllegalStateException(if (isRetry) "Second attempt failed" else "First attempt failed")
+        }
+        assertTrue(res3.isFailure)
+        assertEquals("Second attempt failed", res3.exceptionOrNull()?.message)
+        assertEquals(2, calls3)
+    }
 }

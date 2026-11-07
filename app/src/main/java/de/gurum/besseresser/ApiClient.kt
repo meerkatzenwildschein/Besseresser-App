@@ -117,6 +117,17 @@ interface BesseresserApiService {
 object ApiClient : BesseresserApiService {
     private const val CHAT_COMPLETIONS_PATH = "/chat/completions"
 
+    /**
+     * Führt eine KI-Operation aus und wiederholt sie bei jeglichem Fehler (Netzwerk, HTTP-Fehler,
+     * leere Antwort, Token-Limit, JSON-Parsing) direkt EINMAL automatisch (`isRetry = true`).
+     * Erst wenn auch der zweite Versuch scheitert, wird der Fehler an die UI gemeldet.
+     */
+    internal inline fun <T> runWithOneRetry(block: (isRetry: Boolean) -> T): Result<T> {
+        val firstAttempt = runCatching { block(false) }
+        if (firstAttempt.isSuccess) return firstAttempt
+        return runCatching { block(true) }
+    }
+
     // ---------------------------------------------------------------- Foto bewerten
 
     override suspend fun analyze(
@@ -125,31 +136,24 @@ object ApiClient : BesseresserApiService {
         settings: Settings,
         promptBundle: PromptBundle
     ): Result<Evaluation> = withContext(Dispatchers.IO) {
-        runCatching {
-            val dataUri = ImagePreprocessor.prepareImageDataUri(ctx, photoUri)
-            val prompt = PromptBuilder.createAnalyzePrompt(settings.goals, promptBundle)
-            val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
+        val dataUriResult = runCatching { ImagePreprocessor.prepareImageDataUri(ctx, photoUri) }
+        val dataUri = dataUriResult.getOrElse { return@withContext Result.failure(it) }
+        val prompt = PromptBuilder.createAnalyzePrompt(settings.goals, promptBundle)
+        val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
 
-            var text = OpenAiChatClient.postChat(
+        runWithOneRetry { isRetry ->
+            val text = OpenAiChatClient.postChat(
                 url,
                 settings.apiKey,
-                buildAnalyzeBody(settings, prompt, dataUri, highBudgetRetry = false)
+                buildAnalyzeBody(settings, prompt, dataUri, highBudgetRetry = isRetry)
             )
-            var resp = AppJson.parseToJsonElement(text).jsonObject
-            var rawContent = OpenAiChatClient.extractContent(resp)
-
-            if (rawContent.isNullOrBlank() && OpenAiChatClient.isLengthTruncatedWithoutContent(resp)) {
-                OpenAiChatClient.markModelNeedsBoostedBudget(settings.model)
-                text = OpenAiChatClient.postChat(
-                    url,
-                    settings.apiKey,
-                    buildAnalyzeBody(settings, prompt, dataUri, highBudgetRetry = true)
-                )
-                resp = AppJson.parseToJsonElement(text).jsonObject
-                rawContent = OpenAiChatClient.extractContent(resp)
-            }
+            val resp = AppJson.parseToJsonElement(text).jsonObject
+            val rawContent = OpenAiChatClient.extractContent(resp)
 
             if (rawContent.isNullOrBlank()) {
+                if (OpenAiChatClient.isLengthTruncatedWithoutContent(resp)) {
+                    OpenAiChatClient.markModelNeedsBoostedBudget(settings.model)
+                }
                 throw buildAnalyzeMissingContentException(resp, text)
             }
 
@@ -219,17 +223,17 @@ object ApiClient : BesseresserApiService {
         mealLines: List<String>,
         prompts: FazitPromptBundle
     ): Result<DayFazitResult> = withContext(Dispatchers.IO) {
-        runCatching {
-            val prompt = PromptBuilder.createDayFazitPrompt(goals, promptContext, mealLines, prompts)
-            val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
-            val messages = buildJsonArray {
-                add(buildJsonObject {
-                    put("role", "user")
-                    put("content", prompt)
-                })
-            }
+        val prompt = PromptBuilder.createDayFazitPrompt(goals, promptContext, mealLines, prompts)
+        val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
+        val messages = buildJsonArray {
+            add(buildJsonObject {
+                put("role", "user")
+                put("content", prompt)
+            })
+        }
 
-            var respText = OpenAiChatClient.postChat(
+        runWithOneRetry { isRetry ->
+            val respText = OpenAiChatClient.postChat(
                 url,
                 settings.apiKey,
                 OpenAiChatClient.chatBody(
@@ -238,31 +242,16 @@ object ApiClient : BesseresserApiService {
                     temperature = 0.3,
                     maxTokens = 3000,
                     messages = messages,
-                    highBudgetRetry = false
+                    highBudgetRetry = isRetry
                 )
             )
-            var respObj = AppJson.parseToJsonElement(respText).jsonObject
-            var rawContent = OpenAiChatClient.extractContent(respObj)
-
-            if (rawContent.isNullOrBlank() && OpenAiChatClient.isLengthTruncatedWithoutContent(respObj)) {
-                OpenAiChatClient.markModelNeedsBoostedBudget(settings.model)
-                respText = OpenAiChatClient.postChat(
-                    url,
-                    settings.apiKey,
-                    OpenAiChatClient.chatBody(
-                        model = settings.model,
-                        baseUrl = settings.baseUrl,
-                        temperature = 0.3,
-                        maxTokens = 3000,
-                        messages = messages,
-                        highBudgetRetry = true
-                    )
-                )
-                respObj = AppJson.parseToJsonElement(respText).jsonObject
-                rawContent = OpenAiChatClient.extractContent(respObj)
-            }
+            val respObj = AppJson.parseToJsonElement(respText).jsonObject
+            val rawContent = OpenAiChatClient.extractContent(respObj)
 
             if (rawContent.isNullOrBlank()) {
+                if (OpenAiChatClient.isLengthTruncatedWithoutContent(respObj)) {
+                    OpenAiChatClient.markModelNeedsBoostedBudget(settings.model)
+                }
                 throw buildDayFazitMissingContentException(respObj, respText)
             }
 
@@ -297,17 +286,17 @@ object ApiClient : BesseresserApiService {
         settings: Settings,
         userDescription: String
     ): Result<Evaluation> = withContext(Dispatchers.IO) {
-        runCatching {
-            val prompt = PromptBuilder.createAnalyzeTextPrompt(ctx, settings.goals, userDescription)
-            val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
-            val messages = buildJsonArray {
-                add(buildJsonObject {
-                    put("role", "user")
-                    put("content", prompt)
-                })
-            }
+        val prompt = PromptBuilder.createAnalyzeTextPrompt(ctx, settings.goals, userDescription)
+        val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
+        val messages = buildJsonArray {
+            add(buildJsonObject {
+                put("role", "user")
+                put("content", prompt)
+            })
+        }
 
-            var text = OpenAiChatClient.postChat(
+        runWithOneRetry { isRetry ->
+            val text = OpenAiChatClient.postChat(
                 url,
                 settings.apiKey,
                 OpenAiChatClient.chatBody(
@@ -316,31 +305,18 @@ object ApiClient : BesseresserApiService {
                     temperature = 0.3,
                     maxTokens = 4096,
                     messages = messages,
-                    highBudgetRetry = false
+                    highBudgetRetry = isRetry
                 )
             )
-            var resp = AppJson.parseToJsonElement(text).jsonObject
-            var rawContent = OpenAiChatClient.extractContent(resp)
+            val resp = AppJson.parseToJsonElement(text).jsonObject
+            val rawContent = OpenAiChatClient.extractContent(resp)
 
-            if (rawContent.isNullOrBlank() && OpenAiChatClient.isLengthTruncatedWithoutContent(resp)) {
-                OpenAiChatClient.markModelNeedsBoostedBudget(settings.model)
-                text = OpenAiChatClient.postChat(
-                    url,
-                    settings.apiKey,
-                    OpenAiChatClient.chatBody(
-                        model = settings.model,
-                        baseUrl = settings.baseUrl,
-                        temperature = 0.3,
-                        maxTokens = 4096,
-                        messages = messages,
-                        highBudgetRetry = true
-                    )
-                )
-                resp = AppJson.parseToJsonElement(text).jsonObject
-                rawContent = OpenAiChatClient.extractContent(resp)
+            if (rawContent.isNullOrBlank()) {
+                if (OpenAiChatClient.isLengthTruncatedWithoutContent(resp)) {
+                    OpenAiChatClient.markModelNeedsBoostedBudget(settings.model)
+                }
+                throw IllegalStateException("Die KI hat keinen Text geliefert. Roh-Antwort: ${text.take(300)}")
             }
-
-            check(!rawContent.isNullOrBlank()) { "Die KI hat keinen Text geliefert. Roh-Antwort: ${text.take(300)}" }
 
             parseEvaluation(rawContent, settings.goals)
         }
@@ -352,19 +328,22 @@ object ApiClient : BesseresserApiService {
         request: SplitGoalsRequest
     ): Result<List<String>> = withContext(Dispatchers.IO) {
         val requestUrl = request.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
-        try {
-            val prompt = PromptBuilder.createSplitGoalsPrompt(request)
+        val prompt = PromptBuilder.createSplitGoalsPrompt(request)
+        val messages = buildJsonArray {
+            add(buildJsonObject {
+                put("role", "user")
+                put("content", prompt)
+            })
+        }
+
+        val attemptResult = runWithOneRetry { isRetry ->
             val req = OpenAiChatClient.chatBody(
                 model = request.model,
                 baseUrl = request.baseUrl,
                 temperature = 0.1,
                 maxTokens = 1600,
-                messages = buildJsonArray {
-                    add(buildJsonObject {
-                        put("role", "user")
-                        put("content", prompt)
-                    })
-                }
+                messages = messages,
+                highBudgetRetry = isRetry
             )
             val respBody = OpenAiChatClient.postChat(requestUrl, request.apiKey, req)
 
@@ -381,18 +360,23 @@ object ApiClient : BesseresserApiService {
                 }
             val goals = rawArr.mapNotNull { it.jsonPrimitive.contentOrNull?.trim()?.takeIf { s -> s.isNotBlank() } }
             check(goals.isNotEmpty()) { "KI lieferte keine Ziele" }
-            Result.success(goals)
-        } catch (e: Exception) {
-            val debug = buildString {
-                appendLine("Anfrage:  POST $requestUrl (Modell: ${request.model})")
-                appendLine("Status:   HTTP ${(e as? ChatHttpException)?.code ?: "?"}")
-                appendLine("Fehler:   ${e.message ?: e.javaClass.simpleName}")
-                appendLine()
-                appendLine("Rohantwort (erste 800 Zeichen):")
-                appendLine((e as? ChatHttpException)?.bodyText.orEmpty().take(800).ifBlank { "(leer bzw. Netzfehler)" })
-            }
-            Result.failure(ApiException(e.message ?: e.javaClass.simpleName, debug, e))
+            goals
         }
+
+        attemptResult.fold(
+            onSuccess = { Result.success(it) },
+            onFailure = { e ->
+                val debug = buildString {
+                    appendLine("Anfrage:  POST $requestUrl (Modell: ${request.model})")
+                    appendLine("Status:   HTTP ${(e as? ChatHttpException)?.code ?: "?"}")
+                    appendLine("Fehler:   ${e.message ?: e.javaClass.simpleName}")
+                    appendLine()
+                    appendLine("Rohantwort (erste 800 Zeichen):")
+                    appendLine((e as? ChatHttpException)?.bodyText.orEmpty().take(800).ifBlank { "(leer bzw. Netzfehler)" })
+                }
+                Result.failure(ApiException(e.message ?: e.javaClass.simpleName, debug, e))
+            }
+        )
     }
 
     /** Ziele-Freitext lokal an Satzzeichen teilen (Rückfall ohne KI). */
