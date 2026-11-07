@@ -164,6 +164,7 @@
     <string name="history_swipe_blocked_overlay">Eine Erfassung läuft - bitte zuerst abschließen oder abbrechen.</string>
     <string name="score_caption">Ampelschnitt</string>
     <string name="weekfazit_row_label">Wochenfazit</string>
+    <string name="weekfazit_row_label_kw">Wochenfazit · KW %1$d</string>
     <string name="weekfazit_chip_idle">✨ Wochenfazit ermitteln</string>
     <string name="weekfazit_chip_loading">Wochenfazit …</string>
     <string name="weekfazit_chip_label">Wochenfazit</string>
@@ -179,7 +180,7 @@
     <string name="dayfazit_line_none">keine Erkennung gespeichert</string>
     <string name="dayfazit_line_note">Anmerkung: %1$s</string>
     <string name="prompt_dayfazit_intro">Hier sind alle Mahlzeiten eines Tages (Format: Uhrzeit · erkanntes Essen mit geschätzter Menge · Nutzer-Anmerkung). Bewerte den Tag als GANZES im Hinblick auf folgende Ziele:</string>
-    <string name="prompt_weekfazit_intro">Hier sind alle Mahlzeiten einer WOCHE (Format: Uhrzeit · erkanntes Essen mit geschätzter Menge · Nutzer-Anmerkung), chronologisch von Montag bis Sonntag. Bewerte die Woche als GANZES im Hinblick auf folgende Ziele:</string>
+    <string name="prompt_weekfazit_intro">Hier sind alle Mahlzeiten einer WOCHE (Kalenderwoche %1$d, Format: Datum · erkanntes Essen mit geschätzter Menge · Nutzer-Anmerkung), chronologisch von Montag bis Sonntag. Bewerte die Woche als GANZES im Hinblick auf folgende Ziele:</string>
     <string name="prompt_dayfazit_rules">Wichte kleine Genuss-Snacks in ihrem Kontext: Ein einzelnes Bonbon soll einen sonst vollwertigen Tag nicht überdurchschnittlich verschlechtern. Die Ampel richtet sich nach der Gesamtbilanz über alle Mahlzeiten des Tages.</string>
     <string name="prompt_dayfazit_language">Antworte in deutscher Sprache.</string>
     <string name="score_tooltip_ok">Ampelschnitt der bewerteten Ziele: 🟢 100 · 🟡 50 · 🔴 0</string>

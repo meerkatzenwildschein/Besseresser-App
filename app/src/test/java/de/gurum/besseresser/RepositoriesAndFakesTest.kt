@@ -278,14 +278,15 @@ class RepositoriesAndFakesTest {
         assertEquals("Mittagessen", entry.note)
 
         repo.updateErkannt(entry.id, "Bunter Salat")
-        val fazit = DayFazit("20261106", TrafficLight.GREEN, "Klasse", listOf(entry.id), 1000L, "fp")
+        val entryDayKey = dayKeyOf(entry.dateMillis)
+        val fazit = DayFazit(entryDayKey, TrafficLight.GREEN, "Klasse", listOf(entry.id), 1000L, "fp")
         repo.saveDayFazit(fazit)
-        val loadedFazit = repo.loadDayFazit("20261106")
+        val loadedFazit = repo.loadDayFazit(entryDayKey)
         assertNotNull(loadedFazit)
         assertEquals("Klasse", loadedFazit?.text)
 
         repo.deleteDayFazitForEntry(entry)
-        assertNull(repo.loadDayFazit("20261106"))
+        assertNull(repo.loadDayFazit(entryDayKey))
 
         repo.delete(entry)
     }

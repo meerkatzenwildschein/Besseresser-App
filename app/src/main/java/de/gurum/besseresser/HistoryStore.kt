@@ -273,6 +273,10 @@ fun weekKeyOf(millis: Long): String {
     return monday.format(DAY_KEY_FORMAT)
 }
 
+/** ISO-Kalenderwoche (1..53) für ein gegebenes Datum. */
+fun calendarWeekOf(date: LocalDate = LocalDate.now()): Int =
+    date.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear())
+
 /** KI-generiertes Fazit eines Tages (Text-Ampel statt rechnerischem Tagesscore). */
 @Serializable
 data class DayFazit(

@@ -69,7 +69,7 @@ class HistoryViewModel(
             repo.getAllFlow().collect { list ->
                 val wk = weekKeyOf(System.currentTimeMillis())
                 val wf = repo.loadWeekFazit(wk)
-                val currentWkEntries = list.filter { dayKeyOf(it.dateMillis) == wk }
+                val currentWkEntries = list.filter { weekKeyOf(it.dateMillis) == wk }
                 val validWf = validateWeekFazit(repo, wk, wf, currentWkEntries)
                 _uiState.update { current ->
                     current.copy(
@@ -109,7 +109,7 @@ class HistoryViewModel(
             repo.getWeekFazitsFlow().collect { map ->
                 val currentWk = weekKeyOf(System.currentTimeMillis())
                 val currentWf = map[currentWk] ?: return@collect
-                val currentWkEntries = _uiState.value.entries.filter { dayKeyOf(it.dateMillis) == currentWk }
+                val currentWkEntries = _uiState.value.entries.filter { weekKeyOf(it.dateMillis) == currentWk }
                 if (currentWf.fingerprint == dayFingerprint(currentWkEntries)) {
                     _uiState.update { it.copy(weekFazit = currentWf) }
                 }
@@ -354,10 +354,10 @@ class HistoryViewModel(
         if (_uiState.value.loadingWeek) return
         _uiState.update { it.copy(loadingWeek = true, expandedWeek = true) }
         val wk = weekKeyOf(System.currentTimeMillis())
-        val wkEntries = _uiState.value.entries.filter { dayKeyOf(it.dateMillis) == wk }
+        val wkEntries = _uiState.value.entries.filter { weekKeyOf(it.dateMillis) == wk }
         val lines = when {
             mealLines != null -> mealLines
-            ctx != null -> dayFazitMealLines(ctx, wkEntries)
+            ctx != null -> weekFazitMealLines(ctx, wkEntries)
             else -> wkEntries.map { it.erkannt }
         }
         val promptBundle = when {

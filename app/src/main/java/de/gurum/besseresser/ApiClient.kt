@@ -47,9 +47,9 @@ data class FazitPromptBundle(
             promptHonesty = ctx.getString(R.string.prompt_honesty)
         )
 
-        /** Lokalisierte Prompt-Bausteine für ein Wochenfazit (eigene Einleitung, Rest wie Tagesfazit). */
-        fun forWeek(ctx: Context): FazitPromptBundle = FazitPromptBundle(
-            promptIntro = ctx.getString(R.string.prompt_weekfazit_intro),
+        /** Lokalisierte Prompt-Bausteine für ein Wochenfazit (inkl. Kalenderwoche). */
+        fun forWeek(ctx: Context, calendarWeek: Int = calendarWeekOf()): FazitPromptBundle = FazitPromptBundle(
+            promptIntro = ctx.getString(R.string.prompt_weekfazit_intro, calendarWeek),
             promptRules = ctx.getString(R.string.prompt_dayfazit_rules),
             promptLanguage = ctx.getString(R.string.prompt_dayfazit_language),
             promptHonesty = ctx.getString(R.string.prompt_honesty)
