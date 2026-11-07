@@ -10,9 +10,9 @@
 
 ## 📸 Screenshots
 
-| Home & Goals | Meal Evaluation | History & Daily Summary |
-| :---: | :---: | :---: |
-| <img src="screenshots/Start.jpg" width="250" alt="Home screen with personal goals" /> | <img src="screenshots/Details.jpg" width="250" alt="Detailed view of a rated meal" /> | <img src="screenshots/Verlaufsansicht.jpg" width="250" alt="History view with traffic-light average and daily summary" /> |
+| Home & Goals | Meal Evaluation | History & Daily Summary | AI & Goal Settings |
+| :---: | :---: | :---: | :---: |
+| <img src="screenshots/Start.jpg" width="200" alt="Home screen with personal goals" /> | <img src="screenshots/Details.jpg" width="200" alt="Detailed view of a rated meal" /> | <img src="screenshots/Verlaufsansicht.jpg" width="200" alt="History view with traffic-light average and daily summary" /> | <img src="screenshots/Setup.jpg" width="200" alt="AI connection and personal goals settings" /> |
 
 ---
 
