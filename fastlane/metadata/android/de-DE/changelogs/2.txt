@@ -1,0 +1,5 @@
+* KI-Tagesfazit ersetzt den numerischen Tagesscore (automatisch für die letzten zwei Tage)
+* Verlauf als Tagesgruppen mit Tagesfazit-Kopfzeile
+* Die KI nennt das erkannte Essen; der Text ist über einen Stift-Button anpassbar
+* Profilseite (Geburtsdatum, Gewicht, Größe, Anmerkungen) im Tagesfazit berücksichtigt
+* Menü-Icons, zentrierte KI-Denkkarte, smarter Notiz-Platzhalter, viele Stabilitäts-Fixes

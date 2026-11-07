@@ -1,0 +1,5 @@
+* AI day summary replaces the numeric day score (auto-computed for the latest two days)
+* History list grouped by day with a day-summary header
+* The AI now names the recognized food; its text is editable via pencil icon
+* New profile page (birthdate, weight, height, notes) included in day summaries
+* Menu icons, centered AI-thinking card, smarter note placeholder, many stability fixes

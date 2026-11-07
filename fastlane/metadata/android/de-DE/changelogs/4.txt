@@ -1,0 +1,7 @@
+* Automatischer Retry: Fehlgeschlagene KI-Anfragen werden automatisch einmal wiederholt, bevor ein Fehler angezeigt wird
+* Wochenfazit zeigt jetzt die Kalenderwoche und berücksichtigt alle Mahlzeiten von Montag bis Sonntag
+* Wochenfazit listet Mahlzeiten nach Datum statt nach Uhrzeit
+* Mahlzeiten auf beliebiges Datum nachtragen (nacherfassen)
+* Verlauf: kurzes Wischen zum Löschen mit Inline-Rückgängig-Karte (5 Sekunden); flüssiges Verschieben per Langdruck innerhalb eines Tages, ohne das Tagesfazit zu verlieren
+* Eigener Setup-Bildschirm
+* Fix: Ausgelaufener Reasoning-Token-Budget bei OpenRouter/DeepSeek schneidet keine Antworten mehr ab

@@ -1,0 +1,7 @@
+* Automatic retry: any failed AI request is retried once before an error is shown
+* Week summary now shows the calendar week and includes all meals Monday–Sunday
+* Week summary lists meals by date instead of time
+* Meal duplication to any past date (retro capture)
+* History: short swipe-to-delete with an inline 5-second Undo card; fluid long-press drag-and-drop reordering within a day without invalidating the day summary
+* Dedicated Setup screen
+* Fix: OpenRouter/DeepSeek reasoning-token exhaustion no longer truncates answers

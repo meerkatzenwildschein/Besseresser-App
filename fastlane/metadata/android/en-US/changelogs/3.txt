@@ -1,0 +1,6 @@
+* Unified 40dp day/week header chips and a prominent add-meal button per day
+* Retro capture: photograph meals later in the day; recent notes can be starred and are suggested again
+* Weekly summary is generated on Sunday evening, invalidated and recomputable on week changes
+* Reliable note favorites: starred state persists across restarts; order stays stable until the selection menu reopens
+* Optional gender in profile; auto day summary after 18:00
+* Crash fix on re-evaluating a corrected meal
