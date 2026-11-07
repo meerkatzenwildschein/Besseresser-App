@@ -1,0 +1,25 @@
+Besseresser – dein persönlicher KI-Ernährungsbegleiter für Android.
+
+Kein Kalorienzählen. Keine endlosen Lebensmitteldatenbanken. Fotografiere einfach deinen Teller und erhalte in Sekunden eine ehrliche Ampel-Bewertung (Grün / Gelb / Rot) für jedes deiner persönlichen Ernährungsziele.
+
+<b>So funktioniert's</b>
+* Lege einmal fest, was dir wichtig ist, z. B. „Blutdruck senken", „Weniger Zucker", „Abnehmen" oder „Mehr Protein".
+* Fotografiere deine Mahlzeit (oder beschreibe sie im Text).
+* Besseresser schickt das Bild an deinen eigenen KI-Anbieter (z. B. OpenRouter / DeepSeek) – mit <i>deinem</i> API-Schlüssel – und bewertet die Mahlzeit gegen jedes einzelne Ziel.
+* Jedes Ziel bekommt eine Ampel-Bewertung plus eine kurze, ehrliche Begründung.
+
+<b>Mahlzeiten-Verlauf &amp; Tagesfazit</b>
+* Jede bewertete Mahlzeit wird übersichtlich im Verlauf gespeichert – inklusive erkanntem Essen, deinen Anmerkungen und dem Foto.
+* Nach 20:00 Uhr oder auf Knopfdruck ermittelt die KI ein „Tagesfazit", das den ganzen Tag zusammenfasst. Auf Wunsch gibt es ein „Wochenfazit" inklusive Kalenderwoche.
+* Mahlzeiten lassen sich auf ein anderes Datum duplizieren, mit Rückgängig-Fenster löschen und per Langdruck innerhalb eines Tages verschieben.
+
+<b>Favoriten &amp; Notizen</b>
+* Notizen zu deinen Mahlzeiten bleiben erhalten, können mit Stern favorisiert und in ähnlichen Situationen wieder vorgeschlagen werden.
+
+<b>Privatsphäre &amp; Daten</b>
+* Alle Daten bleiben auf deinem Gerät. Besseresser enthält keine Analysen, kein Tracking und keine Konten.
+* Fotos und Anfragen gehen nur an den KI-Anbieter, den du selbst konfigurierst – mit deinem eigenen API-Schlüssel.
+
+<b>In Deutsch und Englisch verfügbar</b> – Oberfläche und KI-Bewertungen passen sich automatisch deiner Sprache an.
+
+<b>Freie Software</b>: Besseresser steht unter der GPL-3.0-or-later.

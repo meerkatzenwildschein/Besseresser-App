@@ -1,0 +1,25 @@
+Besseresser – your personal AI nutrition companion for Android.
+
+No calorie counting. No endless food databases. Just snap a photo of your plate and get an honest traffic-light rating (Green / Yellow / Red) for each of your personal nutrition goals within seconds.
+
+<b>How it works</b>
+* Define what matters to you once, e.g. "Lower blood pressure", "Less sugar", "Lose weight" or "More protein".
+* Take a photo of your meal (or describe it in text if you prefer).
+* Besseresser sends the image to your own AI provider (e.g. OpenRouter / DeepSeek) using <i>your</i> API key and rates the meal against every one of your goals.
+* Each goal gets a traffic-light rating plus a short, honest explanation.
+
+<b>Meal history &amp; daily summaries</b>
+* Every rated meal is stored in a visual history – including the recognized food, your notes and the photo thumbnail.
+* Once a day (after 20:00) or on demand, the AI sums up your whole day as a "Tagesfazit" (day summary). Weekly summaries ("Wochenfazit") with the calendar week are generated on demand.
+* Meals can be duplicated to another date, deleted with an undo window, and reordered within a day by long-pressing.
+
+<b>Favorites &amp; notes</b>
+* Notes you write on meals are remembered, can be starred and are suggested again in similar situations.
+
+<b>Privacy &amp; data</b>
+* All data stays on your device. Besseresser contains no analytics, no tracking and no accounts.
+* Photos and prompts are sent only to the AI provider you configure, with your own API key. Your goals are never uploaded beyond what a rating requires.
+
+<b>Available in English and German</b> – the interface and the AI evaluations automatically adapt to your language.
+
+<b>Free software</b>: Besseresser is licensed under the GPL-3.0-or-later.

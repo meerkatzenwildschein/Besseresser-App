@@ -1,0 +1,6 @@
+* Einheitliche 40dp Kopf-Chips für Tag/Woche und auffälliger „+“-Button je Tag
+* Nachträgliches Erfassen: Mahlzeiten später am Tag fotografieren; Notizen-Favoriten mit Stern
+* Wochenfazit am Sonntagabend automatisch, bei Änderungen löschbar und neu ermittelbar
+* Zuverlässige Notiz-Favoriten: Sterne überstehen Neustarts, Reihenfolge bleibt stabil
+* Optionales Geschlecht im Profil; Auto-Tagesfazit erst ab 18:00 Uhr
+* Crashfix beim Neubewerten einer korrigierten Mahlzeit
