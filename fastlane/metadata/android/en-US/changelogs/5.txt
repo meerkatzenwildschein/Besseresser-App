@@ -1,0 +1,5 @@
+* New Configuration screen (burger menu, bottom, tool icon)
+* Full JSON backup export to Downloads (settings incl. API key, profile, favorite notes, all meals, Base64-encoded photos, day & week summaries)
+* Restore from a backup JSON via the system file picker; duplicates and existing data are overwritten
+* Import a backup directly from the first-run setup screen after reinstalling
+* "Delete all history data" (meals, photos, day/week summaries) while keeping settings, goals, profile and notes
