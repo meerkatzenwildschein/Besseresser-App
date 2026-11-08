@@ -63,7 +63,7 @@ You can install the app onto your Android phone (Android 8.0 / API 26 or newer) 
 
 ## 🤖 Built with AI
 
-> **Besseresser was developed with the help of AI.** The code was written iteratively by an AI coding agent under human direction, with review, fixes, and release management by the human author. All releases are built from the open source code in this repository – feel free to audit, and report findings via the issue tracker.
+> **Besseresser was developed with the help of AI.** The code was written iteratively by an AI coding agent under human direction, with review, fixes, and release management by the human author. All releases are built from the open source code in this repository.
 
 ---
 
