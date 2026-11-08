@@ -1,0 +1,5 @@
+* Neuer Konfigurations-Screen (Burger-Menü, ganz unten, Werkzeug-Icon)
+* Vollständiger JSON-Export nach Downloads (Einstellungen inkl. API-Key, Profil, Notiz-Favoriten, alle Mahlzeiten, Base64-codierte Fotos, Tages- & Wochenfazits)
+* Wiederherstellung aus Backup-JSON über den System-Dateipicker; Duplikate und vorhandene Daten werden überschrieben
+* Backup-Import direkt im Erst-Setup nach der Neuinstallation
+* „Alle Verlaufsdaten löschen“ (Mahlzeiten, Fotos, Tages- & Wochenfazits); Einstellungen, Ziele, Profil und Notizen bleiben erhalten
