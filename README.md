@@ -2,6 +2,8 @@
 
 **No calorie counting. No endless food databases. Just snap a photo and immediately see how well your meal fits your personal goals.**
 
+> ⚠️ **BYOK – Bring Your Own Key:** Besseresser is 100 % BYOK. An API key from an AI provider is **mandatory** – without a key, the app cannot evaluate meals. Your key stays encrypted on your device.
+
 **Besseresser** is your personal AI nutrition companion for Android. Define what matters to you once – such as *"Lower blood pressure"*, *"Less sugar"*, *"Lose weight"*, or *"More protein"* –, take a photo of your plate, and get an honest **traffic-light rating (🟢 Green · 🟡 Yellow · 🔴 Red)** for each individual goal within seconds.
 
 🌍 **Available in English and German** – both the app interface and the AI evaluations/summaries automatically adapt to your language (on Android 13+, you can also switch the app language independently in system settings).
