@@ -242,6 +242,10 @@ Besseresser-App/
 3. `.\gradlew.bat assembleRelease` → signierte APK liegt unter `app\build\outputs\apk\release\app-release.apk`.
 4. APK als Release-Asset zum GitHub-Release des Tags hochladen (Name: `Besseresser-X.Y.Z.apk`),
    alternativ über die GitHub-API (Token aus dem Git Credential Manager ziehen; nie ausgeben).
+5. **Release-Notes auf GitHub immer auf Englisch verfassen** (internationaler Leserkreis, F-Droid).
+   Format: `**What's new in Besseresser vX.Y.Z (versionCode N)**` als Überschrift, darunter
+   Stichpunkte mit den Nutzer-Features (Fach-Jargon und interne Refactorings weglassen),
+   am Ende primär die `Full changelog:`-Vergleichslinks.
 
 ### Hinweise zur Reproduzierbarkeit
 
