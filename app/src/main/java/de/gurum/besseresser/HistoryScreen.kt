@@ -75,10 +75,10 @@ fun HistoryScreen(
         entries = uiState.entries,
         fazitMap = uiState.fazitMap,
         loadingFazits = uiState.loadingFazits.toList(),
-        weekFazit = uiState.weekFazit,
-        loadingWeek = uiState.loadingWeek,
+        weekFazitMap = uiState.weekFazitMap,
+        loadingWeeks = uiState.loadingWeeks,
         onGenerateFazit = { day, list -> viewModel.generateFazit(ctx, day, list, settings, profile) },
-        onGenerateWeekFazit = { viewModel.generateWeekFazit(ctx, settings, profile) }
+        onGenerateWeekFazit = { wk -> viewModel.generateWeekFazit(ctx, settings, profile, weekKey = wk) }
     )
 
     val anyOverlayOpen = uiState.showAddCamera || uiState.showAddReview || uiState.showAddText || uiState.addDialogForDay != null || uiState.showAddBusyCard
@@ -105,17 +105,17 @@ fun HistoryScreen(
                 fazitMap = uiState.fazitMap,
                 loadingFazits = uiState.loadingFazits.toList(),
                 expandedFazits = uiState.expandedFazits.toList(),
-                weekFazit = uiState.weekFazit,
-                loadingWeek = uiState.loadingWeek,
-                expandedWeek = uiState.expandedWeek,
+                weekFazitMap = uiState.weekFazitMap,
+                loadingWeeks = uiState.loadingWeeks,
+                expandedWeeks = uiState.expandedWeeks,
                 onBack = handleBack,
                 onPick = { entry ->
                     viewModel.flushPendingDeletes(ctx)
                     onPick(entry)
                 },
                 onGenerateFazit = { day, list -> viewModel.generateFazit(ctx, day, list, settings, profile) },
-                onGenerateWeekFazit = { viewModel.generateWeekFazit(ctx, settings, profile) },
-                onToggleExpandWeek = { viewModel.toggleWeekExpanded() },
+                onGenerateWeekFazit = { wk -> viewModel.generateWeekFazit(ctx, settings, profile, weekKey = wk) },
+                onToggleExpandWeek = { wk -> viewModel.toggleWeekExpanded(wk) },
                 onToggleExpandFazit = { viewModel.toggleFazitExpanded(it) },
                 onAddMealForDay = { day -> viewModel.setAddDialogForDay(day) },
                 onDeleteEntry = { entry -> viewModel.requestDeleteEntry(ctx, entry) },

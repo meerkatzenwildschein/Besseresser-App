@@ -154,7 +154,8 @@ fun WeekFazitRow(
     loading: Boolean,
     expanded: Boolean,
     onToggleExpand: () -> Unit,
-    onGenerate: () -> Unit
+    onGenerate: () -> Unit,
+    calendarWeek: Int = calendarWeekOf()
 ) {
     val chevronAngle by animateFloatAsState(if (expanded) 180f else 0f, label = "week-fazit-chevron")
     Column(
@@ -182,7 +183,7 @@ fun WeekFazitRow(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    stringResource(R.string.weekfazit_row_label_kw, calendarWeekOf()),
+                    stringResource(R.string.weekfazit_row_label_kw, calendarWeek),
                     fontSize = 15.5.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -292,24 +293,64 @@ fun isFazitOutdated(fazit: DayFazit, entries: List<HistoryEntry>): Boolean {
     return fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(entries)
 }
 
+/** Ein Wochenfazit steht bereit (sichtbar & auto-generierbar), sobald der Sonntag der betreffenden
+ *  Woche 18:00 Uhr erreicht hat – also am Sonntag ab 18:00 Uhr SOWIE an allen darauffolgenden Tagen
+ *  (z. B. am Montag für die abgelaufene Vorwoche). */
+fun isWeekFazitDue(
+    weekKey: String,
+    nowDate: LocalDate = LocalDate.now(),
+    nowHour: Int = LocalTime.now().hour
+): Boolean {
+    val monday = weekMondayOfKey(weekKey) ?: return false
+    val sunday = monday.plusDays(6)
+    return when {
+        nowDate.isAfter(sunday) -> true
+        nowDate.isEqual(sunday) -> nowHour >= FAZIT_AUTO_HOUR
+        else -> false
+    }
+}
+
+/** Liefert den neuesten fälligen Wochen-Key (mit vorhandenen Einträgen), z. B. am Montag die abgelaufene
+ *  Vorwoche oder am Sonntag ab 18:00 Uhr die laufende Woche. */
+fun latestDueWeekKey(
+    entries: List<HistoryEntry>,
+    nowDate: LocalDate = LocalDate.now(),
+    nowHour: Int = LocalTime.now().hour
+): String? = entries
+    .map { weekKeyOf(it.dateMillis) }
+    .distinct()
+    .sortedDescending()
+    .firstOrNull { wk -> isWeekFazitDue(wk, nowDate, nowHour) }
+
 @Composable
 fun HistoryAutoFazitEffect(
     entries: List<HistoryEntry>,
     fazitMap: Map<String, DayFazit>,
     loadingFazits: List<String>,
-    weekFazit: DayFazit?,
-    loadingWeek: Boolean,
+    weekFazitMap: Map<String, DayFazit>,
+    loadingWeeks: Set<String>,
     onGenerateFazit: (LocalDate, List<HistoryEntry>) -> Unit,
-    onGenerateWeekFazit: () -> Unit
+    onGenerateWeekFazit: (String) -> Unit
 ) {
-    LaunchedEffect(entries, fazitMap) {
+    LaunchedEffect(entries, fazitMap, weekFazitMap) {
         if (entries.isEmpty()) return@LaunchedEffect
         delay(1200)   // Debounce
-        val autoFazitTime = LocalTime.now().hour >= FAZIT_AUTO_HOUR
+        val nowDate = LocalDate.now()
+        val nowHour = LocalTime.now().hour
+        val autoFazitTime = nowHour >= FAZIT_AUTO_HOUR
         groupByDay(entries).take(2).forEach { group ->
-            handleAutoDayFazit(group, fazitMap, loadingFazits, autoFazitTime, onGenerateFazit)
+            val dayAutoReady = group.day.isBefore(nowDate) || autoFazitTime
+            handleAutoDayFazit(group, fazitMap, loadingFazits, dayAutoReady, onGenerateFazit)
         }
-        handleAutoWeekFazit(autoFazitTime, weekFazit, loadingWeek, onGenerateWeekFazit)
+        val dueWk = latestDueWeekKey(entries, nowDate, nowHour)
+        if (dueWk != null) {
+            handleAutoWeekFazitForKey(
+                weekKey = dueWk,
+                weekFazitMap = weekFazitMap,
+                loadingWeeks = loadingWeeks,
+                onGenerateWeekFazit = onGenerateWeekFazit
+            )
+        }
     }
 }
 
@@ -330,6 +371,19 @@ fun handleAutoDayFazit(
         }
     } else if (isFazitOutdated(fazit, group.entries)) {
         onGenerateFazit(group.day, group.entries)
+    }
+}
+
+fun handleAutoWeekFazitForKey(
+    weekKey: String,
+    weekFazitMap: Map<String, DayFazit>,
+    loadingWeeks: Set<String>,
+    onGenerateWeekFazit: (String) -> Unit
+) {
+    if (weekKey in loadingWeeks || weekFazitMap[weekKey] != null) return
+    if (weekKey !in DayFazitSession.attemptedWeekly) {
+        DayFazitSession.attemptedWeekly.add(weekKey)
+        onGenerateWeekFazit(weekKey)
     }
 }
 

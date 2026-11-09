@@ -1,8 +1,13 @@
 package de.gurum.besseresser
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -95,6 +100,55 @@ private val DuplicateCopyIcon: ImageVector by lazy {
             close()
         }
     }.build()
+}
+
+/** Baut den Teilen-Text aus erkanntem Essen (🍽️) und allgemeiner Bewertung (🧠) zusammen. */
+internal fun buildShareText(
+    erkannt: String,
+    summary: String,
+    formatDetected: (String) -> String = { "🍽️ $it" },
+    formatSummary: (String) -> String = { "🧠 $it" }
+): String = buildList {
+    if (erkannt.isNotBlank()) add(formatDetected(erkannt.trim()))
+    if (summary.isNotBlank()) add(formatSummary(summary.trim()))
+}.joinToString("\n\n")
+
+private fun shareHistoryEntry(ctx: Context, entry: HistoryEntry) {
+    val shareText = buildShareText(
+        erkannt = entry.erkannt,
+        summary = entry.summary,
+        formatDetected = { ctx.getString(R.string.detected_prefix, it) },
+        formatSummary = { ctx.getString(R.string.summary_prefix, it) }
+    )
+    if (shareText.isNotBlank()) {
+        val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        clipboard?.setPrimaryClip(ClipData.newPlainText(ctx.getString(R.string.app_name), shareText))
+        Toast.makeText(ctx, ctx.getString(R.string.share_clipboard_hint), Toast.LENGTH_SHORT).show()
+    }
+    val photoFile = HistoryStore.photoFileOf(ctx, entry)
+    val photoUri = photoFile?.let {
+        runCatching {
+            FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", it)
+        }.getOrNull()
+    }
+    if (photoUri == null && shareText.isBlank()) return
+
+    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+        if (photoUri != null) {
+            type = "image/jpeg"
+            putExtra(Intent.EXTRA_STREAM, photoUri)
+            clipData = ClipData.newUri(ctx.contentResolver, ctx.getString(R.string.photo_of_meal), photoUri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (shareText.isNotBlank()) {
+                putExtra(Intent.EXTRA_TEXT, shareText)
+            }
+        } else {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, shareText)
+        }
+    }
+    val chooser = Intent.createChooser(sendIntent, ctx.getString(R.string.history_entry_share))
+    ctx.startActivity(chooser)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -265,14 +319,16 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
             }
         }
 
+        val canShare = thumb != null || current.erkannt.isNotBlank() || current.summary.isNotBlank()
         if (current.summary.isNotBlank() || current.erkannt.isNotBlank() || current.note.isNotBlank()) {
             // Gleicher antipbarer Block wie in der Auswertung: 🧠 sichtbar, 🍽️/📝 einklappbar,
-            // 🍽️ mit Pencil → erkannt userkorrigierbar
+            // 🍽️ mit Pencil → erkannt userkorrigierbar, unten rechts Teilen-Button
             CollapsibleSummaryBlock(
                 summary = current.summary,
                 erkannt = current.erkannt,
                 note = current.note,
-                onEditErkannt = { if (current.erkannt.isNotBlank()) showErkanntEdit = true }
+                onEditErkannt = { if (current.erkannt.isNotBlank()) showErkanntEdit = true },
+                onShare = if (canShare) ({ shareHistoryEntry(ctx, current) }) else null
             )
         }
 

@@ -378,4 +378,81 @@ class DomainLogicAndFingerprintTest {
         val entriesAfterDuplication = listOf(existingTargetEntry, duplicated)
         assertTrue(isFazitOutdated(targetDayFazit, entriesAfterDuplication))
     }
+
+    @Test
+    fun testBuildShareTextFormatting() {
+        val both = buildShareText(
+            erkannt = "250 g Gemüse-Curry mit Reis",
+            summary = "Sehr ausgewogenes Mittagessen."
+        )
+        assertEquals(
+            "🍽️ 250 g Gemüse-Curry mit Reis\n\n🧠 Sehr ausgewogenes Mittagessen.",
+            both
+        )
+
+        val onlyDetected = buildShareText(
+            erkannt = "100 g Haferflocken",
+            summary = "   "
+        )
+        assertEquals("🍽️ 100 g Haferflocken", onlyDetected)
+
+        val onlySummary = buildShareText(
+            erkannt = "",
+            summary = "Gute Wahl."
+        )
+        assertEquals("🧠 Gute Wahl.", onlySummary)
+
+        val neither = buildShareText(erkannt = "", summary = "")
+        assertEquals("", neither)
+    }
+
+    @Test
+    fun testWeekFazitDueOnSundayEveningAndMonday() {
+        val lastWeekKey = "20261102" // KW 45: Mon 02.11.2026 .. Sun 08.11.2026
+        val newWeekKey = "20261109"  // KW 46: Mon 09.11.2026 .. Sun 15.11.2026
+
+        assertEquals(45, calendarWeekOfKey(lastWeekKey))
+        assertEquals(46, calendarWeekOfKey(newWeekKey))
+
+        // On Sunday 08.11.2026 before 18:00 -> NOT due yet
+        assertFalse(isWeekFazitDue(lastWeekKey, LocalDate.of(2026, 11, 8), 17))
+        // On Sunday 08.11.2026 at 18:00 -> DUE
+        assertTrue(isWeekFazitDue(lastWeekKey, LocalDate.of(2026, 11, 8), 18))
+
+        // On Monday 09.11.2026 at 08:00 in the morning:
+        // Last week (KW 45) MUST still be due and visible!
+        assertTrue(isWeekFazitDue(lastWeekKey, LocalDate.of(2026, 11, 9), 8))
+        // The new week (KW 46) that just started on Monday is NOT due yet
+        assertFalse(isWeekFazitDue(newWeekKey, LocalDate.of(2026, 11, 9), 8))
+
+        val saturdayEntry = HistoryEntry(
+            id = 1L,
+            dateMillis = LocalDate.of(2026, 11, 7).atTime(13, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            erkannt = "Linsensuppe"
+        )
+        val mondayMorningEntry = HistoryEntry(
+            id = 2L,
+            dateMillis = LocalDate.of(2026, 11, 9).atTime(8, 30).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            erkannt = "Müsli"
+        )
+
+        // On Monday morning, latestDueWeekKey picks last week ("20261102"), even if Monday already has an entry
+        val dueKeyOnMonday = latestDueWeekKey(
+            entries = listOf(saturdayEntry, mondayMorningEntry),
+            nowDate = LocalDate.of(2026, 11, 9),
+            nowHour = 9
+        )
+        assertEquals(lastWeekKey, dueKeyOnMonday)
+
+        // Auto-trigger on Monday for the completed week if not generated on Sunday evening
+        DayFazitSession.attemptedWeekly.clear()
+        val generatedKeys = mutableListOf<String>()
+        handleAutoWeekFazitForKey(
+            weekKey = dueKeyOnMonday!!,
+            weekFazitMap = emptyMap(),
+            loadingWeeks = emptySet(),
+            onGenerateWeekFazit = { generatedKeys.add(it) }
+        )
+        assertEquals(listOf(lastWeekKey), generatedKeys)
+    }
 }

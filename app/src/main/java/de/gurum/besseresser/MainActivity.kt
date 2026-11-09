@@ -1,5 +1,7 @@
 package de.gurum.besseresser
 
+import android.app.Activity
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -23,7 +25,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,8 +35,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
 
 // ----------------------------------------------------------------- Farb- & Form-Theme (Besseresser)
 
@@ -104,6 +111,11 @@ private val BesseresserShapes = Shapes(
 enum class AppScreen(val order: Int) { Main(0), Profile(1), History(1), Config(1), Detail(2) }
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: Context) {
+        val lang = UiPrefsStore.loadLanguage(newBase)
+        super.attachBaseContext(newBase.withAppLanguage(lang))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent { GesundEssenApp() }
@@ -112,148 +124,191 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun GesundEssenApp() {
-    // Folgt dem System-Theme: hell im hellen, dunkel im dunklen Modus
-    val darkTheme = isSystemInDarkTheme()
-    MaterialTheme(
-        colorScheme = if (darkTheme) BesseresserDarkColors else BesseresserLightColors,
-        shapes = BesseresserShapes
+    val baseCtx = LocalContext.current
+    var themeMode by remember { mutableStateOf(UiPrefsStore.loadThemeMode(baseCtx)) }
+    var appLanguage by remember { mutableStateOf(UiPrefsStore.loadLanguage(baseCtx)) }
+
+    val localizedCtx = remember(baseCtx, appLanguage) {
+        baseCtx.withAppLanguage(appLanguage)
+    }
+    val localizedConfig = remember(localizedCtx) {
+        localizedCtx.resources.configuration
+    }
+
+    val systemDark = isSystemInDarkTheme()
+    val darkTheme = when (themeMode) {
+        AppThemeMode.LIGHT -> false
+        AppThemeMode.DARK -> true
+        AppThemeMode.SYSTEM -> systemDark
+    }
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (baseCtx as? Activity)?.window ?: return@SideEffect
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalContext provides localizedCtx,
+        LocalConfiguration provides localizedConfig
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
+        MaterialTheme(
+            colorScheme = if (darkTheme) BesseresserDarkColors else BesseresserLightColors,
+            shapes = BesseresserShapes
         ) {
-            val ctx = LocalContext.current
-            var loaded by remember { mutableStateOf(false) }
-            var showSetup by remember { mutableStateOf(true) }
-            var settings by remember { mutableStateOf(Settings("", "", "", emptyList())) }
-            var showHistory by remember { mutableStateOf(false) }
-            var historyEntry by remember { mutableStateOf<HistoryEntry?>(null) }
-            var showProfile by remember { mutableStateOf(false) }
-            var showConfig by remember { mutableStateOf(false) }
-            var profile by remember { mutableStateOf(Profile()) }
-            val mainViewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {
+                val ctx = LocalContext.current
+                var loaded by remember { mutableStateOf(false) }
+                var showSetup by remember { mutableStateOf(true) }
+                var settings by remember { mutableStateOf(Settings("", "", "", emptyList())) }
+                var showHistory by remember { mutableStateOf(false) }
+                var historyEntry by remember { mutableStateOf<HistoryEntry?>(null) }
+                var showProfile by remember { mutableStateOf(false) }
+                var showConfig by remember { mutableStateOf(false) }
+                var profile by remember { mutableStateOf(Profile()) }
+                val mainViewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 
-            LaunchedEffect(Unit) {
-                settings = Store.load(ctx)
-                profile = ProfileStore.load(ctx)
-                showSetup = !settings.isComplete
-                loaded = true
-            }
-
-            // Einstellungs-Overlay über einem bestehenden Setup: Android-Zurück schließt
-            // es (wie der Zurückpfeil). Beim Erst-Setup (unvollständig) bleibt Zurück = App beenden.
-            if (loaded && showSetup && settings.isComplete) {
-                BackHandler { showSetup = false }
-            }
-
-            when {
-                !loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                LaunchedEffect(Unit) {
+                    settings = Store.load(ctx)
+                    profile = ProfileStore.load(ctx)
+                    showSetup = !settings.isComplete
+                    loaded = true
                 }
-                showSetup -> SetupScreen(
-                    initial = settings,
-                    firstRun = !settings.isComplete,
-                    onCancel = {
-                        if (settings.isComplete) showSetup = false
-                        else (ctx as? android.app.Activity)?.finish()
-                    },
-                    onDone = { neu ->
-                        val firstRun = !settings.isComplete
-                        Store.save(ctx, neu)
-                        settings = neu
-                        showSetup = false
-                        // Nach dem ERSTEN Erfassen der KI-Zugangsdaten einmalig das Profil öffnen
-                        if (firstRun) showProfile = true
-                    },
-                    onBackupImported = { importedSettings, importedProfile ->
-                        settings = importedSettings
-                        profile = importedProfile
-                        mainViewModel.loadRecentNotes(ctx)
-                        if (importedSettings.isComplete) {
+
+                // Einstellungs-Overlay über einem bestehenden Setup: Android-Zurück schließt
+                // es (wie der Zurückpfeil). Beim Erst-Setup (unvollständig) bleibt Zurück = App beenden.
+                if (loaded && showSetup && settings.isComplete) {
+                    BackHandler { showSetup = false }
+                }
+
+                when {
+                    !loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                    showSetup -> SetupScreen(
+                        initial = settings,
+                        firstRun = !settings.isComplete,
+                        onCancel = {
+                            if (settings.isComplete) showSetup = false
+                            else (baseCtx as? Activity)?.finish()
+                        },
+                        onDone = { neu ->
+                            val firstRun = !settings.isComplete
+                            Store.save(ctx, neu)
+                            settings = neu
                             showSetup = false
-                            showProfile = false
-                        }
-                    }
-                )
-                else -> {
-                    val target = when {
-                        historyEntry != null -> AppScreen.Detail
-                        showProfile -> AppScreen.Profile
-                        showConfig -> AppScreen.Config
-                        showHistory -> AppScreen.History
-                        else -> AppScreen.Main
-                    }
-                    AnimatedContent(
-                        targetState = target,
-                        label = "screen-switch",
-                        transitionSpec = {
-                            // vorwärts: neuer Screen von rechts; rückwärts: von links
-                            val forward = targetState.order > initialState.order
-                            val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(
-                                durationMillis = 280,
-                                easing = FastOutSlowInEasing
-                            )
-                            val fadeSpec = tween<Float>(durationMillis = 220)
-                            if (forward) {
-                                slideInHorizontally(slideSpec) { it } + fadeIn(fadeSpec) togetherWith
-                                        slideOutHorizontally(slideSpec) { -it / 3 } + fadeOut(fadeSpec)
-                            } else {
-                                slideInHorizontally(slideSpec) { -it / 3 } + fadeIn(fadeSpec) togetherWith
-                                        slideOutHorizontally(slideSpec) { it } + fadeOut(fadeSpec)
+                            // Nach dem ERSTEN Erfassen der KI-Zugangsdaten einmalig das Profil öffnen
+                            if (firstRun) showProfile = true
+                        },
+                        onBackupImported = { importedSettings, importedProfile ->
+                            settings = importedSettings
+                            profile = importedProfile
+                            themeMode = UiPrefsStore.loadThemeMode(ctx)
+                            appLanguage = UiPrefsStore.loadLanguage(ctx)
+                            mainViewModel.loadRecentNotes(ctx)
+                            if (importedSettings.isComplete) {
+                                showSetup = false
+                                showProfile = false
                             }
                         }
-                    ) { s ->
-                        when (s) {
-                            AppScreen.Main -> MainScreen(
-                                settings = settings,
-                                onEditSettings = { showSetup = true },
-                                onOpenProfile = { showProfile = true },
-                                onOpenHistory = {
-                                    showHistory = true
-                                    historyEntry = null
-                                },
-                                onOpenConfig = { showConfig = true },
-                                viewModel = mainViewModel
-                            )
-                            AppScreen.Profile -> ProfileScreen(
-                                initial = profile,
-                                onCancel = { showProfile = false },
-                                onSave = { p ->
-                                    ProfileStore.save(ctx, p.birthDate, p.weightKg, p.heightCm, p.notes, p.gender)
-                                    profile = p
-                                    showProfile = false
+                    )
+                    else -> {
+                        val target = when {
+                            historyEntry != null -> AppScreen.Detail
+                            showProfile -> AppScreen.Profile
+                            showConfig -> AppScreen.Config
+                            showHistory -> AppScreen.History
+                            else -> AppScreen.Main
+                        }
+                        AnimatedContent(
+                            targetState = target,
+                            label = "screen-switch",
+                            transitionSpec = {
+                                // vorwärts: neuer Screen von rechts; rückwärts: von links
+                                val forward = targetState.order > initialState.order
+                                val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(
+                                    durationMillis = 280,
+                                    easing = FastOutSlowInEasing
+                                )
+                                val fadeSpec = tween<Float>(durationMillis = 220)
+                                if (forward) {
+                                    slideInHorizontally(slideSpec) { it } + fadeIn(fadeSpec) togetherWith
+                                            slideOutHorizontally(slideSpec) { -it / 3 } + fadeOut(fadeSpec)
+                                } else {
+                                    slideInHorizontally(slideSpec) { -it / 3 } + fadeIn(fadeSpec) togetherWith
+                                            slideOutHorizontally(slideSpec) { it } + fadeOut(fadeSpec)
                                 }
-                            )
-                            AppScreen.Config -> ConfigScreen(
-                                onBack = { showConfig = false },
-                                onDataImported = { importedSettings, importedProfile ->
-                                    settings = importedSettings
-                                    profile = importedProfile
-                                    mainViewModel.loadRecentNotes(ctx)
-                                },
-                                onHistoryCleared = {
-                                    historyEntry = null
-                                    mainViewModel.reset()
-                                }
-                            )
-                            AppScreen.History -> HistoryScreen(
-                                settings = settings,
-                                profile = profile,
-                                onPick = { historyEntry = it },
-                                onBack = { showHistory = false }
-                            )
-                            AppScreen.Detail -> {
-                                // Wichtig-Pitfall: onBack nullt historyEntry, während der Detail-Screen
-                                // als outgoing-Content der Back-Animation NOCH komponiert ist. Ein
-                                // `historyEntry!!` direkt im Branch würde beim Re-Compose mit null
-                                // crashen. Deshalb: Eintrag einmalig per remember einfrieren.
-                                val entry = remember { historyEntry }
-                                if (entry != null) {
-                                    HistoryDetailScreen(
-                                        entry = entry,
-                                        settings = settings,
-                                        onBack = { historyEntry = null }
-                                    )
+                            }
+                        ) { s ->
+                            when (s) {
+                                AppScreen.Main -> MainScreen(
+                                    settings = settings,
+                                    onEditSettings = { showSetup = true },
+                                    onOpenProfile = { showProfile = true },
+                                    onOpenHistory = {
+                                        showHistory = true
+                                        historyEntry = null
+                                    },
+                                    onOpenConfig = { showConfig = true },
+                                    viewModel = mainViewModel
+                                )
+                                AppScreen.Profile -> ProfileScreen(
+                                    initial = profile,
+                                    onCancel = { showProfile = false },
+                                    onSave = { p ->
+                                        ProfileStore.save(ctx, p.birthDate, p.weightKg, p.heightCm, p.notes, p.gender)
+                                        profile = p
+                                        showProfile = false
+                                    }
+                                )
+                                AppScreen.Config -> ConfigScreen(
+                                    themeMode = themeMode,
+                                    onThemeModeChange = { newMode ->
+                                        UiPrefsStore.saveThemeMode(ctx, newMode)
+                                        themeMode = newMode
+                                    },
+                                    appLanguage = appLanguage,
+                                    onLanguageChange = { newLang ->
+                                        UiPrefsStore.saveLanguage(ctx, newLang)
+                                        appLanguage = newLang
+                                    },
+                                    onBack = { showConfig = false },
+                                    onDataImported = { importedSettings, importedProfile ->
+                                        settings = importedSettings
+                                        profile = importedProfile
+                                        themeMode = UiPrefsStore.loadThemeMode(ctx)
+                                        appLanguage = UiPrefsStore.loadLanguage(ctx)
+                                        mainViewModel.loadRecentNotes(ctx)
+                                    },
+                                    onHistoryCleared = {
+                                        historyEntry = null
+                                        mainViewModel.reset()
+                                    }
+                                )
+                                AppScreen.History -> HistoryScreen(
+                                    settings = settings,
+                                    profile = profile,
+                                    onPick = { historyEntry = it },
+                                    onBack = { showHistory = false }
+                                )
+                                AppScreen.Detail -> {
+                                    // Wichtig-Pitfall: onBack nullt historyEntry, während der Detail-Screen
+                                    // als outgoing-Content der Back-Animation NOCH komponiert ist. Ein
+                                    // `historyEntry!!` direkt im Branch würde beim Re-Compose mit null
+                                    // crashen. Deshalb: Eintrag einmalig per remember einfrieren.
+                                    val entry = remember { historyEntry }
+                                    if (entry != null) {
+                                        HistoryDetailScreen(
+                                            entry = entry,
+                                            settings = settings,
+                                            onBack = { historyEntry = null }
+                                        )
+                                    }
                                 }
                             }
                         }

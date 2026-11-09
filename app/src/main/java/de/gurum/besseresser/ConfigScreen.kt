@@ -29,10 +29,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -71,8 +75,13 @@ class OpenBackupDocumentContract : ActivityResultContracts.OpenDocument() {
  * 2. Vollständiger JSON-Import (überschreibt Duplikate & bestehende Einstellungen/Einträge)
  * 3. Alle Verlaufsdaten löschen (mit Sicherheitsabfrage)
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConfigScreen(
+    themeMode: AppThemeMode,
+    onThemeModeChange: (AppThemeMode) -> Unit,
+    appLanguage: AppLanguage,
+    onLanguageChange: (AppLanguage) -> Unit,
     onBack: () -> Unit,
     onDataImported: (Settings, Profile) -> Unit,
     onHistoryCleared: () -> Unit
@@ -207,6 +216,71 @@ fun ConfigScreen(
                         fontSize = 13.5.sp,
                         fontWeight = FontWeight.Medium
                     )
+                }
+            }
+        }
+
+        SectionCard(title = stringResource(R.string.config_section_appearance)) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    stringResource(R.string.config_language_label),
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                val languageOptions = listOf(
+                    AppLanguage.DE to ("🇩🇪 " + stringResource(R.string.config_language_de)),
+                    AppLanguage.EN to ("🇬🇧 " + stringResource(R.string.config_language_en))
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    languageOptions.forEachIndexed { index, (lang, label) ->
+                        SegmentedButton(
+                            selected = appLanguage == lang,
+                            onClick = { if (appLanguage != lang) onLanguageChange(lang) },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = languageOptions.size
+                            )
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    stringResource(R.string.config_theme_label),
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                val themeOptions = listOf(
+                    AppThemeMode.SYSTEM to ("📱 " + stringResource(R.string.config_theme_system)),
+                    AppThemeMode.LIGHT to ("☀️ " + stringResource(R.string.config_theme_light)),
+                    AppThemeMode.DARK to ("🌙 " + stringResource(R.string.config_theme_dark))
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    themeOptions.forEachIndexed { index, (mode, label) ->
+                        SegmentedButton(
+                            selected = themeMode == mode,
+                            onClick = { if (themeMode != mode) onThemeModeChange(mode) },
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = index,
+                                count = themeOptions.size
+                            )
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
                 }
             }
         }

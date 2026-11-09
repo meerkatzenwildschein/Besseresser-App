@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Create
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -169,7 +170,8 @@ fun CollapsibleSummaryBlock(
     summary: String,
     erkannt: String,
     note: String,
-    onEditErkannt: (() -> Unit)? = null
+    onEditErkannt: (() -> Unit)? = null,
+    onShare: (() -> Unit)? = null
 ) {
     val ctx = LocalContext.current
     val extraCount = listOf(erkannt.isNotBlank(), note.isNotBlank()).count { it }
@@ -260,32 +262,70 @@ fun CollapsibleSummaryBlock(
                     }
                 }
             }
-            if (extraCount > 0) {
+            if (extraCount > 0 || onShare != null) {
                 Spacer(Modifier.height(8.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = if (expanded)
-                            stringResource(R.string.details_toggle_less)
-                        else ctx.resources.getQuantityString(R.plurals.details_toggle_more, extraCount, extraCount),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.width(2.dp))
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(16.dp)
-                            .rotate(chevron)
-                    )
+                    if (extraCount > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (expanded)
+                                    stringResource(R.string.details_toggle_less)
+                                else ctx.resources.getQuantityString(R.plurals.details_toggle_more, extraCount, extraCount),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Icon(
+                                Icons.Filled.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .rotate(chevron)
+                            )
+                        }
+                    } else {
+                        Spacer(Modifier.width(1.dp))
+                    }
+
+                    if (onShare != null) {
+                        Surface(
+                            onClick = onShare,
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.Share,
+                                    contentDescription = stringResource(R.string.history_entry_share),
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(Modifier.width(5.dp))
+                                Text(
+                                    text = stringResource(R.string.share_button_label),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

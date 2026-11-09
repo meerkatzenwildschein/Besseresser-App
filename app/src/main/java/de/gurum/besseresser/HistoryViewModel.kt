@@ -25,6 +25,9 @@ data class HistoryUiState(
     val weekFazit: DayFazit? = null,
     val loadingWeek: Boolean = false,
     val expandedWeek: Boolean = false,
+    val weekFazitMap: Map<String, DayFazit> = emptyMap(),
+    val loadingWeeks: Set<String> = emptySet(),
+    val expandedWeeks: Set<String> = emptySet(),
     val addDialogForDay: LocalDate? = null,
     val showAddCamera: Boolean = false,
     val showAddReview: Boolean = false,
@@ -64,21 +67,44 @@ class HistoryViewModel(
         observeWeekFazits(repo)
     }
 
+    private var latestRawWeekMap: Map<String, DayFazit> = emptyMap()
+
     private fun observeEntries(repo: HistoryRepository) {
         viewModelScope.launch {
             repo.getAllFlow().collect { list ->
-                val wk = weekKeyOf(System.currentTimeMillis())
-                val wf = repo.loadWeekFazit(wk)
-                val currentWkEntries = list.filter { weekKeyOf(it.dateMillis) == wk }
-                val validWf = validateWeekFazit(repo, wk, wf, currentWkEntries)
+                val validWeekMap = validateAllWeekFazits(repo, list, latestRawWeekMap)
+                val targetWk = latestDueWeekKey(list) ?: weekKeyOf(System.currentTimeMillis())
+                val validWf = validWeekMap[targetWk] ?: repo.loadWeekFazit(targetWk)?.let { wf ->
+                    val wkEntries = list.filter { weekKeyOf(it.dateMillis) == targetWk }
+                    validateWeekFazit(repo, targetWk, wf, wkEntries)
+                }
+                val mergedWeekMap = if (validWf != null) validWeekMap + (targetWk to validWf) else validWeekMap
                 _uiState.update { current ->
                     current.copy(
                         entries = list,
-                        weekFazit = validWf
+                        weekFazit = validWf,
+                        weekFazitMap = mergedWeekMap
                     )
                 }
             }
         }
+    }
+
+    private suspend fun validateAllWeekFazits(
+        repo: HistoryRepository,
+        entries: List<HistoryEntry>,
+        rawMap: Map<String, DayFazit>
+    ): Map<String, DayFazit> {
+        if (entries.isEmpty()) return emptyMap()
+        val result = mutableMapOf<String, DayFazit>()
+        for ((wk, wf) in rawMap) {
+            val wkEntries = entries.filter { weekKeyOf(it.dateMillis) == wk }
+            val validated = validateWeekFazit(repo, wk, wf, wkEntries)
+            if (validated != null) {
+                result[wk] = validated
+            }
+        }
+        return result
     }
 
     private suspend fun validateWeekFazit(
@@ -88,7 +114,7 @@ class HistoryViewModel(
         entries: List<HistoryEntry>
     ): DayFazit? {
         if (fazit == null) return null
-        return if (fazit.fingerprint == dayFingerprint(entries)) {
+        return if (entries.isNotEmpty() && fazit.fingerprint == dayFingerprint(entries)) {
             fazit
         } else {
             repo.deleteWeekFazit(weekKey)
@@ -107,15 +133,15 @@ class HistoryViewModel(
     private fun observeWeekFazits(repo: HistoryRepository) {
         viewModelScope.launch {
             repo.getWeekFazitsFlow().collect { map ->
-                val currentWk = weekKeyOf(System.currentTimeMillis())
-                val currentWf = map[currentWk]
-                if (currentWf == null) {
-                    _uiState.update { it.copy(weekFazit = null) }
-                    return@collect
-                }
-                val currentWkEntries = _uiState.value.entries.filter { weekKeyOf(it.dateMillis) == currentWk }
-                if (currentWf.fingerprint == dayFingerprint(currentWkEntries)) {
-                    _uiState.update { it.copy(weekFazit = currentWf) }
+                latestRawWeekMap = map
+                val entries = _uiState.value.entries
+                val validWeekMap = validateAllWeekFazits(repo, entries, map)
+                val targetWk = latestDueWeekKey(entries) ?: weekKeyOf(System.currentTimeMillis())
+                _uiState.update {
+                    it.copy(
+                        weekFazit = validWeekMap[targetWk],
+                        weekFazitMap = validWeekMap
+                    )
                 }
             }
         }
@@ -129,8 +155,19 @@ class HistoryViewModel(
         }
     }
 
-    fun toggleWeekExpanded() {
-        _uiState.update { it.copy(expandedWeek = !it.expandedWeek) }
+    fun toggleWeekExpanded(weekKey: String? = null) {
+        _uiState.update { current ->
+            if (weekKey == null) {
+                current.copy(expandedWeek = !current.expandedWeek)
+            } else {
+                val set = current.expandedWeeks.toMutableSet()
+                if (weekKey in set) set.remove(weekKey) else set.add(weekKey)
+                current.copy(
+                    expandedWeek = weekKey in set,
+                    expandedWeeks = set
+                )
+            }
+        }
     }
 
     fun setAddDialogForDay(day: LocalDate?) {
@@ -352,12 +389,22 @@ class HistoryViewModel(
         ctx: Context? = null,
         settings: Settings,
         profile: Profile,
+        weekKey: String? = null,
         mealLines: List<String>? = null,
         prompts: FazitPromptBundle? = null
     ) {
-        if (_uiState.value.loadingWeek) return
-        _uiState.update { it.copy(loadingWeek = true, expandedWeek = true) }
-        val wk = weekKeyOf(System.currentTimeMillis())
+        val wk = weekKey
+            ?: latestDueWeekKey(_uiState.value.entries)
+            ?: weekKeyOf(System.currentTimeMillis())
+        if (wk in _uiState.value.loadingWeeks) return
+        _uiState.update {
+            it.copy(
+                loadingWeek = true,
+                expandedWeek = true,
+                loadingWeeks = it.loadingWeeks + wk,
+                expandedWeeks = it.expandedWeeks + wk
+            )
+        }
         val wkEntries = _uiState.value.entries.filter { weekKeyOf(it.dateMillis) == wk }
         val lines = when {
             mealLines != null -> mealLines
@@ -366,7 +413,7 @@ class HistoryViewModel(
         }
         val promptBundle = when {
             prompts != null -> prompts
-            ctx != null -> FazitPromptBundle.forWeek(ctx)
+            ctx != null -> FazitPromptBundle.forWeek(ctx, calendarWeekOfKey(wk))
             else -> FazitPromptBundle("", "", "", "")
         }
         val histRepo = getHistoryRepo(ctx)
@@ -384,9 +431,23 @@ class HistoryViewModel(
                     System.currentTimeMillis(), dayFingerprint(wkEntries)
                 )
                 histRepo?.saveWeekFazit(wf)
-                _uiState.update { it.copy(weekFazit = wf, loadingWeek = false) }
+                _uiState.update {
+                    val newLoading = it.loadingWeeks - wk
+                    it.copy(
+                        weekFazit = wf,
+                        loadingWeek = newLoading.isNotEmpty(),
+                        weekFazitMap = it.weekFazitMap + (wk to wf),
+                        loadingWeeks = newLoading
+                    )
+                }
             }.onFailure {
-                _uiState.update { it.copy(loadingWeek = false) }
+                _uiState.update {
+                    val newLoading = it.loadingWeeks - wk
+                    it.copy(
+                        loadingWeek = newLoading.isNotEmpty(),
+                        loadingWeeks = newLoading
+                    )
+                }
             }
         }
     }

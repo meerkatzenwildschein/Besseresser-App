@@ -99,14 +99,14 @@ fun HistoryListContent(
     fazitMap: Map<String, DayFazit>,
     loadingFazits: List<String>,
     expandedFazits: List<String>,
-    weekFazit: DayFazit?,
-    loadingWeek: Boolean,
-    expandedWeek: Boolean,
+    weekFazitMap: Map<String, DayFazit>,
+    loadingWeeks: Set<String>,
+    expandedWeeks: Set<String>,
     onBack: () -> Unit,
     onPick: (HistoryEntry) -> Unit,
     onGenerateFazit: (LocalDate, List<HistoryEntry>) -> Unit,
-    onGenerateWeekFazit: () -> Unit,
-    onToggleExpandWeek: () -> Unit,
+    onGenerateWeekFazit: (String) -> Unit,
+    onToggleExpandWeek: (String) -> Unit,
     onToggleExpandFazit: (String) -> Unit,
     onAddMealForDay: (LocalDate) -> Unit,
     onDeleteEntry: (HistoryEntry) -> Unit,
@@ -121,6 +121,10 @@ fun HistoryListContent(
     )
 
     val today = LocalDate.now()
+    val nowHour = LocalTime.now().hour
+    val weeksWithEntries = remember(entries) {
+        entries.map { weekKeyOf(it.dateMillis) }.toSet()
+    }
     val rawGroups = groupByDay(entries)
     val displayGroups = if (rawGroups.any { it.day == today }) {
         rawGroups
@@ -142,8 +146,28 @@ fun HistoryListContent(
         Spacer(Modifier.height(8.dp))
     }
 
+    val renderedWeeks = mutableSetOf<String>()
+
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         displayGroups.forEach { group ->
+            val weekKey = weekKeyOf(group.day)
+            if (weekKey !in renderedWeeks &&
+                weekKey in weeksWithEntries &&
+                isWeekFazitDue(weekKey, today, nowHour)
+            ) {
+                renderedWeeks.add(weekKey)
+                item(key = "week-$weekKey") {
+                    WeekFazitRow(
+                        fazit = weekFazitMap[weekKey],
+                        loading = weekKey in loadingWeeks,
+                        expanded = weekKey in expandedWeeks,
+                        onToggleExpand = { onToggleExpandWeek(weekKey) },
+                        onGenerate = { onGenerateWeekFazit(weekKey) },
+                        calendarWeek = calendarWeekOfKey(weekKey)
+                    )
+                }
+            }
+
             val dayKey = dayKeyOf(group.day)
             val hasEntries = group.entries.isNotEmpty()
             val fazit = if (hasEntries) fazitMap[dayKey] else null
@@ -250,18 +274,6 @@ fun HistoryListContent(
                         )
                     }
                 }
-            }
-        } else if (LocalDate.now().dayOfWeek == java.time.DayOfWeek.SUNDAY &&
-            LocalTime.now().hour >= FAZIT_AUTO_HOUR
-        ) {
-            item(key = "week") {
-                WeekFazitRow(
-                    fazit = weekFazit,
-                    loading = loadingWeek,
-                    expanded = expandedWeek,
-                    onToggleExpand = onToggleExpandWeek,
-                    onGenerate = onGenerateWeekFazit
-                )
             }
         }
     }

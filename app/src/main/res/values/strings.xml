@@ -189,6 +189,9 @@
     <string name="history_deleted_label">Deleted</string>
     <string name="history_undo_delete">↩ Undo</string>
     <string name="history_entry_duplicate">Duplicate entry</string>
+    <string name="history_entry_share">Share meal</string>
+    <string name="share_button_label">Share</string>
+    <string name="share_clipboard_hint">Text also copied to clipboard</string>
     <string name="history_duplicate_pick_date_title">Duplicate meal to date</string>
     <string name="history_duplicate_done">Meal duplicated to %1$s</string>
     <string name="history_delete_confirm_title">Delete entry?</string>
@@ -197,8 +200,16 @@
     <!-- Configuration / Backup -->
     <string name="menu_config">Configuration</string>
     <string name="setup_import_backup_button">Import backup from file</string>
-    <string name="config_intro_title">Backup &amp; Data Management</string>
-    <string name="config_intro_text">Back up all app data before reinstalling, restore an existing backup, or clear your history.</string>
+    <string name="config_intro_title">App Preferences &amp; Data Backup</string>
+    <string name="config_intro_text">Customize language and appearance, back up all app data before reinstalling, or clear your history.</string>
+    <string name="config_section_appearance">Language &amp; Appearance</string>
+    <string name="config_language_label">Language</string>
+    <string name="config_language_de">Deutsch</string>
+    <string name="config_language_en">English</string>
+    <string name="config_theme_label">Theme</string>
+    <string name="config_theme_system">System</string>
+    <string name="config_theme_light">Light</string>
+    <string name="config_theme_dark">Dark</string>
     <string name="config_busy_hint">Please wait, processing data …</string>
     <string name="config_section_backup">Data Backup (Export &amp; Import)</string>
     <string name="config_backup_desc">Exports or imports all app data (settings including API key, goals, profile, favorite notes, and all meals with Base64-encoded photos, daily and weekly summaries) as a JSON file in your \"Downloads\" folder. Existing or duplicate entries are overwritten on import.</string>

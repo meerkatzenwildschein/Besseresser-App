@@ -321,4 +321,27 @@ class DataSerializationTest {
         assertEquals(RecentNote("Müsli", starred = false), mergedNotes[1])
         assertEquals(RecentNote("Nur lokal", starred = true), mergedNotes[2])
     }
+
+    @Test
+    fun testThemeModeAndLanguageParsingAndSerialization() {
+        assertEquals(AppThemeMode.SYSTEM, AppThemeMode.fromString(null))
+        assertEquals(AppThemeMode.SYSTEM, AppThemeMode.fromString("system"))
+        assertEquals(AppThemeMode.LIGHT, AppThemeMode.fromString("light"))
+        assertEquals(AppThemeMode.DARK, AppThemeMode.fromString("DARK"))
+
+        assertEquals(AppLanguage.DE, AppLanguage.resolve("de", "en"))
+        assertEquals(AppLanguage.EN, AppLanguage.resolve("en", "de"))
+        assertEquals(AppLanguage.DE, AppLanguage.resolve(null, "de-DE"))
+        assertEquals(AppLanguage.EN, AppLanguage.resolve(null, "en-US"))
+        assertEquals(AppLanguage.EN, AppLanguage.resolve(null, "fr"))
+
+        val backup = AppBackup(
+            themeMode = AppThemeMode.DARK,
+            language = AppLanguage.DE
+        )
+        val json = BackupStore.serializeBackup(backup)
+        val restored = BackupStore.deserializeBackup(json)
+        assertEquals(AppThemeMode.DARK, restored.themeMode)
+        assertEquals(AppLanguage.DE, restored.language)
+    }
 }
