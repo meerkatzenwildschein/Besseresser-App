@@ -296,13 +296,25 @@ fun dayKeyOf(date: LocalDate): String = date.format(DAY_KEY_FORMAT)
 /** Wochen-Key = ISO-Montag der Woche, in der das Datum liegt (Format yyyyMMdd). */
 fun weekKeyOf(millis: Long): String {
     val day = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+    return weekKeyOf(day)
+}
+
+fun weekKeyOf(day: LocalDate): String {
     val monday = day.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
     return monday.format(DAY_KEY_FORMAT)
 }
 
+fun weekMondayOfKey(weekKey: String): LocalDate? = runCatching {
+    LocalDate.parse(weekKey.removePrefix("week_"), DAY_KEY_FORMAT)
+}.getOrNull()
+
 /** ISO-Kalenderwoche (1..53) für ein gegebenes Datum. */
 fun calendarWeekOf(date: LocalDate = LocalDate.now()): Int =
     date.get(java.time.temporal.WeekFields.ISO.weekOfWeekBasedYear())
+
+/** ISO-Kalenderwoche (1..53) zu einem Wochen-Key (yyyyMMdd). */
+fun calendarWeekOfKey(weekKey: String): Int =
+    weekMondayOfKey(weekKey)?.let { calendarWeekOf(it) } ?: calendarWeekOf()
 
 /** KI-generiertes Fazit eines Tages (Text-Ampel statt rechnerischem Tagesscore). */
 @Serializable

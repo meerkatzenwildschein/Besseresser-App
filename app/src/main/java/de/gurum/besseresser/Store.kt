@@ -219,3 +219,48 @@ object RecentNotesStore {
             .commit()
     }
 }
+
+// ----------------------------------------------------------------- Sprache & Theme (UI-Einstellungen)
+
+object UiPrefsStore {
+    private const val KEY_THEME = "appThemeMode"
+    private const val KEY_LANG = "appLanguage"
+
+    fun loadThemeMode(ctx: Context): AppThemeMode {
+        val raw = ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_THEME, null)
+        return AppThemeMode.fromString(raw)
+    }
+
+    fun saveThemeMode(ctx: Context, mode: AppThemeMode) {
+        ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_THEME, mode.rawValue)
+            .apply()
+    }
+
+    fun loadLanguage(ctx: Context): AppLanguage {
+        val raw = ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_LANG, null)
+        return AppLanguage.resolve(raw)
+    }
+
+    fun saveLanguage(ctx: Context, language: AppLanguage) {
+        ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_LANG, language.rawValue)
+            .apply()
+    }
+}
+
+/** Erzeugt einen ContextWrapper mit der gewählten App-Sprache, behält aber den Basis-Activity-Context bei. */
+fun Context.withAppLanguage(language: AppLanguage): Context {
+    val targetLocale = language.locale
+    java.util.Locale.setDefault(targetLocale)
+    val config = android.content.res.Configuration(resources.configuration)
+    config.setLocale(targetLocale)
+    config.setLocales(android.os.LocaleList(targetLocale))
+    val localized = createConfigurationContext(config)
+    return object : android.content.ContextWrapper(this) {
+        override fun getResources(): android.content.res.Resources = localized.resources
+        override fun getAssets(): android.content.res.AssetManager = localized.assets
+    }
+}

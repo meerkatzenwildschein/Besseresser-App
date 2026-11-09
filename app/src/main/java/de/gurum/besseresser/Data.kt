@@ -124,6 +124,75 @@ enum class Gender(val rawValue: String) {
     }
 }
 
+// ----------------------------------------------------------------- Erscheinungsbild (Theme) & Sprache
+
+object AppThemeModeSerializer : KSerializer<AppThemeMode> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AppThemeMode", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: AppThemeMode) {
+        encoder.encodeString(value.rawValue)
+    }
+
+    override fun deserialize(decoder: Decoder): AppThemeMode {
+        return AppThemeMode.fromString(decoder.decodeString())
+    }
+}
+
+/** Theme-Auswahl: System-Vorgabe folgen, immer Hell oder immer Dunkel. */
+@Serializable(with = AppThemeModeSerializer::class)
+enum class AppThemeMode(val rawValue: String) {
+    SYSTEM("system"),
+    LIGHT("light"),
+    DARK("dark");
+
+    companion object {
+        fun fromString(value: String?): AppThemeMode = when (value?.trim()?.lowercase()) {
+            "light", "hell" -> LIGHT
+            "dark", "dunkel" -> DARK
+            else -> SYSTEM
+        }
+    }
+}
+
+object AppLanguageSerializer : KSerializer<AppLanguage> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("AppLanguage", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: AppLanguage) {
+        encoder.encodeString(value.rawValue)
+    }
+
+    override fun deserialize(decoder: Decoder): AppLanguage {
+        return AppLanguage.resolve(decoder.decodeString())
+    }
+}
+
+/** Unterstützte App-Sprachen: Deutsch (de) und Englisch (en). */
+@Serializable(with = AppLanguageSerializer::class)
+enum class AppLanguage(val rawValue: String) {
+    DE("de"),
+    EN("en");
+
+    val locale: java.util.Locale
+        get() = when (this) {
+            DE -> java.util.Locale.GERMAN
+            EN -> java.util.Locale.ENGLISH
+        }
+
+    companion object {
+        fun fromString(value: String?): AppLanguage? = when (value?.trim()?.lowercase()) {
+            "de", "de-de", "german", "deutsch" -> DE
+            "en", "en-us", "en-gb", "english", "englisch" -> EN
+            else -> null
+        }
+
+        /** Gespeicherte Sprache oder Fallback anhand der Systemsprache (de -> DE, sonst EN). */
+        fun resolve(savedRaw: String?, systemLanguage: String = java.util.Locale.getDefault().language): AppLanguage =
+            fromString(savedRaw) ?: if (systemLanguage.trim().lowercase().startsWith("de")) DE else EN
+    }
+}
+
 // ----------------------------------------------------------------- Einstellungen & Bewertungen
 
 /** Einstellungen (Setup): URL/Key/Modell + Ziele. */

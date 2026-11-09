@@ -43,7 +43,11 @@ data class AppBackup(
     @SerialName("tagesfazits")
     val dayFazits: List<DayFazit> = emptyList(),
     @SerialName("wochenfazits")
-    val weekFazits: List<DayFazit> = emptyList()
+    val weekFazits: List<DayFazit> = emptyList(),
+    @SerialName("theme")
+    val themeMode: AppThemeMode? = null,
+    @SerialName("sprache")
+    val language: AppLanguage? = null
 )
 
 /** Kompakte Zusammenfassung eines durchgeführten Exports oder Imports für die UI. */
@@ -142,7 +146,9 @@ object BackupStore {
             recentNotes = recentNotes,
             historyEntries = backupEntries,
             dayFazits = dayFazits,
-            weekFazits = weekFazits
+            weekFazits = weekFazits,
+            themeMode = UiPrefsStore.loadThemeMode(ctx),
+            language = UiPrefsStore.loadLanguage(ctx)
         )
     }
 
@@ -215,9 +221,11 @@ object BackupStore {
     fun importFromJson(ctx: Context, rawJson: String): Result<BackupSummary> = runCatching {
         val backup = deserializeBackup(rawJson)
 
-        // 1. Einstellungen (inkl. API-Key) zusammenführen & speichern
+        // 1. Einstellungen (inkl. API-Key) sowie Theme & Sprache zusammenführen & speichern
         val mergedSettings = mergeSettings(Store.load(ctx), backup.settings)
         Store.save(ctx, mergedSettings)
+        backup.themeMode?.let { UiPrefsStore.saveThemeMode(ctx, it) }
+        backup.language?.let { UiPrefsStore.saveLanguage(ctx, it) }
 
         // 2. Profil zusammenführen & speichern
         val mergedProfile = mergeProfile(ProfileStore.load(ctx), backup.profile)

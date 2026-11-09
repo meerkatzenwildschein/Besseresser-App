@@ -189,6 +189,9 @@
     <string name="history_deleted_label">Gelöscht</string>
     <string name="history_undo_delete">↩ Rückgängig</string>
     <string name="history_entry_duplicate">Eintrag duplizieren</string>
+    <string name="history_entry_share">Mahlzeit teilen</string>
+    <string name="share_button_label">Teilen</string>
+    <string name="share_clipboard_hint">Text auch in die Zwischenablage kopiert</string>
     <string name="history_duplicate_pick_date_title">Essen auf Tag duplizieren</string>
     <string name="history_duplicate_done">Essen auf %1$s dupliziert</string>
     <string name="history_delete_confirm_title">Eintrag löschen?</string>
@@ -197,8 +200,16 @@
     <!-- Konfiguration / Backup -->
     <string name="menu_config">Konfiguration</string>
     <string name="setup_import_backup_button">Backup aus Datei importieren</string>
-    <string name="config_intro_title">Datensicherung &amp; Verwaltung</string>
-    <string name="config_intro_text">Hier kannst du sämtliche App-Daten vor einer Neuinstallation sichern, wiederherstellen oder den Verlauf leeren.</string>
+    <string name="config_intro_title">App-Einstellungen &amp; Datensicherung</string>
+    <string name="config_intro_text">Passe Sprache und Erscheinungsbild an, sichere deine App-Daten vor einer Neuinstallation oder setze den Verlauf zurück.</string>
+    <string name="config_section_appearance">Sprache &amp; Erscheinungsbild</string>
+    <string name="config_language_label">Sprache</string>
+    <string name="config_language_de">Deutsch</string>
+    <string name="config_language_en">English</string>
+    <string name="config_theme_label">Design (Theme)</string>
+    <string name="config_theme_system">System</string>
+    <string name="config_theme_light">Hell</string>
+    <string name="config_theme_dark">Dunkel</string>
     <string name="config_busy_hint">Bitte warten, Daten werden verarbeitet …</string>
     <string name="config_section_backup">Datensicherung (Export &amp; Import)</string>
     <string name="config_backup_desc">Exportiert bzw. importiert alle App-Daten (Einstellungen inkl. API-Key, Ziele, Profil, Notiz-Favoriten sowie alle Mahlzeiten mit Base64-codierten Fotos, Tages- und Wochenfazits) als JSON-Datei im Ordner „Downloads“. Vorhandene oder doppelte Einträge werden beim Import überschrieben.</string>
