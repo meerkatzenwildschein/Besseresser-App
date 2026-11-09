@@ -28,7 +28,7 @@
     <string name="goals_preview_more">+%1$d</string>
 
     <!-- Main screen -->
-    <string name="main_take_photo">Photograph your food</string>
+    <string name="main_take_photo">Snap your meal</string>
     <string name="main_rate_now">Rate this meal</string>
     <string name="main_retake">Retake photo</string>
     <string name="review_title">Check the photo</string>
