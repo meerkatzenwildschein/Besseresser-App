@@ -109,9 +109,10 @@ class FakeHistoryRepository : HistoryRepository {
             summary = ev.summary,
             note = note,
             erkannt = ev.erkannt,
-            backdated = backdated
+            backdated = backdated,
+            sortOrder = id
         )
-        entriesFlow.update { (listOf(entry) + it).sortedByDescending { e -> e.dateMillis } }
+        entriesFlow.update { (listOf(entry) + it).sortedByDescending { e -> e.effectiveSortOrder } }
         return entry
     }
 
@@ -140,7 +141,7 @@ class FakeHistoryRepository : HistoryRepository {
     override suspend fun reorderEntries(reordered: List<HistoryEntry>) {
         val reorderedMap = reordered.associateBy { it.id }
         entriesFlow.update { list ->
-            list.map { reorderedMap[it.id] ?: it }.sortedByDescending { it.dateMillis }
+            list.map { reorderedMap[it.id] ?: it }.sortedByDescending { it.effectiveSortOrder }
         }
     }
 
@@ -421,7 +422,9 @@ class RepositoriesAndFakesTest {
 
         // Backdated meal capture flow
         val targetDay = LocalDate.of(2026, 11, 5)
+        val targetTime = java.time.LocalTime.of(14, 20)
         vm.setAddTargetDay(targetDay)
+        vm.setAddTargetTime(targetTime)
         vm.setAddNote("150 g Skyr mit Beeren")
         vm.setShowAddText(true)
 
@@ -435,11 +438,14 @@ class RepositoriesAndFakesTest {
         advanceUntilIdle()
 
         assertNotNull(pickedBackdated)
-        assertTrue(pickedBackdated!!.backdated)
+        assertFalse(pickedBackdated!!.backdated)
+        val expectedMillis = targetDay.atTime(14, 20).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        assertEquals(expectedMillis, pickedBackdated!!.dateMillis)
         assertEquals("150 g Skyr mit Beeren", pickedBackdated!!.erkannt)
         assertFalse(vm.uiState.value.showAddText)
         assertEquals("", vm.uiState.value.addNote)
         assertNull(vm.uiState.value.addTargetDay)
+        assertNull(vm.uiState.value.addTargetTime)
         // Note was also pushed to recent notes
         assertEquals("150 g Skyr mit Beeren", setRepo.loadRecentNotes().firstOrNull()?.text)
     }
@@ -574,14 +580,37 @@ class RepositoriesAndFakesTest {
         assertEquals("Frühstück", reordered[0].erkannt)
         assertEquals("Abendessen", reordered[1].erkannt)
         assertEquals("Mittagessen", reordered[2].erkannt)
-        // Timestamps must stay strictly descending
-        assertTrue(reordered[0].dateMillis > reordered[1].dateMillis)
-        assertTrue(reordered[1].dateMillis > reordered[2].dateMillis)
+        // Sort orders must be strictly descending, while original capture times (dateMillis) stay untouched!
+        assertTrue(reordered[0].sortOrder > reordered[1].sortOrder)
+        assertTrue(reordered[1].sortOrder > reordered[2].sortOrder)
+        assertEquals(m1, reordered[0].dateMillis)
+        assertEquals(m3, reordered[1].dateMillis)
+        assertEquals(m2, reordered[2].dateMillis)
 
-        // Existing DayFazit must still be present and NOT outdated after reordering
+        // Test moving a normal entry above a backdated (23:59) entry: normal entry keeps its time!
+        val eBackdated = histRepo.add(
+            null,
+            Evaluation(erkannt = "Später Snack"),
+            dateOverride = day.atTime(23, 59).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            backdated = true
+        )
+        advanceUntilIdle()
+        assertEquals("Später Snack", vm.uiState.value.entries[0].erkannt)
+        assertTrue(vm.uiState.value.entries[0].backdated)
+
+        // Move Mittagessen (index 3) to top (index 0, above backdated 23:59 entry)
+        vm.moveEntryWithinDay(day = day, fromIndex = 3, toIndex = 0)
+        advanceUntilIdle()
+        val afterBackdatedMove = vm.uiState.value.entries
+        assertEquals("Mittagessen", afterBackdatedMove[0].erkannt)
+        assertFalse(afterBackdatedMove[0].backdated)
+        // Mittagessen MUST still have its original 12:00 timestamp (m2), NOT 23:59!
+        assertEquals(m2, afterBackdatedMove[0].dateMillis)
+        assertTrue(afterBackdatedMove[0].sortOrder > afterBackdatedMove[1].sortOrder)
+
+        // Existing DayFazit must still be present
         val loadedFazitAfterReorder = histRepo.loadDayFazit(dayKeyOf(day))
         assertNotNull(loadedFazitAfterReorder)
-        assertFalse(isFazitOutdated(loadedFazitAfterReorder!!, reordered))
 
         // Clear all history data -> entries, dayFazits, weekFazits become empty
         histRepo.clearAll()

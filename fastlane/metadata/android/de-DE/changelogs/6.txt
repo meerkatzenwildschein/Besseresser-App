@@ -1,0 +1,4 @@
+* Duplizieren von Mahlzeiten fragt jetzt nach Datum und Uhrzeit (vorbelegt mit der aktuellen Uhrzeit)
+* Nacherfassen (+-Button) am heutigen Tag übernimmt automatisch die aktuelle Uhrzeit; an vergangenen Tagen wird die Uhrzeit abgefragt
+* Neue und duplizierte Mahlzeiten werden anhand ihrer Uhrzeit chronologisch an der richtigen Stelle des Tages einsortiert
+* Beim manuellen Verschieben von Mahlzeiten per Langdruck bleibt die ursprüngliche Erfassungsuhrzeit erhalten

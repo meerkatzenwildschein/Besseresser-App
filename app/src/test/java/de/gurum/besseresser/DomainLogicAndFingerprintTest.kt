@@ -354,10 +354,12 @@ class DomainLogicAndFingerprintTest {
         )
         assertFalse(isFazitOutdated(targetDayFazit, listOf(existingTargetEntry)))
 
-        // Duplicate source entry to targetDay
+        // Duplicate source entry to targetDay with explicit targetTime
+        val targetTime = java.time.LocalTime.of(18, 45)
         val duplicated = HistoryStore.createDuplicatedEntry(
             source = source,
             targetDay = targetDay,
+            targetTime = targetTime,
             newId = 3005L,
             newPhotoFile = "3005.jpg"
         )
@@ -370,13 +372,35 @@ class DomainLogicAndFingerprintTest {
         assertEquals(source.note, duplicated.note)
         assertEquals(source.erkannt, duplicated.erkannt)
         assertEquals(source.score, duplicated.score)
-        // Marked as backdated ("nachträglich erfasst") on targetDay
-        assertTrue(duplicated.backdated)
+        // Has an explicit user-chosen time on targetDay -> backdated is false
+        assertFalse(duplicated.backdated)
         assertEquals(dayKeyOf(targetDay), dayKeyOf(duplicated.dateMillis))
+        val expectedMillis = targetDay.atTime(18, 45).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        assertEquals(expectedMillis, duplicated.dateMillis)
+        assertEquals(expectedMillis, duplicated.sortOrder)
 
         // Target day's existing Fazit is now automatically tracked as outdated/stale
         val entriesAfterDuplication = listOf(existingTargetEntry, duplicated)
         assertTrue(isFazitOutdated(targetDayFazit, entriesAfterDuplication))
+
+        // Even if the target day had a legacy backdated (23:59) or manually reordered entry,
+        // computeChronologicalSortOrders places the new entry at the right position for its time (18:45):
+        val legacyBackdatedEntry = HistoryEntry(
+            id = 2002L,
+            dateMillis = targetDay.atTime(23, 59).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            erkannt = "Alter nacherfasster Eintrag",
+            backdated = true,
+            sortOrder = targetDay.atTime(23, 59).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        )
+        val synced = HistoryStore.computeChronologicalSortOrders(
+            existingDayEntries = listOf(legacyBackdatedEntry, existingTargetEntry),
+            newEntry = duplicated
+        )
+        val grouped = groupByDay(synced).single().entries
+        // 18:45 duplicated meal is placed above 08:15 (existingTargetEntry)
+        val idxDuplicated = grouped.indexOfFirst { it.id == duplicated.id }
+        val idxMorning = grouped.indexOfFirst { it.id == existingTargetEntry.id }
+        assertTrue(idxDuplicated < idxMorning)
     }
 
     @Test

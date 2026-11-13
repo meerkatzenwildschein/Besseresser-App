@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 
 const val UNDO_DELETE_DELAY_MS = 5000L
@@ -34,7 +35,8 @@ data class HistoryUiState(
     val showAddText: Boolean = false,
     val showAddBusyCard: Boolean = false,
     val addNote: String = "",
-    val addTargetDay: LocalDate? = null
+    val addTargetDay: LocalDate? = null,
+    val addTargetTime: LocalTime? = null
 )
 
 class HistoryViewModel(
@@ -198,6 +200,10 @@ class HistoryViewModel(
         _uiState.update { it.copy(addTargetDay = day) }
     }
 
+    fun setAddTargetTime(time: LocalTime?) {
+        _uiState.update { it.copy(addTargetTime = time) }
+    }
+
     fun saveBackdatedEntry(
         ctx: Context? = null,
         ev: Evaluation,
@@ -205,15 +211,16 @@ class HistoryViewModel(
         onPick: (HistoryEntry) -> Unit = {}
     ) {
         val day = _uiState.value.addTargetDay ?: return
+        val time = _uiState.value.addTargetTime ?: LocalTime.now()
         val note = _uiState.value.addNote.trim()
-        val millis = day.atTime(23, 59).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val millis = day.atTime(time.hour, time.minute).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val histRepo = getHistoryRepo(ctx)
         val setRepo = getSettingsRepo(ctx)
         viewModelScope.launch {
             val entry = histRepo?.add(
                 photoUri = photoUriIn, ev = ev,
-                note = note, dateOverride = millis, backdated = true
-            ) ?: HistoryEntry(id = millis, dateMillis = millis, goalResults = ev.goalResults, summary = ev.summary, note = note, backdated = true)
+                note = note, dateOverride = millis, backdated = false
+            ) ?: HistoryEntry(id = millis, dateMillis = millis, goalResults = ev.goalResults, summary = ev.summary, note = note, backdated = false)
             histRepo?.deleteDayFazitForEntry(entry)
             histRepo?.deleteWeekFazitForEntry(entry)
             setRepo?.pushRecentNote(note)
@@ -224,7 +231,8 @@ class HistoryViewModel(
                     showAddText = false,
                     showAddBusyCard = false,
                     addNote = "",
-                    addTargetDay = null
+                    addTargetDay = null,
+                    addTargetTime = null
                 )
             }
             onPick(entry)
@@ -291,7 +299,8 @@ class HistoryViewModel(
     }
 
     /** Verschiebt einen Eintrag innerhalb seines Tages von [fromIndex] nach [toIndex].
-     *  Vergibt saubere Zeitstempel (absteigend), damit die Reihenfolge persistent bleibt. */
+     *  Aktualisiert ausschließlich [HistoryEntry.sortOrder] (absteigend), sodass die echte
+     *  Erfassungsuhrzeit ([HistoryEntry.dateMillis]) unverändert erhalten bleibt. */
     fun moveEntryWithinDay(ctx: Context? = null, day: LocalDate, fromIndex: Int, toIndex: Int) {
         if (fromIndex == toIndex) return
         val currentEntries = _uiState.value.entries
@@ -299,30 +308,30 @@ class HistoryViewModel(
             java.time.Instant.ofEpochMilli(it.dateMillis)
                 .atZone(ZoneId.systemDefault())
                 .toLocalDate() == day
-        }.toMutableList()
+        }.sortedByDescending { it.effectiveSortOrder }.toMutableList()
 
         if (fromIndex !in dayEntries.indices || toIndex !in dayEntries.indices) return
 
         val moved = dayEntries.removeAt(fromIndex)
         dayEntries.add(toIndex, moved)
 
-        // Die vorhandenen Millis absteigend sortieren und der neuen Reihenfolge zuweisen
-        val timestamps = dayEntries.map { it.dateMillis }.sortedDescending().toMutableList()
-        // Sicherstellen, dass keine doppelten Zeitstempel existieren (jeweils mind. 1 ms Differenz)
-        for (i in 1 until timestamps.size) {
-            if (timestamps[i] >= timestamps[i - 1]) {
-                timestamps[i] = timestamps[i - 1] - 1000L
+        // Die vorhandenen Sortierwerte absteigend sortieren und der neuen Reihenfolge zuweisen
+        val sortOrders = dayEntries.map { it.effectiveSortOrder }.sortedDescending().toMutableList()
+        // Sicherstellen, dass keine doppelten Sortierwerte existieren (jeweils mind. 1000 Differenz)
+        for (i in 1 until sortOrders.size) {
+            if (sortOrders[i] >= sortOrders[i - 1]) {
+                sortOrders[i] = sortOrders[i - 1] - 1000L
             }
         }
 
         val reorderedDayEntries = dayEntries.mapIndexed { idx, entry ->
-            entry.copy(dateMillis = timestamps[idx])
+            entry.copy(sortOrder = sortOrders[idx])
         }
 
         // Optimistisches Update im UI-State
         val reorderedMap = reorderedDayEntries.associateBy { it.id }
         val updatedAllEntries = currentEntries.map { reorderedMap[it.id] ?: it }
-            .sortedByDescending { it.dateMillis }
+            .sortedByDescending { it.effectiveSortOrder }
 
         _uiState.update { it.copy(entries = updatedAllEntries) }
 

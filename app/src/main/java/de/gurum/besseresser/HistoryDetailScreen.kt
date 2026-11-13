@@ -37,7 +37,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,6 +62,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.time.LocalDate
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 
@@ -160,6 +164,7 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
     BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf(false) }
     var showDuplicateDatePicker by remember { mutableStateOf(false) }
+    var duplicateTargetDate by remember { mutableStateOf<LocalDate?>(null) }
     var showErkanntEdit by remember { mutableStateOf(false) }
     var reEvalBusy by remember { mutableStateOf(false) }
     var current by remember { mutableStateOf(entry) }
@@ -408,15 +413,8 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
                     enabled = pickerState.selectedDateMillis != null,
                     onClick = {
                         val ms = pickerState.selectedDateMillis ?: return@TextButton
-                        val targetDay = LocalDate.ofEpochDay(ms / 86_400_000L)
-                        HistoryStore.duplicateToDate(ctx, current, targetDay)
+                        duplicateTargetDate = LocalDate.ofEpochDay(ms / 86_400_000L)
                         showDuplicateDatePicker = false
-                        Toast.makeText(
-                            ctx,
-                            ctx.getString(R.string.history_duplicate_done, targetDay.format(DATE_FORMATTER)),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        onBack()
                     }
                 ) {
                     Text(stringResource(R.string.profile_ok))
@@ -439,5 +437,54 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
                 }
             )
         }
+    }
+
+    duplicateTargetDate?.let { targetDay ->
+        val now = remember { LocalTime.now() }
+        val timePickerState = rememberTimePickerState(
+            initialHour = now.hour,
+            initialMinute = now.minute,
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { duplicateTargetDate = null },
+            title = {
+                Text(
+                    stringResource(R.string.history_duplicate_pick_time_title),
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    TimePicker(state = timePickerState)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val targetTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
+                        HistoryStore.duplicateToDate(ctx, current, targetDay, targetTime)
+                        duplicateTargetDate = null
+                        val formattedDateTime = "${targetDay.format(DATE_FORMATTER)}, ${targetTime.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+                        Toast.makeText(
+                            ctx,
+                            ctx.getString(R.string.history_duplicate_done, formattedDateTime),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        onBack()
+                    }
+                ) {
+                    Text(stringResource(R.string.profile_ok))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { duplicateTargetDate = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 }

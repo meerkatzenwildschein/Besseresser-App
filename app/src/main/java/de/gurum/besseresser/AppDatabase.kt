@@ -11,6 +11,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.encodeToString
@@ -27,7 +29,8 @@ data class HistoryEntryEntity(
     val summary: String,
     val note: String,
     val erkannt: String,
-    val backdated: Boolean
+    val backdated: Boolean,
+    val sortOrder: Long = dateMillis
 ) {
     fun toDomain(): HistoryEntry = HistoryEntry(
         id = id,
@@ -37,7 +40,8 @@ data class HistoryEntryEntity(
         summary = summary,
         note = note,
         erkannt = erkannt,
-        backdated = backdated
+        backdated = backdated,
+        sortOrder = if (sortOrder != 0L) sortOrder else dateMillis
     )
 }
 
@@ -49,7 +53,8 @@ fun HistoryEntry.toEntity(): HistoryEntryEntity = HistoryEntryEntity(
     summary = summary,
     note = note,
     erkannt = erkannt,
-    backdated = backdated
+    backdated = backdated,
+    sortOrder = effectiveSortOrder
 )
 
 @Entity(tableName = "day_fazits")
@@ -142,10 +147,10 @@ class RoomConverters {
 
 @Dao
 interface HistoryDao {
-    @Query("SELECT * FROM history_entries ORDER BY dateMillis DESC")
+    @Query("SELECT * FROM history_entries ORDER BY CASE WHEN sortOrder != 0 THEN sortOrder ELSE dateMillis END DESC, dateMillis DESC")
     fun getAllFlow(): Flow<List<HistoryEntryEntity>>
 
-    @Query("SELECT * FROM history_entries ORDER BY dateMillis DESC")
+    @Query("SELECT * FROM history_entries ORDER BY CASE WHEN sortOrder != 0 THEN sortOrder ELSE dateMillis END DESC, dateMillis DESC")
     suspend fun getAll(): List<HistoryEntryEntity>
 
     @Query("SELECT * FROM history_entries WHERE id = :id")
@@ -222,7 +227,7 @@ interface WeekFazitDao {
 
 @Database(
     entities = [HistoryEntryEntity::class, DayFazitEntity::class, WeekFazitEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
@@ -235,13 +240,23 @@ abstract class AppDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE history_entries ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE history_entries SET sortOrder = dateMillis WHERE sortOrder = 0")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
                     "besseresser.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .addMigrations(MIGRATION_1_2)
+                    .build()
+                    .also { INSTANCE = it }
             }
         }
     }

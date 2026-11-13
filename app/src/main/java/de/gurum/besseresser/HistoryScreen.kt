@@ -129,13 +129,15 @@ fun HistoryScreen(
         NacherfassenChoiceDialog(
             day = uiState.addDialogForDay,
             onDismiss = { viewModel.setAddDialogForDay(null) },
-            onSelectWithPhoto = { targetDay ->
+            onSelectWithPhoto = { targetDay, targetTime ->
                 viewModel.setAddTargetDay(targetDay)
+                viewModel.setAddTargetTime(targetTime)
                 viewModel.setAddDialogForDay(null)
                 viewModel.setShowAddCamera(true)
             },
-            onSelectWithoutPhoto = { targetDay ->
+            onSelectWithoutPhoto = { targetDay, targetTime ->
                 viewModel.setAddTargetDay(targetDay)
+                viewModel.setAddTargetTime(targetTime)
                 viewModel.setAddDialogForDay(null)
                 viewModel.setShowAddText(true)
             }

@@ -54,7 +54,8 @@ class RoomDatabaseAndViewModelTest {
             summary = "Summary",
             note = "Note",
             erkannt = "Pizza",
-            backdated = true
+            backdated = true,
+            sortOrder = 1700000005000L
         )
         val entity = domain.toEntity()
         assertEquals(domain.id, entity.id)
@@ -65,6 +66,7 @@ class RoomDatabaseAndViewModelTest {
         assertEquals(domain.note, entity.note)
         assertEquals(domain.erkannt, entity.erkannt)
         assertEquals(domain.backdated, entity.backdated)
+        assertEquals(domain.sortOrder, entity.sortOrder)
 
         val restoredDomain = entity.toDomain()
         assertEquals(domain, restoredDomain)

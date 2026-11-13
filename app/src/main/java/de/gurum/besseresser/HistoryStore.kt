@@ -30,8 +30,13 @@ data class HistoryEntry(
     @SerialName("erkannt")
     val erkannt: String = "",       // Was die KI auf dem Foto erkannt zu haben meint
     @SerialName("nacherfasst")
-    val backdated: Boolean = false  // nachträglich erfasst (keine echte Uhrzeit bekannt)
+    val backdated: Boolean = false, // nachträglich erfasst (keine echte Uhrzeit bekannt)
+    @SerialName("sortOrder")
+    val sortOrder: Long = dateMillis // Sortierposition (getrennt von dateMillis, damit die echte Uhrzeit beim Verschieben erhalten bleibt)
 ) {
+    /** Effektiver Sortierschlüssel (Fallback auf dateMillis für ältere Backups/Einträge mit sortOrder == 0). */
+    val effectiveSortOrder: Long
+        get() = if (sortOrder != 0L) sortOrder else dateMillis
     /** Ampel-Score 0..100 (gruen=100, gelb=50, rot=0, grau ausgeschlossen); -1 = nicht bewertbar. */
     val score: Int
         get() {
@@ -111,10 +116,17 @@ object HistoryStore {
         val entry = HistoryEntry(
             id = id, dateMillis = date, photoFile = photoFile,
             goalResults = ev.goalResults, summary = ev.summary,
-            note = note, erkannt = ev.erkannt, backdated = backdated
+            note = note, erkannt = ev.erkannt, backdated = backdated,
+            sortOrder = date
         )
         kotlinx.coroutines.runBlocking {
-            AppDatabase.getInstance(ctx).historyDao().insert(entry.toEntity())
+            val dao = AppDatabase.getInstance(ctx).historyDao()
+            val targetDay = Instant.ofEpochMilli(date).atZone(ZoneId.systemDefault()).toLocalDate()
+            val existingSameDay = dao.getAll().map { it.toDomain() }.filter {
+                Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate() == targetDay
+            }
+            val synced = computeChronologicalSortOrders(existingSameDay, entry)
+            dao.insertAll(synced.map { it.toEntity() })
         }
         return entry
     }
@@ -153,15 +165,16 @@ object HistoryStore {
         }
     }
 
-    /** Erzeugt ein Duplikat-Domänenobjekt für das gewählte Zieldatum (ohne echte Uhrzeit -> backdated = true). */
+    /** Erzeugt ein Duplikat-Domänenobjekt für das gewählte Zieldatum und die gewählte Uhrzeit. */
     internal fun createDuplicatedEntry(
         source: HistoryEntry,
         targetDay: LocalDate,
+        targetTime: java.time.LocalTime = java.time.LocalTime.now(),
         newId: Long = System.currentTimeMillis(),
         newPhotoFile: String = ""
     ): HistoryEntry {
         val targetMillis = targetDay
-            .atTime(23, 59)
+            .atTime(targetTime.hour, targetTime.minute)
             .atZone(ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli()
@@ -169,15 +182,59 @@ object HistoryStore {
             id = newId,
             dateMillis = targetMillis,
             photoFile = newPhotoFile,
-            backdated = true
+            backdated = false,
+            sortOrder = targetMillis
         )
     }
 
+    /** Berechnet beim Einfügen eines neuen Eintrags (mit konkreter Uhrzeit) in einen Tag konsistente
+     *  `sortOrder`-Werte für alle Einträge dieses Tages:
+     *  Der neue Eintrag wird anhand seiner echten Uhrzeit (`dateMillis`) an der chronologisch richtigen
+     *  Stelle zwischen den bestehenden Einträgen des Tages eingereiht, auch wenn bestehende Einträge
+     *  zuvor manuell verschoben wurden oder als altes `backdated` (23:59) gespeichert waren. */
+    internal fun computeChronologicalSortOrders(
+        existingDayEntries: List<HistoryEntry>,
+        newEntry: HistoryEntry
+    ): List<HistoryEntry> {
+        if (existingDayEntries.isEmpty()) return listOf(newEntry)
+        // Bestehende Einträge in ihrer aktuellen Anzeigereihenfolge (oben = Index 0 = späteste Position)
+        val ordered = existingDayEntries.sortedByDescending { it.effectiveSortOrder }.toMutableList()
+
+        // Suche die chronologisch passende Einfügeposition anhand der echten Uhrzeiten (!backdated):
+        // - Vor dem ersten Eintrag mit echter Uhrzeit <= newEntry.dateMillis
+        // - Falls es Einträge mit echter Uhrzeit > newEntry.dateMillis gibt, direkt hinter dem letzten davon
+        // - Falls der Tag bisher nur alte backdated-Einträge (ohne Uhrzeit) hat, kommt der neue Eintrag mit Uhrzeit nach oben (Index 0)
+        val firstEarlierTimedIdx = ordered.indexOfFirst { !it.backdated && it.dateMillis <= newEntry.dateMillis }
+        val lastLaterTimedIdx = ordered.indexOfLast { !it.backdated && it.dateMillis > newEntry.dateMillis }
+        val insertIdx = when {
+            firstEarlierTimedIdx != -1 -> firstEarlierTimedIdx
+            lastLaterTimedIdx != -1 -> lastLaterTimedIdx + 1
+            else -> 0
+        }
+        ordered.add(insertIdx, newEntry)
+
+        // Allen Einträgen streng absteigende sortOrder-Werte zuweisen (Basis: absteigend sortierte Zeitstempel)
+        val baseSortOrders = ordered.map { maxOf(it.effectiveSortOrder, it.dateMillis) }
+            .sortedDescending()
+            .toMutableList()
+        for (i in 1 until baseSortOrders.size) {
+            if (baseSortOrders[i] >= baseSortOrders[i - 1]) {
+                baseSortOrders[i] = baseSortOrders[i - 1] - 1000L
+            }
+        }
+        return ordered.mapIndexed { idx, e -> e.copy(sortOrder = baseSortOrders[idx]) }
+    }
+
     /** Dupliziert einen bestehenden Eintrag komplett (inkl. Foto, Ziele, Texte, Notiz) ohne erneute KI-Bewertung
-     *  auf das gewählte Zieldatum. Der neue Eintrag wird als „nachträglich erfasst“ (backdated = true) markiert.
+     *  auf das gewählte Zieldatum und die gewählte Uhrzeit.
      *  Ein bestehendes Tagesfazit des Zieltags bleibt in der DB, damit es über den Entry-ID-/Fingerprint-Mismatch
      *  genau wie bei einer Eintrags-Bearbeitung als geändert/veraltet („⟳ Neu bewerten“) getrackt wird. */
-    fun duplicateToDate(ctx: Context, source: HistoryEntry, targetDay: LocalDate): HistoryEntry {
+    fun duplicateToDate(
+        ctx: Context,
+        source: HistoryEntry,
+        targetDay: LocalDate,
+        targetTime: java.time.LocalTime = java.time.LocalTime.now()
+    ): HistoryEntry {
         ensureMigrated(ctx)
         val id = System.currentTimeMillis()
         var copiedPhotoName = ""
@@ -196,16 +253,24 @@ object HistoryStore {
         val duplicated = createDuplicatedEntry(
             source = source,
             targetDay = targetDay,
+            targetTime = targetTime,
             newId = id,
             newPhotoFile = copiedPhotoName
         )
+        var finalDuplicated = duplicated
         kotlinx.coroutines.runBlocking {
-            AppDatabase.getInstance(ctx).historyDao().insert(duplicated.toEntity())
+            val dao = AppDatabase.getInstance(ctx).historyDao()
+            val existingSameDay = dao.getAll().map { it.toDomain() }.filter {
+                Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate() == targetDay
+            }
+            val synced = computeChronologicalSortOrders(existingSameDay, duplicated)
+            finalDuplicated = synced.first { it.id == duplicated.id }
+            dao.insertAll(synced.map { it.toEntity() })
         }
         // Wochenfazit der Zielwoche invalidieren; Tagesfazit bleibt stehen und wird durch die neue
         // Entry-ID automatisch als veraltet (stale = true / „⟳ Neu bewerten“) markiert.
-        WeekFazitStore.deleteForEntry(ctx, duplicated)
-        return duplicated
+        WeekFazitStore.deleteForEntry(ctx, finalDuplicated)
+        return finalDuplicated
     }
 
     /** Aktualisiert die Zeitstempel der übergebenen Einträge (für Umsortierung innerhalb eines Tages).
