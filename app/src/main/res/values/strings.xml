@@ -193,6 +193,7 @@
     <string name="share_button_label">Share</string>
     <string name="share_clipboard_hint">Text also copied to clipboard</string>
     <string name="history_duplicate_pick_date_title">Duplicate meal to date</string>
+    <string name="history_duplicate_pick_time_title">Select time</string>
     <string name="history_duplicate_done">Meal duplicated to %1$s</string>
     <string name="history_delete_confirm_title">Delete entry?</string>
     <string name="history_delete_confirm_text">Photo and rating will be removed irreversibly.</string>

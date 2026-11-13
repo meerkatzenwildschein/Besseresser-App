@@ -236,7 +236,7 @@ fun WeekFazitRow(
 /** Mahlzeiten-Zeilen für den Tagesfazit-Prompt: „HH:mm · Erkanntes mit Menge · Anmerkung";
  *  nachgetragene Einträge ohne echte Uhrzeit → Label „nachträglich erfasst". */
 fun dayFazitMealLines(ctx: Context, entriesOfDay: List<HistoryEntry>): List<String> =
-    entriesOfDay.sortedBy { it.dateMillis }.map { e ->
+    entriesOfDay.sortedBy { it.effectiveSortOrder }.map { e ->
         val time = if (e.backdated)
             ctx.getString(R.string.nacherfassen_label)
         else
@@ -251,7 +251,11 @@ fun dayFazitMealLines(ctx: Context, entriesOfDay: List<HistoryEntry>): List<Stri
 /** Mahlzeiten-Zeilen für den Wochenfazit-Prompt: „dd.MM.yyyy · Erkanntes mit Menge · Anmerkung"
  *  (chronologisch aufsteigend, mit Tagesdatum statt Uhrzeit). */
 fun weekFazitMealLines(ctx: Context, entriesOfWeek: List<HistoryEntry>): List<String> =
-    entriesOfWeek.sortedBy { it.dateMillis }.map { e ->
+    entriesOfWeek.sortedWith(
+        compareBy<HistoryEntry> {
+            Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+        }.thenBy { it.effectiveSortOrder }
+    ).map { e ->
         val dateStr = Instant.ofEpochMilli(e.dateMillis)
             .atZone(ZoneId.systemDefault())
             .toLocalDate()

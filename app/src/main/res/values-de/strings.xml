@@ -193,6 +193,7 @@
     <string name="share_button_label">Teilen</string>
     <string name="share_clipboard_hint">Text auch in die Zwischenablage kopiert</string>
     <string name="history_duplicate_pick_date_title">Essen auf Tag duplizieren</string>
+    <string name="history_duplicate_pick_time_title">Uhrzeit wählen</string>
     <string name="history_duplicate_done">Essen auf %1$s dupliziert</string>
     <string name="history_delete_confirm_title">Eintrag löschen?</string>
     <string name="history_delete_confirm_text">Foto und Bewertung werden unwiderruflich entfernt.</string>

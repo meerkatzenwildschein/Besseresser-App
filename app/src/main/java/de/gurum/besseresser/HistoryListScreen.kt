@@ -83,12 +83,13 @@ data class DayGroup(
     val entries: List<HistoryEntry>
 )
 
-/** Nach Kalendertag gruppieren (absteigend); Einträge bleiben innerhalb der Gruppe absteigend. */
+/** Nach Kalendertag gruppieren (absteigend); Einträge innerhalb der Gruppe nach sortOrder absteigend. */
 fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
     entries.groupBy {
         Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate()
-    }.map { (day, list) -> DayGroup(day = day, entries = list) }
-        .sortedByDescending { it.day }
+    }.map { (day, list) ->
+        DayGroup(day = day, entries = list.sortedByDescending { it.effectiveSortOrder })
+    }.sortedByDescending { it.day }
 
 /** Merkt sich Versuche pro App-Lauf — Deklaration liegt zentral in HistoryStore.kt. */
 

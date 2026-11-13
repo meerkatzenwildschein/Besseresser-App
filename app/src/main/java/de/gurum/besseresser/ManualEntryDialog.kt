@@ -27,15 +27,21 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalDate
+import java.time.LocalTime
 
 @Composable
 fun BackdatedBusyDialog() {
@@ -98,83 +105,146 @@ fun BackdatedBusyDialog() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NacherfassenChoiceDialog(
     day: LocalDate?,
     onDismiss: () -> Unit,
-    onSelectWithPhoto: (LocalDate) -> Unit,
-    onSelectWithoutPhoto: (LocalDate) -> Unit
+    onSelectWithPhoto: (LocalDate, LocalTime) -> Unit,
+    onSelectWithoutPhoto: (LocalDate, LocalTime) -> Unit
 ) {
     day?.let { targetDay ->
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = {
-                Text(
-                    stringResource(R.string.nacherfassen_title),
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        val isPastDay = targetDay.isBefore(LocalDate.now())
+        var pendingWithPhoto by remember(targetDay) { mutableStateOf<Boolean?>(null) }
+
+        if (pendingWithPhoto != null) {
+            val now = remember { LocalTime.now() }
+            val timePickerState = rememberTimePickerState(
+                initialHour = now.hour,
+                initialMinute = now.minute,
+                is24Hour = true
+            )
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = {
                     Text(
-                        stringResource(R.string.nacherfassen_text) + " (" +
-                            targetDay.format(DATE_FORMATTER) + ")",
-                        fontSize = 13.5.sp,
-                        lineHeight = 19.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        stringResource(R.string.history_duplicate_pick_time_title),
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(Modifier.height(2.dp))
-                    Surface(
-                        onClick = { onSelectWithPhoto(targetDay) },
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
-                        modifier = Modifier.fillMaxWidth()
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)
-                        ) {
-                            Text("📷", fontSize = 20.sp)
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                stringResource(R.string.nacherfassen_with_photo),
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        }
+                        TimePicker(state = timePickerState)
                     }
-                    Surface(
-                        onClick = { onSelectWithoutPhoto(targetDay) },
-                        shape = RoundedCornerShape(14.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)
-                        ) {
-                            Text("✍️", fontSize = 20.sp)
-                            Spacer(Modifier.width(12.dp))
-                            Text(
-                                stringResource(R.string.nacherfassen_without_photo),
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val chosenTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
+                            val withPhoto = pendingWithPhoto == true
+                            pendingWithPhoto = null
+                            if (withPhoto) {
+                                onSelectWithPhoto(targetDay, chosenTime)
+                            } else {
+                                onSelectWithoutPhoto(targetDay, chosenTime)
+                            }
                         }
+                    ) {
+                        Text(stringResource(R.string.profile_ok))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.cancel))
                     }
                 }
-            },
-            confirmButton = { },
-            dismissButton = {
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.cancel))
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = onDismiss,
+                title = {
+                    Text(
+                        stringResource(R.string.nacherfassen_title),
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            stringResource(R.string.nacherfassen_text) + " (" +
+                                targetDay.format(DATE_FORMATTER) + ")",
+                            fontSize = 13.5.sp,
+                            lineHeight = 19.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Surface(
+                            onClick = {
+                                if (isPastDay) {
+                                    pendingWithPhoto = true
+                                } else {
+                                    onSelectWithPhoto(targetDay, LocalTime.now())
+                                }
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)
+                            ) {
+                                Text("📷", fontSize = 20.sp)
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    stringResource(R.string.nacherfassen_with_photo),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                        Surface(
+                            onClick = {
+                                if (isPastDay) {
+                                    pendingWithPhoto = false
+                                } else {
+                                    onSelectWithoutPhoto(targetDay, LocalTime.now())
+                                }
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)
+                            ) {
+                                Text("✍️", fontSize = 20.sp)
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    stringResource(R.string.nacherfassen_without_photo),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = { },
+                dismissButton = {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.cancel))
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 }
 

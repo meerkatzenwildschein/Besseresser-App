@@ -1,0 +1,4 @@
+* Duplicating a meal now asks for both date and time (pre-filled with the current time)
+* Adding a meal via the + button on the current day uses the current time automatically; on past days a time picker is shown
+* New and duplicated meals are inserted at their chronological position within the day
+* Reordering meals within a day via long-press preserves their original capture time
