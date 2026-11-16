@@ -281,17 +281,6 @@ fun createWeekFazitPrompts(ctx: Context, calendarWeek: Int = calendarWeekOf()): 
     promptHonesty = ctx.getString(R.string.prompt_honesty)
 )
 
-fun syncWeekFazit(ctx: Context, entries: List<HistoryEntry>): DayFazit? {
-    val wk = weekKeyOf(System.currentTimeMillis())
-    val wf = WeekFazitStore.load(ctx, wk) ?: return null
-    val currentWkEntries = entries.filter { weekKeyOf(it.dateMillis) == wk }
-    if (wf.fingerprint != dayFingerprint(currentWkEntries)) {
-        WeekFazitStore.delete(ctx, wk)
-        return null
-    }
-    return wf
-}
-
 fun isFazitOutdated(fazit: DayFazit, entries: List<HistoryEntry>): Boolean {
     if (fazit.entryIds.toSet() != entries.map { it.id }.toSet()) return true
     return fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(entries)
@@ -388,21 +377,5 @@ fun handleAutoWeekFazitForKey(
     if (weekKey !in DayFazitSession.attemptedWeekly) {
         DayFazitSession.attemptedWeekly.add(weekKey)
         onGenerateWeekFazit(weekKey)
-    }
-}
-
-fun handleAutoWeekFazit(
-    autoFazitTime: Boolean,
-    weekFazit: DayFazit?,
-    loadingWeek: Boolean,
-    onGenerateWeekFazit: () -> Unit
-) {
-    if (!autoFazitTime || LocalDate.now().dayOfWeek != java.time.DayOfWeek.SUNDAY || weekFazit != null || loadingWeek) {
-        return
-    }
-    val wk = weekKeyOf(System.currentTimeMillis())
-    if (wk !in DayFazitSession.attemptedWeekly) {
-        DayFazitSession.attemptedWeekly.add(wk)
-        onGenerateWeekFazit()
     }
 }

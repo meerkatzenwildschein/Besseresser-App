@@ -118,7 +118,7 @@ class RoomDatabaseAndViewModelTest {
 
     @Test
     fun testMainViewModelUiStateTransitions() {
-        val viewModel = MainViewModel()
+        val viewModel = MainViewModel(FakeApiService(), FakeHistoryRepository(), FakeSettingsRepository())
         val initial = viewModel.uiState.value
         assertNull(initial.evaluation)
         assertFalse(initial.isBusy)
@@ -144,7 +144,7 @@ class RoomDatabaseAndViewModelTest {
 
     @Test
     fun testHistoryViewModelUiStateTransitions() {
-        val viewModel = HistoryViewModel()
+        val viewModel = HistoryViewModel(FakeApiService(), FakeHistoryRepository(), FakeSettingsRepository())
         val initial = viewModel.uiState.value
         assertTrue(initial.entries.isEmpty())
         assertTrue(initial.loadingFazits.isEmpty())
@@ -162,7 +162,7 @@ class RoomDatabaseAndViewModelTest {
 
     @Test
     fun testProfileViewModelUiStateTransitions() {
-        val viewModel = ProfileViewModel()
+        val viewModel = ProfileViewModel(FakeProfileRepository())
         val profile = Profile(
             birthDate = "1985-10-20",
             weightKg = 82.0,
@@ -187,7 +187,7 @@ class RoomDatabaseAndViewModelTest {
 
     @Test
     fun testSetupViewModelUiStateTransitions() {
-        val viewModel = SetupViewModel()
+        val viewModel = SetupViewModel(FakeApiService())
         val settings = Settings(
             baseUrl = "https://api.openai.com/v1",
             apiKey = "sk-test",

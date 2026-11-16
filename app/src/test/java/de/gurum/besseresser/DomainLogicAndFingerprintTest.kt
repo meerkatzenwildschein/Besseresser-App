@@ -356,7 +356,7 @@ class DomainLogicAndFingerprintTest {
 
         // Duplicate source entry to targetDay with explicit targetTime
         val targetTime = java.time.LocalTime.of(18, 45)
-        val duplicated = HistoryStore.createDuplicatedEntry(
+        val duplicated = HistoryEntryLogic.createDuplicatedEntry(
             source = source,
             targetDay = targetDay,
             targetTime = targetTime,
@@ -392,7 +392,7 @@ class DomainLogicAndFingerprintTest {
             backdated = true,
             sortOrder = targetDay.atTime(23, 59).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         )
-        val synced = HistoryStore.computeChronologicalSortOrders(
+        val synced = HistoryEntryLogic.computeChronologicalSortOrders(
             existingDayEntries = listOf(legacyBackdatedEntry, existingTargetEntry),
             newEntry = duplicated
         )

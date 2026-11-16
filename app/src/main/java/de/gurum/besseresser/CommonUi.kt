@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.koin.compose.koinInject
 
 
 // ----------------------------------------------------------------- Gemeinsame UI-Bausteine (von Main, Verlauf-Detail und Profil genutzt)
@@ -361,16 +362,16 @@ fun ErkanntEditDialog(initialText: String, onOk: (String) -> Unit, onDismiss: ()
  *  Auswahl setzt den Text und verschiebt den Eintrag an die Spitze (MRU). */
 @Composable
 fun RecentNotesButton(onPick: (String) -> Unit) {
-    val ctx = LocalContext.current
-    var recent by remember { mutableStateOf(RecentNotesStore.load(ctx)) }
+    val settingsRepository: SettingsRepository = koinInject()
+    var recent by remember { mutableStateOf(settingsRepository.loadRecentNotes()) }
     var open by remember { mutableStateOf(false) }
-    val isEnabled = remember(open) { RecentNotesStore.load(ctx).isNotEmpty() }
+    val isEnabled = remember(open) { settingsRepository.loadRecentNotes().isNotEmpty() }
     Box {
         IconButton(
             onClick = {
                 // Anzeigereihenfolge NUR beim Öffnen: Sternchen nach oben (in-place-Toggling
                 // darf nicht hüpfen), unmarkierte behalten ihre MRU-Reihenfolge
-                recent = RecentNotesStore.load(ctx, sortStarredFirst = true)
+                recent = settingsRepository.loadRecentNotes(sortStarredFirst = true)
                 open = true
             },
             enabled = isEnabled,
@@ -395,7 +396,7 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
                             val updated = recent.map {
                                 if (it.text == n.text) it.copy(starred = !it.starred) else it
                             }
-                            RecentNotesStore.save(ctx, updated)
+                            settingsRepository.saveRecentNotes(updated)
                             recent = updated
                         }, modifier = Modifier.size(32.dp)) {
                             Icon(
@@ -419,8 +420,8 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
                     },
                     onClick = {
                         open = false
-                        RecentNotesStore.push(ctx, n.text)   // Auswahl rutscht nach oben (MRU)
-                        recent = RecentNotesStore.load(ctx)
+                        settingsRepository.pushRecentNote(n.text)   // Auswahl rutscht nach oben (MRU)
+                        recent = settingsRepository.loadRecentNotes()
                         onPick(n.text)
                     }
                 )

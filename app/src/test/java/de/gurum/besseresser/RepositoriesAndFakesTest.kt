@@ -38,32 +38,32 @@ class FakeSettingsRepository(
     }
 
     override fun loadRecentNotes(sortStarredFirst: Boolean): List<RecentNote> =
-        RecentNotesStore.formatLoadedNotes(recentNotesList.toList(), sortStarredFirst)
+        RecentNotesLogic.formatLoadedNotes(recentNotesList.toList(), sortStarredFirst)
 
     override fun pushRecentNote(note: String, evaluation: Evaluation?) {
-        val updated = RecentNotesStore.pushNote(recentNotesList, note, evaluation)
+        val updated = RecentNotesLogic.pushNote(recentNotesList, note, evaluation)
         recentNotesList.clear()
         recentNotesList.addAll(updated)
     }
 
     override fun toggleStarRecentNote(noteText: String) {
-        val updated = RecentNotesStore.toggleStarInList(recentNotesList, noteText)
+        val updated = RecentNotesLogic.toggleStarInList(recentNotesList, noteText)
         recentNotesList.clear()
         recentNotesList.addAll(updated)
     }
 
     override fun updateRecentNoteEvaluation(note: String, evaluation: Evaluation) {
-        val updated = RecentNotesStore.updateEvaluationInList(recentNotesList, note, evaluation)
+        val updated = RecentNotesLogic.updateEvaluationInList(recentNotesList, note, evaluation)
         recentNotesList.clear()
         recentNotesList.addAll(updated)
     }
 
     override fun findCachedEvaluation(note: String, goals: List<String>): Evaluation? =
-        RecentNotesStore.findMatchingEvaluation(recentNotesList, note, goals)
+        RecentNotesLogic.findMatchingEvaluation(recentNotesList, note, goals)
 
     override fun saveRecentNotes(notes: List<RecentNote>) {
         recentNotesList.clear()
-        recentNotesList.addAll(RecentNotesStore.normalizeAndPrune(notes))
+        recentNotesList.addAll(RecentNotesLogic.normalizeAndPrune(notes))
     }
 }
 
@@ -90,6 +90,8 @@ class FakeHistoryRepository : HistoryRepository {
     override fun getAllFlow(): Flow<List<HistoryEntry>> = entriesFlow.asStateFlow()
     override fun getDayFazitsFlow(): Flow<Map<String, DayFazit>> = dayFazitsFlow.asStateFlow()
     override fun getWeekFazitsFlow(): Flow<Map<String, DayFazit>> = weekFazitsFlow.asStateFlow()
+
+    override suspend fun getAll(): List<HistoryEntry> = entriesFlow.value
 
     override suspend fun add(
         photoUri: Uri?,
@@ -143,11 +145,41 @@ class FakeHistoryRepository : HistoryRepository {
         }
     }
 
+    override suspend fun saveAll(entries: List<HistoryEntry>) {
+        entriesFlow.update { list ->
+            val byId = entries.associateBy { it.id }
+            (list.map { byId[it.id] ?: it } + entries.filter { e -> list.none { it.id == e.id } })
+                .sortedByDescending { it.effectiveSortOrder }
+        }
+    }
+
+    override suspend fun duplicateToDate(
+        source: HistoryEntry,
+        targetDay: LocalDate,
+        targetTime: java.time.LocalTime
+    ): HistoryEntry {
+        val duplicated = HistoryEntryLogic.createDuplicatedEntry(
+            source = source,
+            targetDay = targetDay,
+            targetTime = targetTime,
+            newId = System.currentTimeMillis(),
+            newPhotoFile = ""
+        )
+        entriesFlow.update { (listOf(duplicated) + it).sortedByDescending { e -> e.effectiveSortOrder } }
+        return duplicated
+    }
+
     override suspend fun saveDayFazit(fazit: DayFazit) {
         dayFazitsFlow.update { it + (fazit.dayKey to fazit) }
     }
 
     override suspend fun loadDayFazit(dayKey: String): DayFazit? = dayFazitsFlow.value[dayKey]
+
+    override suspend fun loadAllDayFazits(): List<DayFazit> = dayFazitsFlow.value.values.toList()
+
+    override suspend fun saveAllDayFazits(fazits: List<DayFazit>) {
+        dayFazitsFlow.update { it + fazits.associateBy { f -> f.dayKey } }
+    }
 
     override suspend fun deleteDayFazitForEntry(entry: HistoryEntry) {
         val key = dayKeyOf(entry.dateMillis)
@@ -159,6 +191,12 @@ class FakeHistoryRepository : HistoryRepository {
     }
 
     override suspend fun loadWeekFazit(weekKey: String): DayFazit? = weekFazitsFlow.value[weekKey]
+
+    override suspend fun loadAllWeekFazits(): List<DayFazit> = weekFazitsFlow.value.values.toList()
+
+    override suspend fun saveAllWeekFazits(fazits: List<DayFazit>) {
+        weekFazitsFlow.update { it + fazits.associateBy { f -> f.dayKey } }
+    }
 
     override suspend fun deleteWeekFazit(weekKey: String) {
         weekFazitsFlow.update { it - weekKey }
@@ -316,7 +354,7 @@ class RepositoriesAndFakesTest {
         val ev = Evaluation(goalResults = listOf(GoalResult("Ziel", TrafficLight.GREEN, "Top")), summary = "Sehr gut", erkannt = "Apfel")
         api.analyzeResult = Result.success(ev)
 
-        vm.saveToHistory(settings = Settings("", "", "", emptyList()))
+        vm.saveToHistory()
         advanceUntilIdle()
 
         // When no evaluation is in state, saveToHistory early returns
@@ -364,8 +402,7 @@ class RepositoriesAndFakesTest {
     @Test
     fun testSetupViewModelWithFakes() = runTest(testDispatcher) {
         val api = FakeApiService(splitResult = Result.success(listOf("Ziel 1", "Ziel 2")))
-        val setRepo = FakeSettingsRepository()
-        val vm = SetupViewModel(apiService = api, settingsRepository = setRepo)
+        val vm = SetupViewModel(apiService = api)
 
         val initial = Settings("https://api.openai.com/v1", "key123", "gpt-4o", listOf("Z1"))
         vm.init(initial, listOf("Default Ziel"))
@@ -518,7 +555,7 @@ class RepositoriesAndFakesTest {
         val api = FakeApiService(
             splitResult = Result.failure(ApiException("HTTP 401", "Debug: Unauthorized"))
         )
-        val vm = SetupViewModel(apiService = api, settingsRepository = FakeSettingsRepository())
+        val vm = SetupViewModel(apiService = api)
 
         vm.startSplitGoals(rawGoals = "Weniger Salz, mehr Gemüse")
         advanceUntilIdle()

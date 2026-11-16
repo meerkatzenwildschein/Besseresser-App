@@ -42,6 +42,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import org.koin.compose.koinInject
+import org.koin.androidx.compose.koinViewModel
 
 // ----------------------------------------------------------------- Farb- & Form-Theme (Besseresser)
 
@@ -169,6 +171,10 @@ fun GesundEssenApp() {
             ) {
                 Box(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
                 val ctx = LocalContext.current
+                // Übergangslösung (Phase 2): direkter Repository-Zugriff; wird in Phase 3/5
+                // durch Flow-basierte State-Hoistings in ViewModels ersetzt.
+                val settingsRepository: SettingsRepository = koinInject()
+                val profileRepository: ProfileRepository = koinInject()
                 var loaded by remember { mutableStateOf(false) }
                 var showSetup by remember { mutableStateOf(true) }
                 var settings by remember { mutableStateOf(Settings("", "", "", emptyList())) }
@@ -177,11 +183,11 @@ fun GesundEssenApp() {
                 var showProfile by remember { mutableStateOf(false) }
                 var showConfig by remember { mutableStateOf(false) }
                 var profile by remember { mutableStateOf(Profile()) }
-                val mainViewModel: MainViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+                val mainViewModel: MainViewModel = koinViewModel()
 
                 LaunchedEffect(Unit) {
-                    settings = Store.load(ctx)
-                    profile = ProfileStore.load(ctx)
+                    settings = settingsRepository.load()
+                    profile = profileRepository.load()
                     showSetup = !settings.isComplete
                     loaded = true
                 }
@@ -205,7 +211,7 @@ fun GesundEssenApp() {
                         },
                         onDone = { neu ->
                             val firstRun = !settings.isComplete
-                            Store.save(ctx, neu)
+                            settingsRepository.save(neu)
                             settings = neu
                             showSetup = false
                             // Nach dem ERSTEN Erfassen der KI-Zugangsdaten einmalig das Profil öffnen
@@ -216,7 +222,7 @@ fun GesundEssenApp() {
                             profile = importedProfile
                             themeMode = UiPrefsStore.loadThemeMode(ctx)
                             appLanguage = UiPrefsStore.loadLanguage(ctx)
-                            mainViewModel.loadRecentNotes(ctx)
+                            mainViewModel.loadRecentNotes()
                             if (importedSettings.isComplete) {
                                 showSetup = false
                                 showProfile = false
@@ -267,7 +273,7 @@ fun GesundEssenApp() {
                                     initial = profile,
                                     onCancel = { showProfile = false },
                                     onSave = { p ->
-                                        ProfileStore.save(ctx, p.birthDate, p.weightKg, p.heightCm, p.notes, p.gender)
+                                        profileRepository.save(p)
                                         profile = p
                                         showProfile = false
                                     }
@@ -289,7 +295,7 @@ fun GesundEssenApp() {
                                         profile = importedProfile
                                         themeMode = UiPrefsStore.loadThemeMode(ctx)
                                         appLanguage = UiPrefsStore.loadLanguage(ctx)
-                                        mainViewModel.loadRecentNotes(ctx)
+                                        mainViewModel.loadRecentNotes()
                                     },
                                     onHistoryCleared = {
                                         historyEntry = null

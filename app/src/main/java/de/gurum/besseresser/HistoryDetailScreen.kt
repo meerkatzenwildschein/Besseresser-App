@@ -60,6 +60,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -117,7 +118,7 @@ internal fun buildShareText(
     if (summary.isNotBlank()) add(formatSummary(summary.trim()))
 }.joinToString("\n\n")
 
-private fun shareHistoryEntry(ctx: Context, entry: HistoryEntry) {
+private fun shareHistoryEntry(ctx: Context, historyRepository: HistoryRepository, entry: HistoryEntry) {
     val shareText = buildShareText(
         erkannt = entry.erkannt,
         summary = entry.summary,
@@ -129,7 +130,7 @@ private fun shareHistoryEntry(ctx: Context, entry: HistoryEntry) {
         clipboard?.setPrimaryClip(ClipData.newPlainText(ctx.getString(R.string.app_name), shareText))
         Toast.makeText(ctx, ctx.getString(R.string.share_clipboard_hint), Toast.LENGTH_SHORT).show()
     }
-    val photoFile = HistoryStore.photoFileOf(ctx, entry)
+    val photoFile = historyRepository.photoFileOf(entry)
     val photoUri = photoFile?.let {
         runCatching {
             FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", it)
@@ -159,6 +160,11 @@ private fun shareHistoryEntry(ctx: Context, entry: HistoryEntry) {
 @Composable
 fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> Unit) {
     val ctx = LocalContext.current
+    // Übergangslösung (Phase 2): direkter Repository-/Service-Zugriff; wird in Phase 5
+    // in ein eigenes HistoryDetailViewModel verlagert.
+    val historyRepository: HistoryRepository = koinInject()
+    val settingsRepository: SettingsRepository = koinInject()
+    val apiService: BesseresserApiService = koinInject()
     val coroutineScope = rememberCoroutineScope()
     // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
     BackHandler(onBack = onBack)
@@ -169,35 +175,36 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
     var reEvalBusy by remember { mutableStateOf(false) }
     var current by remember { mutableStateOf(entry) }
     val thumb = remember(entry.id) {
-        HistoryStore.photoFileOf(ctx, entry)?.let { decodeThumb(it, target = 1280) }
+        historyRepository.decodeThumbnail(entry, target = 1280)
     }
 
     /** Re-Bewertung nach erkannt-Korrektur: Mit Foto wenn vorhanden, sonst text-only.
      *  Ziele + Gesamteindruck werden 1:1 ersetzt; Tages-/Wochenfazit werden verworfen. */
     fun reEvaluate(correctedText: String) {
-        val photoFile = HistoryStore.photoFileOf(ctx, current)
+        val photoFile = historyRepository.photoFileOf(current)
         // Acht-Pitfall: KEIN FileProvider für gespeicherte Fotos! Dessen file_paths.xml mappt
         // nur cache-path/photos – getUriForFile auf filesDir/history wirft IllegalArgumentException
         // (Crash nach Pencil-OK). analyzer liest intern via openInputStream: file://-Uri reicht.
         val photoUri = photoFile?.let { Uri.fromFile(it) }
         reEvalBusy = true
         val onDone: (Evaluation) -> Unit = { ev ->
-            HistoryStore.updateEvaluation(ctx, current.id, ev.goalResults, ev.summary)
-            current = current.copy(goalResults = ev.goalResults, summary = ev.summary)
-            if (current.note.isNotBlank()) {
-                RecentNotesStore.updateEvaluation(
-                    ctx,
-                    current.note,
-                    Evaluation(
-                        goalResults = current.goalResults,
-                        summary = current.summary,
-                        erkannt = current.erkannt
+            coroutineScope.launch {
+                historyRepository.updateEvaluation(current.id, ev.goalResults, ev.summary)
+                current = current.copy(goalResults = ev.goalResults, summary = ev.summary)
+                if (current.note.isNotBlank()) {
+                    settingsRepository.updateRecentNoteEvaluation(
+                        current.note,
+                        Evaluation(
+                            goalResults = current.goalResults,
+                            summary = current.summary,
+                            erkannt = current.erkannt
+                        )
                     )
-                )
+                }
+                historyRepository.deleteDayFazitForEntry(current)
+                historyRepository.deleteWeekFazitForEntry(current)
+                reEvalBusy = false
             }
-            DayFazitStore.deleteForEntry(ctx, current)
-            WeekFazitStore.deleteForEntry(ctx, current)
-            reEvalBusy = false
         }
         val onFail: (String) -> Unit = { msg ->
             Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_LONG).show()
@@ -205,7 +212,7 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
         }
         coroutineScope.launch {
             val result = if (photoUri != null) {
-                ApiClient.analyze(
+                apiService.analyze(
                     ctx = ctx,
                     photoUri = photoUri,
                     settings = settings,
@@ -221,7 +228,7 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
                     )
                 )
             } else {
-                ApiClient.analyzeText(
+                apiService.analyzeText(
                     ctx = ctx,
                     settings = settings,
                     userDescription = correctedText
@@ -344,7 +351,7 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
                 erkannt = current.erkannt,
                 note = current.note,
                 onEditErkannt = { if (current.erkannt.isNotBlank()) showErkanntEdit = true },
-                onShare = if (canShare) ({ shareHistoryEntry(ctx, current) }) else null
+                onShare = if (canShare) ({ shareHistoryEntry(ctx, historyRepository, current) }) else null
             )
         }
 
@@ -387,11 +394,12 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
             initialText = current.erkannt,
             onOk = { newText ->
                 val trimmed = newText.trim()
-                HistoryStore.updateErkannt(ctx, current.id, trimmed)
+                coroutineScope.launch {
+                    historyRepository.updateErkannt(current.id, trimmed)
+                }
                 current = current.copy(erkannt = trimmed)
                 if (current.note.isNotBlank()) {
-                    RecentNotesStore.updateEvaluation(
-                        ctx,
+                    settingsRepository.updateRecentNoteEvaluation(
                         current.note,
                         Evaluation(
                             goalResults = current.goalResults,
@@ -414,9 +422,11 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
             text = { Text(stringResource(R.string.history_delete_confirm_text)) },
             confirmButton = {
                 TextButton(onClick = {
-                    HistoryStore.delete(ctx, entry)
-                    confirmDelete = false
-                    onBack()
+                    coroutineScope.launch {
+                        historyRepository.delete(entry)
+                        confirmDelete = false
+                        onBack()
+                    }
                 }) { Text(stringResource(R.string.delete)) }
             },
             dismissButton = {
@@ -489,15 +499,17 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
                 TextButton(
                     onClick = {
                         val targetTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
-                        HistoryStore.duplicateToDate(ctx, current, targetDay, targetTime)
-                        duplicateTargetDate = null
-                        val formattedDateTime = "${targetDay.format(DATE_FORMATTER)}, ${targetTime.format(DateTimeFormatter.ofPattern("HH:mm"))}"
-                        Toast.makeText(
-                            ctx,
-                            ctx.getString(R.string.history_duplicate_done, formattedDateTime),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        onBack()
+                        coroutineScope.launch {
+                            historyRepository.duplicateToDate(current, targetDay, targetTime)
+                            duplicateTargetDate = null
+                            val formattedDateTime = "${targetDay.format(DATE_FORMATTER)}, ${targetTime.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+                            Toast.makeText(
+                                ctx,
+                                ctx.getString(R.string.history_duplicate_done, formattedDateTime),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            onBack()
+                        }
                     }
                 ) {
                     Text(stringResource(R.string.profile_ok))

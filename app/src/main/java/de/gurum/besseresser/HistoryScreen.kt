@@ -20,7 +20,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.androidx.compose.koinViewModel
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -32,11 +32,11 @@ fun HistoryScreen(
     profile: Profile,
     onPick: (HistoryEntry) -> Unit,
     onBack: () -> Unit,
-    viewModel: HistoryViewModel = viewModel()
+    viewModel: HistoryViewModel = koinViewModel()
 ) {
     val ctx = LocalContext.current
     val handleBack = {
-        viewModel.flushPendingDeletes(ctx)
+        viewModel.flushPendingDeletes()
         onBack()
     }
     BackHandler(onBack = handleBack)
@@ -44,12 +44,12 @@ fun HistoryScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
-        viewModel.startObserving(ctx)
+        viewModel.startObserving()
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            viewModel.flushPendingDeletes(ctx)
+            viewModel.flushPendingDeletes()
         }
     }
 
@@ -110,7 +110,7 @@ fun HistoryScreen(
                 expandedWeeks = uiState.expandedWeeks,
                 onBack = handleBack,
                 onPick = { entry ->
-                    viewModel.flushPendingDeletes(ctx)
+                    viewModel.flushPendingDeletes()
                     onPick(entry)
                 },
                 onGenerateFazit = { day, list -> viewModel.generateFazit(ctx, day, list, settings, profile) },
@@ -118,10 +118,10 @@ fun HistoryScreen(
                 onToggleExpandWeek = { wk -> viewModel.toggleWeekExpanded(wk) },
                 onToggleExpandFazit = { viewModel.toggleFazitExpanded(it) },
                 onAddMealForDay = { day -> viewModel.setAddDialogForDay(day) },
-                onDeleteEntry = { entry -> viewModel.requestDeleteEntry(ctx, entry) },
+                onDeleteEntry = { entry -> viewModel.requestDeleteEntry(entry) },
                 onUndoDeleteEntry = { entry -> viewModel.undoDeleteEntry(entry.id) },
                 onMoveEntryWithinDay = { day, fromIdx, toIdx ->
-                    viewModel.moveEntryWithinDay(ctx, day, fromIdx, toIdx)
+                    viewModel.moveEntryWithinDay(day, fromIdx, toIdx)
                 }
             )
         }
@@ -166,7 +166,7 @@ fun HistoryScreen(
                 addSystemCameraLauncher.launch(addPhotoUri)
             },
             onSaveBackdated = { ev, uri ->
-                viewModel.saveBackdatedEntry(ctx, ev, uri, onPick)
+                viewModel.saveBackdatedEntry(ev, uri, onPick)
             },
             onSetBusy = { viewModel.setShowAddBusyCard(it) }
         )
