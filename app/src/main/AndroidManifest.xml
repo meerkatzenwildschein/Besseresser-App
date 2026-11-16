@@ -10,7 +10,7 @@
         android:name=".BesseresserApp"
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
-        android:theme="@style/Theme.GesundEssen"
+        android:theme="@style/Theme.Besseresser"
         android:localeConfig="@xml/locales_config"
         android:allowBackup="false"
         android:usesCleartextTraffic="false"

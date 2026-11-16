@@ -129,15 +129,16 @@ Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz 
 
 | Komponente | Version / Detail |
 |---|---|
-| Sprache & Compiler | Kotlin 2.0.20 |
-| UI-Framework | Jetpack Compose (BOM 2024.09.02), Material 3 |
+| Sprache & Compiler | Kotlin 2.0.21 |
+| UI-Framework | Jetpack Compose (BOM 2024.12.01), Material 3 |
 | Android Gradle Plugin | 8.9.1 (Gradle 8.11.1) |
 | SDK-Versionen | `compileSdk` / `targetSdk` = 36, `minSdk` = 26 |
-| Persistenz | Room Database 2.6.1 (`androidx.room:room-runtime`, `room-ktx`, `room-compiler` via KSP) + Preferences DataStore 1.1.1 (Settings, Profil, RecentNotes, Theme/Sprache; migriert aus SharedPreferences) |
+| Persistenz | Room Database 2.6.1 (`androidx.room:room-runtime`, `room-ktx`, `room-compiler` via KSP 2.0.21-1.0.26) + Preferences DataStore 1.1.1 (Settings, Profil, RecentNotes, Theme/Sprache; migriert aus SharedPreferences) |
 | Dependency Injection | Koin 4.0.4 (`koin-android`, `koin-androidx-compose`) – Container-Start in `BesseresserApp`, Modul in `di/AppModule.kt` |
-| State Management | Jetpack Lifecycle ViewModel & Compose (`lifecycle-viewmodel-compose:2.8.6`, `StateFlow`) |
+| State Management | Jetpack Lifecycle ViewModel & Compose (`lifecycle-viewmodel-compose:2.8.7`, `StateFlow`) |
 | Serialisierung | `kotlinx-serialization-json:1.7.3` |
 | Kamera | CameraX 1.4.2 (`camera-core`, `camera-camera2`, `camera-lifecycle`, `camera-view`) |
+| Navigation | Jetpack Navigation Compose 2.8.4 (`navigation-compose`) – `NavHost` in `MainActivity.kt` |
 | Sicherheit | Android Keystore / AES-256-GCM (`KeyVault.kt`) |
 | Tests | JUnit 4 (`DataSerializationTest.kt`, `ApiClientTest.kt`, `RoomDatabaseAndViewModelTest.kt`) |
 
@@ -149,7 +150,7 @@ Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz 
 Besseresser-App/
 ├── AGENT.md                      ← Diese Architektur- & Kontextdatei
 ├── README.md                     ← Allgemeine Projektübersicht
-├── REFACTORING.md                ← Refactoring-Roadmap & Fortschrittstracking
+├── REFACTORING.md                ← Abgeschlossene Refactoring-Roadmap & offene Punkte
 ├── build.gradle.kts              ← Root-Build-Skript mit Plugin-Definitionen (KSP, Kotlin, Compose)
 ├── settings.gradle.kts           ← Modul- & Repository-Konfiguration
 ├── gradle.properties
