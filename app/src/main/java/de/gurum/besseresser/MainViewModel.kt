@@ -99,14 +99,41 @@ class MainViewModel(
         }
     }
 
+    /** Prüft, ob für die aktuelle Anmerkung bereits eine gültige KI-Bewertung im Menü-Speicher
+     *  vorliegt, die zu [settings.goals] passt. Falls ja, wird sie direkt übernommen (ohne KI-Aufruf). */
+    fun tryUseCachedEvaluation(ctx: Context? = null, settings: Settings): Boolean {
+        val currentNote = _uiState.value.note.trim()
+        val setRepo = getSettingsRepo(ctx) ?: return false
+        val cachedEv = setRepo.findCachedEvaluation(currentNote, settings.goals) ?: return false
+        analyzeJob?.cancel()
+        setRepo.pushRecentNote(currentNote, cachedEv)
+        val updatedNotes = setRepo.loadRecentNotes()
+        _uiState.update {
+            it.copy(
+                evaluation = cachedEv,
+                isBusy = false,
+                error = null,
+                recentNotes = updatedNotes
+            )
+        }
+        return true
+    }
+
     fun analyze(ctx: Context, settings: Settings, promptBundle: PromptBundle) {
         val uri = _uiState.value.photoPreviewUri ?: return
+        if (tryUseCachedEvaluation(ctx, settings)) return
+        val currentNote = _uiState.value.note.trim()
+        val setRepo = getSettingsRepo(ctx)
         analyzeJob?.cancel()
         analyzeJob = viewModelScope.launch {
             _uiState.update { it.copy(isBusy = true, error = null) }
             val res = apiService.analyze(ctx, uri, settings, promptBundle)
             res.onSuccess { ev ->
-                _uiState.update { it.copy(evaluation = ev, isBusy = false) }
+                if (currentNote.isNotBlank()) {
+                    setRepo?.pushRecentNote(currentNote, ev)
+                }
+                val updatedNotes = setRepo?.loadRecentNotes() ?: _uiState.value.recentNotes
+                _uiState.update { it.copy(evaluation = ev, isBusy = false, recentNotes = updatedNotes) }
             }.onFailure { e ->
                 _uiState.update { it.copy(error = e.message ?: "Analyse fehlgeschlagen.", isBusy = false) }
             }
@@ -130,7 +157,7 @@ class MainViewModel(
                 ?: HistoryEntry(id = System.currentTimeMillis(), goalResults = ev.goalResults, summary = ev.summary, note = note)
             histRepo?.deleteDayFazitForEntry(entry)
             histRepo?.deleteWeekFazitForEntry(entry)
-            setRepo?.pushRecentNote(note)
+            setRepo?.pushRecentNote(note, ev)
             val updatedNotes = setRepo?.loadRecentNotes() ?: _uiState.value.recentNotes
             _uiState.update {
                 it.copy(
@@ -145,28 +172,45 @@ class MainViewModel(
     }
 
     fun updateErkannt(ctx: Context? = null, newText: String) {
+        val trimmed = newText.trim()
         val entryId = _uiState.value.savedEntryId
+        val currentNote = _uiState.value.note.trim()
+        var updatedEv: Evaluation? = null
         _uiState.update { state ->
-            val updatedEv = state.evaluation?.copy(erkannt = newText.trim())
+            updatedEv = state.evaluation?.copy(erkannt = trimmed)
             state.copy(evaluation = updatedEv, showErkanntEdit = false)
+        }
+        val evToSave = updatedEv
+        if (evToSave != null && currentNote.isNotBlank()) {
+            val setRepo = getSettingsRepo(ctx)
+            setRepo?.updateRecentNoteEvaluation(currentNote, evToSave)
+            if (setRepo != null) {
+                _uiState.update { it.copy(recentNotes = setRepo.loadRecentNotes()) }
+            }
         }
         if (entryId != null) {
             val histRepo = getHistoryRepo(ctx)
             viewModelScope.launch {
-                histRepo?.updateErkannt(entryId, newText.trim())
+                histRepo?.updateErkannt(entryId, trimmed)
             }
         }
     }
 
     fun reEvaluate(ctx: Context, settings: Settings, promptBundle: PromptBundle, newText: String) {
         val uri = _uiState.value.photoPreviewUri ?: return
+        val currentNote = _uiState.value.note.trim()
+        val setRepo = getSettingsRepo(ctx)
         analyzeJob?.cancel()
         analyzeJob = viewModelScope.launch {
             _uiState.update { it.copy(isBusy = true, error = null) }
             val res = apiService.analyze(ctx, uri, settings, promptBundle)
             res.onSuccess { ev ->
                 val merged = ev.copy(erkannt = newText.trim())
-                _uiState.update { it.copy(evaluation = merged, isBusy = false) }
+                if (currentNote.isNotBlank()) {
+                    setRepo?.updateRecentNoteEvaluation(currentNote, merged)
+                }
+                val updatedNotes = setRepo?.loadRecentNotes() ?: _uiState.value.recentNotes
+                _uiState.update { it.copy(evaluation = merged, isBusy = false, recentNotes = updatedNotes) }
                 val entryId = _uiState.value.savedEntryId
                 if (entryId != null) {
                     val histRepo = getHistoryRepo(ctx)

@@ -107,8 +107,12 @@ object BackupStore {
 
     /** Importierte Notizen überschreiben gleichlautende vorhandene Notizen; Reihenfolge aus dem Backup hat Vorrang. */
     internal fun mergeRecentNotes(existing: List<RecentNote>, imported: List<RecentNote>): List<RecentNote> {
+        val existingByText = existing.associateBy { it.text.trim() }
         val cleanedImported = imported
-            .map { it.copy(text = it.text.trim()) }
+            .map {
+                val t = it.text.trim()
+                it.copy(text = t, evaluation = it.evaluation ?: existingByText[t]?.evaluation)
+            }
             .filter { it.text.isNotBlank() }
             .distinctBy { it.text }
         val importedTexts = cleanedImported.map { it.text }.toSet()

@@ -226,4 +226,11 @@ data class Evaluation(
     val goalResults: List<GoalResult> = emptyList(),
     val summary: String = "",
     val erkannt: String = ""    // Was die KI auf dem Foto (inkl. Nutzer-Anmerkung) erkannt zu haben meint
-)
+) {
+    /** Prüft, ob diese Bewertung vollständig und passend für die übergebenen Ziele [goals] vorliegt. */
+    fun matchesGoals(goals: List<String>): Boolean {
+        if (goals.isEmpty() || goalResults.isEmpty()) return false
+        if (goalResults.size != goals.size) return false
+        return goals.all { g -> goalResults.any { it.goal.equals(g, ignoreCase = true) } }
+    }
+}

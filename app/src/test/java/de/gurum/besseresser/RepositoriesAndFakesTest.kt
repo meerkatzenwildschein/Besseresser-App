@@ -37,35 +37,33 @@ class FakeSettingsRepository(
         this.settings = settings
     }
 
-    override fun loadRecentNotes(sortStarredFirst: Boolean): List<RecentNote> {
-        return if (sortStarredFirst) {
-            val starred = recentNotesList.filter { it.starred }
-            val unstarred = recentNotesList.filter { !it.starred }.take(5)
-            starred + unstarred
-        } else {
-            recentNotesList
-        }
-    }
+    override fun loadRecentNotes(sortStarredFirst: Boolean): List<RecentNote> =
+        RecentNotesStore.formatLoadedNotes(recentNotesList.toList(), sortStarredFirst)
 
-    override fun pushRecentNote(note: String) {
-        val t = note.trim()
-        if (t.isBlank()) return
-        val wasStarred = recentNotesList.firstOrNull { it.text == t }?.starred == true
-        recentNotesList.removeAll { it.text == t }
-        recentNotesList.add(0, RecentNote(t, wasStarred))
+    override fun pushRecentNote(note: String, evaluation: Evaluation?) {
+        val updated = RecentNotesStore.pushNote(recentNotesList, note, evaluation)
+        recentNotesList.clear()
+        recentNotesList.addAll(updated)
     }
 
     override fun toggleStarRecentNote(noteText: String) {
-        val idx = recentNotesList.indexOfFirst { it.text == noteText }
-        if (idx != -1) {
-            val cur = recentNotesList[idx]
-            recentNotesList[idx] = cur.copy(starred = !cur.starred)
-        }
+        val updated = RecentNotesStore.toggleStarInList(recentNotesList, noteText)
+        recentNotesList.clear()
+        recentNotesList.addAll(updated)
     }
+
+    override fun updateRecentNoteEvaluation(note: String, evaluation: Evaluation) {
+        val updated = RecentNotesStore.updateEvaluationInList(recentNotesList, note, evaluation)
+        recentNotesList.clear()
+        recentNotesList.addAll(updated)
+    }
+
+    override fun findCachedEvaluation(note: String, goals: List<String>): Evaluation? =
+        RecentNotesStore.findMatchingEvaluation(recentNotesList, note, goals)
 
     override fun saveRecentNotes(notes: List<RecentNote>) {
         recentNotesList.clear()
-        recentNotesList.addAll(notes)
+        recentNotesList.addAll(RecentNotesStore.normalizeAndPrune(notes))
     }
 }
 
@@ -446,8 +444,73 @@ class RepositoriesAndFakesTest {
         assertEquals("", vm.uiState.value.addNote)
         assertNull(vm.uiState.value.addTargetDay)
         assertNull(vm.uiState.value.addTargetTime)
-        // Note was also pushed to recent notes
+        // Note AND its evaluation were also pushed to recent notes
         assertEquals("150 g Skyr mit Beeren", setRepo.loadRecentNotes().firstOrNull()?.text)
+        assertEquals(backdatedEval, setRepo.loadRecentNotes().firstOrNull()?.evaluation)
+
+        // Reusing a cached evaluation when backdating a meal (without calling AI):
+        val day2 = LocalDate.of(2026, 11, 7)
+        vm.setAddTargetDay(day2)
+        vm.setAddTargetTime(java.time.LocalTime.of(9, 15))
+        vm.setAddNote("  150 g Skyr mit Beeren  ")
+        var reusedEntry: HistoryEntry? = null
+        val usedCache = vm.trySaveCachedBackdated(
+            settings = Settings("", "", "", listOf("Z")),
+            photoUriIn = null
+        ) { reusedEntry = it }
+        advanceUntilIdle()
+
+        assertTrue(usedCache)
+        assertNotNull(reusedEntry)
+        assertEquals("Top Snack", reusedEntry?.summary)
+        assertEquals("150 g Skyr mit Beeren", reusedEntry?.erkannt)
+
+        // When goals changed, trySaveCachedBackdated returns false (forces new AI evaluation)
+        vm.setAddTargetDay(day2)
+        vm.setAddNote("150 g Skyr mit Beeren")
+        val usedCacheWithChangedGoals = vm.trySaveCachedBackdated(
+            settings = Settings("", "", "", listOf("Z", "Neues Ziel")),
+            photoUriIn = null
+        )
+        assertFalse(usedCacheWithChangedGoals)
+    }
+
+    @Test
+    fun testMainViewModelCachedEvaluationAndErkanntUpdate() = runTest(testDispatcher) {
+        val api = FakeApiService()
+        val histRepo = FakeHistoryRepository()
+        val setRepo = FakeSettingsRepository()
+        val vm = MainViewModel(apiService = api, historyRepository = histRepo, settingsRepository = setRepo)
+
+        val cachedEv = Evaluation(
+            goalResults = listOf(GoalResult("Ziel 1", TrafficLight.GREEN, "Sehr gut")),
+            summary = "Gesundes Frühstück",
+            erkannt = "Haferflocken mit Obst"
+        )
+        setRepo.pushRecentNote("Haferflocken", cachedEv)
+
+        // Exact match with matching goals -> uses cached evaluation immediately without AI call
+        vm.setNote("  Haferflocken ")
+        val usedCache = vm.tryUseCachedEvaluation(settings = Settings(goals = listOf("Ziel 1")))
+        assertTrue(usedCache)
+        assertFalse(vm.uiState.value.isBusy)
+        assertEquals(cachedEv, vm.uiState.value.evaluation)
+
+        // Editing "erkannt" also updates the cached evaluation on the RecentNote entry
+        vm.updateErkannt(newText = "Haferflocken mit Beeren und Nüssen")
+        assertEquals("Haferflocken mit Beeren und Nüssen", vm.uiState.value.evaluation?.erkannt)
+        assertEquals(
+            "Haferflocken mit Beeren und Nüssen",
+            setRepo.findCachedEvaluation("Haferflocken", listOf("Ziel 1"))?.erkannt
+        )
+
+        // Modified note text -> does not match cached entry -> returns false
+        vm.setNote("Haferflocken mit Schoko")
+        assertFalse(vm.tryUseCachedEvaluation(settings = Settings(goals = listOf("Ziel 1"))))
+
+        // Changed goals -> cached evaluation does not match new goals -> returns false
+        vm.setNote("Haferflocken")
+        assertFalse(vm.tryUseCachedEvaluation(settings = Settings(goals = listOf("Ziel 1", "Ziel 2"))))
     }
 
     @Test

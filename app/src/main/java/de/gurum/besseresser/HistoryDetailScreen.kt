@@ -184,6 +184,17 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
         val onDone: (Evaluation) -> Unit = { ev ->
             HistoryStore.updateEvaluation(ctx, current.id, ev.goalResults, ev.summary)
             current = current.copy(goalResults = ev.goalResults, summary = ev.summary)
+            if (current.note.isNotBlank()) {
+                RecentNotesStore.updateEvaluation(
+                    ctx,
+                    current.note,
+                    Evaluation(
+                        goalResults = current.goalResults,
+                        summary = current.summary,
+                        erkannt = current.erkannt
+                    )
+                )
+            }
             DayFazitStore.deleteForEntry(ctx, current)
             WeekFazitStore.deleteForEntry(ctx, current)
             reEvalBusy = false
@@ -375,10 +386,22 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
         ErkanntEditDialog(
             initialText = current.erkannt,
             onOk = { newText ->
-                HistoryStore.updateErkannt(ctx, current.id, newText)
-                current = current.copy(erkannt = newText)
+                val trimmed = newText.trim()
+                HistoryStore.updateErkannt(ctx, current.id, trimmed)
+                current = current.copy(erkannt = trimmed)
+                if (current.note.isNotBlank()) {
+                    RecentNotesStore.updateEvaluation(
+                        ctx,
+                        current.note,
+                        Evaluation(
+                            goalResults = current.goalResults,
+                            summary = current.summary,
+                            erkannt = current.erkannt
+                        )
+                    )
+                }
                 showErkanntEdit = false
-                if (newText.isNotBlank() && !reEvalBusy) reEvaluate(newText)
+                if (trimmed.isNotBlank() && !reEvalBusy) reEvaluate(trimmed)
             },
             onDismiss = { showErkanntEdit = false }
         )

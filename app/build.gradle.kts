@@ -40,19 +40,19 @@ val composeBomVersion = "2024.09.02"
 val coreKtxVersion = "1.13.1"
 val activityComposeVersion = "1.9.2"
 val lifecycleVersion = "2.8.6"
-val cameraVersion = "1.3.4"
+val cameraVersion = "1.4.2"
 val kotlinxSerializationVersion = "1.7.3"
 val roomVersion = "2.6.1"
 val junitVersion = "4.13.2"
 
 android {
     namespace = "de.gurum.besseresser"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "de.gurum.besseresser"
         minSdk = 26
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 6
         versionName = appVersion
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
@@ -93,6 +93,11 @@ android {
     }
     packaging {
         resources.excludes += "META-INF/*"
+        jniLibs.keepDebugSymbols += setOf(
+            "**/libandroidx.graphics.path.so",
+            "**/libimage_processing_util_jni.so",
+            "**/libsurface_util_jni.so"
+        )
     }
 }
 
