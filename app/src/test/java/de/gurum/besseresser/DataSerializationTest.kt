@@ -144,17 +144,72 @@ class DataSerializationTest {
 
     @Test
     fun testRecentNoteSerialization() {
+        val sampleEval = Evaluation(
+            goalResults = listOf(GoalResult("Weniger Zucker", TrafficLight.GREEN, "Kein Zuckerzusatz")),
+            summary = "Top Frühstück",
+            erkannt = "Müsli mit Beeren"
+        )
         val notes = listOf(
-            RecentNote("Müsli mit Beeren", starred = true),
+            RecentNote("Müsli mit Beeren", starred = true, evaluation = sampleEval),
             RecentNote("Kaffee schwarz", starred = false)
         )
 
         val json = AppJson.encodeToString(notes)
         assertTrue(json.contains("\"t\":\"Müsli mit Beeren\""))
         assertTrue(json.contains("\"s\":true"))
+        assertTrue(json.contains("\"ev\":"))
+        assertTrue(json.contains("\"Top Frühstück\""))
 
         val decoded = AppJson.decodeFromString<List<RecentNote>>(json)
         assertEquals(notes, decoded)
+        assertEquals(sampleEval, decoded[0].evaluation)
+    }
+
+    @Test
+    fun testRecentNotesCachingEvictionAndMatching() {
+        val goals = listOf("Ziel 1", "Ziel 2")
+        fun makeEval(name: String) = Evaluation(
+            goalResults = listOf(
+                GoalResult("Ziel 1", TrafficLight.GREEN, "Ok $name"),
+                GoalResult("Ziel 2", TrafficLight.YELLOW, "Mittel $name")
+            ),
+            summary = "Fazit $name",
+            erkannt = "Erkannt $name"
+        )
+
+        var list = emptyList<RecentNote>()
+        // Push 6 unstarred notes with evaluations -> oldest ("Essen 1") and its evaluation JSON must be removed!
+        for (i in 1..6) {
+            list = RecentNotesStore.pushNote(list, "Essen $i", makeEval("Essen $i"))
+        }
+
+        assertEquals(5, list.size)
+        assertFalse(list.any { it.text == "Essen 1" })
+        val serialized = AppJson.encodeToString(list)
+        assertFalse(serialized.contains("Erkannt Essen 1"))
+        assertTrue(serialized.contains("Erkannt Essen 6"))
+
+        // Pushing an existing note without passing evaluation preserves its cached evaluation
+        list = RecentNotesStore.pushNote(list, "Essen 2")
+        assertEquals("Essen 2", list.first().text)
+        assertEquals("Erkannt Essen 2", list.first().evaluation?.erkannt)
+
+        // Exact match returns cached evaluation when goals match
+        val matched = RecentNotesStore.findMatchingEvaluation(list, "  Essen 2  ", goals)
+        assertEquals(makeEval("Essen 2"), matched)
+
+        // Modified text or different casing does not match (exact match required)
+        assertEquals(null, RecentNotesStore.findMatchingEvaluation(list, "Essen 2 extra", goals))
+        assertEquals(null, RecentNotesStore.findMatchingEvaluation(list, "essen 2", goals))
+
+        // Outdated/changed goals -> returns null so AI is queried again
+        assertEquals(null, RecentNotesStore.findMatchingEvaluation(list, "Essen 2", listOf("Ziel 1", "Neues Ziel")))
+        assertEquals(null, RecentNotesStore.findMatchingEvaluation(list, "Essen 2", listOf("Ziel 1")))
+
+        // Updating evaluation in-place (e.g. after erkannt correction) keeps order and updates evaluation
+        val correctedEval = makeEval("Essen 2").copy(erkannt = "Korrigiertes Essen 2")
+        list = RecentNotesStore.updateEvaluationInList(list, "Essen 2", correctedEval)
+        assertEquals("Korrigiertes Essen 2", RecentNotesStore.findMatchingEvaluation(list, "Essen 2", goals)?.erkannt)
     }
 
     @Test

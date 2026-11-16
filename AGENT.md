@@ -72,6 +72,7 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
   - Werden als `backdated = true` markiert (keine fingierte Uhrzeit, Kennzeichnung „nachträglich erfasst").
 - **Notiz-Schnellauswahl (`RecentNotesStore`):**
   - MRU-Speicher (max. 5 unmarkierte Einträge) plus dauerhafte Favoriten mit Sternchen (`RecentNote`).
+  - Persistiert das KI-Ergebnis (`Evaluation` unter `"ev"`) direkt am `RecentNote`-Eintrag. Bei exaktem Text-Match und passenden Zielen wird die gespeicherte KI-Antwort direkt wiederverwendet (Startbildschirm sowie Nacherfassen mit/ohne Foto), ohne einen neuen KI-Request zu senden. Fällt ein unmarkierter Eintrag aus den Top 5 heraus, wird auch sein persistiertes KI-Ergebnis gelöscht.
 
 ### 7. Konfiguration & Datensicherung (`ConfigScreen.kt`, `BackupStore.kt`)
 - Im Burger-Menü ganz unten eingehängt (`Icons.Filled.Build`), zusätzlich beim Erststart direkt im `SetupScreen` erreichbar („Backup aus Datei importieren").
@@ -120,7 +121,7 @@ Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz 
 | `DayFazit` | Tagesbewertung | Ampel, Fazit-Text, Entry-IDs und `fingerprint` |
 | `DayFazitResult` | KI-Ergebnis Tages-/Wochenfazit | Typsicheres Paar aus `TrafficLight` und Fazit-Text (`text`) |
 | `ApiException` | API-Fehlermodell | Fehlertext, optionaler Monospace-`debugReport` und Root-Cause |
-| `RecentNote` | Notiz-Schnellauswahl | Text (`t`) und Sternchen-Favoriten-Status (`s`) |
+| `RecentNote` | Notiz-Schnellauswahl | Text (`t`), Sternchen-Favoriten-Status (`s`) und gecachtes KI-Ergebnis (`ev`) |
 
 ---
 
@@ -130,12 +131,12 @@ Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz 
 |---|---|
 | Sprache & Compiler | Kotlin 2.0.20 |
 | UI-Framework | Jetpack Compose (BOM 2024.09.02), Material 3 |
-| Android Gradle Plugin | 8.5.2 (Gradle 8.9) |
-| SDK-Versionen | `compileSdk` / `targetSdk` = 34, `minSdk` = 26 |
+| Android Gradle Plugin | 8.9.1 (Gradle 8.11.1) |
+| SDK-Versionen | `compileSdk` / `targetSdk` = 36, `minSdk` = 26 |
 | Persistenz | Room Database 2.6.1 (`androidx.room:room-runtime`, `room-ktx`, `room-compiler` via KSP) |
 | State Management | Jetpack Lifecycle ViewModel & Compose (`lifecycle-viewmodel-compose:2.8.6`, `StateFlow`) |
 | Serialisierung | `kotlinx-serialization-json:1.7.3` |
-| Kamera | CameraX 1.3.4 (`camera-core`, `camera-camera2`, `camera-lifecycle`, `camera-view`) |
+| Kamera | CameraX 1.4.2 (`camera-core`, `camera-camera2`, `camera-lifecycle`, `camera-view`) |
 | Sicherheit | Android Keystore / AES-256-GCM (`KeyVault.kt`) |
 | Tests | JUnit 4 (`DataSerializationTest.kt`, `ApiClientTest.kt`, `RoomDatabaseAndViewModelTest.kt`) |
 

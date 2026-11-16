@@ -204,6 +204,22 @@ class HistoryViewModel(
         _uiState.update { it.copy(addTargetTime = time) }
     }
 
+    /** Prüft beim Nacherfassen (mit oder ohne Foto), ob für die aktuelle Anmerkung [addNote]
+     *  bereits eine zu [settings.goals] passende KI-Bewertung im Menü-Speicher existiert.
+     *  Falls ja, wird der Eintrag sofort ohne KI-Aufruf gespeichert. */
+    fun trySaveCachedBackdated(
+        ctx: Context? = null,
+        settings: Settings,
+        photoUriIn: Uri?,
+        onPick: (HistoryEntry) -> Unit = {}
+    ): Boolean {
+        val note = _uiState.value.addNote.trim()
+        val setRepo = getSettingsRepo(ctx) ?: return false
+        val cachedEv = setRepo.findCachedEvaluation(note, settings.goals) ?: return false
+        saveBackdatedEntry(ctx, cachedEv, photoUriIn, onPick)
+        return true
+    }
+
     fun saveBackdatedEntry(
         ctx: Context? = null,
         ev: Evaluation,
@@ -223,7 +239,7 @@ class HistoryViewModel(
             ) ?: HistoryEntry(id = millis, dateMillis = millis, goalResults = ev.goalResults, summary = ev.summary, note = note, backdated = false)
             histRepo?.deleteDayFazitForEntry(entry)
             histRepo?.deleteWeekFazitForEntry(entry)
-            setRepo?.pushRecentNote(note)
+            setRepo?.pushRecentNote(note, ev)
             _uiState.update {
                 it.copy(
                     showAddCamera = false,

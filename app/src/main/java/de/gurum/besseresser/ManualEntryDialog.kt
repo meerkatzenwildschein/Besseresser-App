@@ -278,34 +278,42 @@ fun BackdatedOverlays(
             onFallbackSystemCamera = onFallbackSystemCamera,
             onConfirm = {
                 onDismissCamera()
-                RecentNotesStore.push(ctx, addNote.trim())
-                onSetBusy(true)
-                val prompts = PromptBundle(
-                    intro = ctx.getString(R.string.prompt_eval_intro),
-                    formatIntro = ctx.getString(R.string.prompt_eval_format),
-                    ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                    exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                    responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                    recognized = ctx.getString(R.string.prompt_eval_recognized),
-                    honesty = ctx.getString(R.string.prompt_honesty),
-                    noteHeader = if (addNote.isNotBlank())
-                        ctx.getString(R.string.prompt_note_header, addNote)
-                    else ""
-                )
-                coroutineScope.launch {
-                    val result = ApiClient.analyze(
-                        ctx = ctx,
-                        photoUri = addPhotoUri,
-                        settings = settings,
-                        promptBundle = prompts
+                val trimmedNote = addNote.trim()
+                val cachedEv = RecentNotesStore.findCachedEvaluation(ctx, trimmedNote, settings.goals)
+                if (cachedEv != null) {
+                    RecentNotesStore.push(ctx, trimmedNote, cachedEv)
+                    onSaveBackdated(cachedEv, addPhotoUri)
+                } else {
+                    RecentNotesStore.push(ctx, trimmedNote)
+                    onSetBusy(true)
+                    val prompts = PromptBundle(
+                        intro = ctx.getString(R.string.prompt_eval_intro),
+                        formatIntro = ctx.getString(R.string.prompt_eval_format),
+                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                        recognized = ctx.getString(R.string.prompt_eval_recognized),
+                        honesty = ctx.getString(R.string.prompt_honesty),
+                        noteHeader = if (trimmedNote.isNotBlank())
+                            ctx.getString(R.string.prompt_note_header, trimmedNote)
+                        else ""
                     )
-                    result.onSuccess {
-                        onSetBusy(false)
-                        onSaveBackdated(it, addPhotoUri)
-                    }.onFailure { e ->
-                        onSetBusy(false)
-                        val msg = e.message ?: e.javaClass.simpleName
-                        Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                    coroutineScope.launch {
+                        val result = ApiClient.analyze(
+                            ctx = ctx,
+                            photoUri = addPhotoUri,
+                            settings = settings,
+                            promptBundle = prompts
+                        )
+                        result.onSuccess { ev ->
+                            RecentNotesStore.push(ctx, trimmedNote, ev)
+                            onSetBusy(false)
+                            onSaveBackdated(ev, addPhotoUri)
+                        }.onFailure { e ->
+                            onSetBusy(false)
+                            val msg = e.message ?: e.javaClass.simpleName
+                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             }
@@ -319,34 +327,42 @@ fun BackdatedOverlays(
             onBack = onDismissReview,
             busy = showBusy,
             onRate = {
-                RecentNotesStore.push(ctx, addNote.trim())
-                onSetBusy(true)
-                val prompts = PromptBundle(
-                    intro = ctx.getString(R.string.prompt_eval_intro),
-                    formatIntro = ctx.getString(R.string.prompt_eval_format),
-                    ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                    exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                    responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                    recognized = ctx.getString(R.string.prompt_eval_recognized),
-                    honesty = ctx.getString(R.string.prompt_honesty),
-                    noteHeader = if (addNote.isNotBlank())
-                        ctx.getString(R.string.prompt_note_header, addNote.trim())
-                    else ""
-                )
-                coroutineScope.launch {
-                    val result = ApiClient.analyze(
-                        ctx = ctx,
-                        photoUri = addPhotoUri,
-                        settings = settings,
-                        promptBundle = prompts
+                val trimmedNote = addNote.trim()
+                val cachedEv = RecentNotesStore.findCachedEvaluation(ctx, trimmedNote, settings.goals)
+                if (cachedEv != null) {
+                    RecentNotesStore.push(ctx, trimmedNote, cachedEv)
+                    onSaveBackdated(cachedEv, addPhotoUri)
+                } else {
+                    RecentNotesStore.push(ctx, trimmedNote)
+                    onSetBusy(true)
+                    val prompts = PromptBundle(
+                        intro = ctx.getString(R.string.prompt_eval_intro),
+                        formatIntro = ctx.getString(R.string.prompt_eval_format),
+                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                        recognized = ctx.getString(R.string.prompt_eval_recognized),
+                        honesty = ctx.getString(R.string.prompt_honesty),
+                        noteHeader = if (trimmedNote.isNotBlank())
+                            ctx.getString(R.string.prompt_note_header, trimmedNote)
+                        else ""
                     )
-                    result.onSuccess {
-                        onSetBusy(false)
-                        onSaveBackdated(it, addPhotoUri)
-                    }.onFailure { e ->
-                        onSetBusy(false)
-                        val msg = e.message ?: e.javaClass.simpleName
-                        Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                    coroutineScope.launch {
+                        val result = ApiClient.analyze(
+                            ctx = ctx,
+                            photoUri = addPhotoUri,
+                            settings = settings,
+                            promptBundle = prompts
+                        )
+                        result.onSuccess { ev ->
+                            RecentNotesStore.push(ctx, trimmedNote, ev)
+                            onSetBusy(false)
+                            onSaveBackdated(ev, addPhotoUri)
+                        }.onFailure { e ->
+                            onSetBusy(false)
+                            val msg = e.message ?: e.javaClass.simpleName
+                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             }
@@ -360,21 +376,29 @@ fun BackdatedOverlays(
             onBack = onDismissText,
             busy = showBusy,
             onSend = {
-                RecentNotesStore.push(ctx, addNote.trim())
-                onSetBusy(true)
-                coroutineScope.launch {
-                    val result = ApiClient.analyzeText(
-                        ctx = ctx,
-                        settings = settings,
-                        userDescription = addNote.trim()
-                    )
-                    result.onSuccess {
-                        onSetBusy(false)
-                        onSaveBackdated(it, null)
-                    }.onFailure { e ->
-                        onSetBusy(false)
-                        val msg = e.message ?: e.javaClass.simpleName
-                        Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                val trimmedNote = addNote.trim()
+                val cachedEv = RecentNotesStore.findCachedEvaluation(ctx, trimmedNote, settings.goals)
+                if (cachedEv != null) {
+                    RecentNotesStore.push(ctx, trimmedNote, cachedEv)
+                    onSaveBackdated(cachedEv, null)
+                } else {
+                    RecentNotesStore.push(ctx, trimmedNote)
+                    onSetBusy(true)
+                    coroutineScope.launch {
+                        val result = ApiClient.analyzeText(
+                            ctx = ctx,
+                            settings = settings,
+                            userDescription = trimmedNote
+                        )
+                        result.onSuccess { ev ->
+                            RecentNotesStore.push(ctx, trimmedNote, ev)
+                            onSetBusy(false)
+                            onSaveBackdated(ev, null)
+                        }.onFailure { e ->
+                            onSetBusy(false)
+                            val msg = e.message ?: e.javaClass.simpleName
+                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             }

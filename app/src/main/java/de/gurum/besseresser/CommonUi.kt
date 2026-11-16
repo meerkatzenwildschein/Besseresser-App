@@ -393,7 +393,7 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
                             // Reihenfolge persistieren — kein Laden/Sortieren zwischendurch,
                             // sonst springt der Eintrag (unds dass sortierende load() lagern lässt)
                             val updated = recent.map {
-                                if (it.text == n.text) RecentNote(it.text, !it.starred) else it
+                                if (it.text == n.text) it.copy(starred = !it.starred) else it
                             }
                             RecentNotesStore.save(ctx, updated)
                             recent = updated

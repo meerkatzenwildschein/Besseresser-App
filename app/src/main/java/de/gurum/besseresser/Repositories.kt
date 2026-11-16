@@ -15,8 +15,10 @@ interface SettingsRepository {
     fun load(): Settings
     fun save(settings: Settings)
     fun loadRecentNotes(sortStarredFirst: Boolean = true): List<RecentNote>
-    fun pushRecentNote(note: String)
+    fun pushRecentNote(note: String, evaluation: Evaluation? = null)
     fun toggleStarRecentNote(noteText: String)
+    fun updateRecentNoteEvaluation(note: String, evaluation: Evaluation)
+    fun findCachedEvaluation(note: String, goals: List<String>): Evaluation?
     fun saveRecentNotes(notes: List<RecentNote>)
 }
 
@@ -54,9 +56,16 @@ class DefaultSettingsRepository(private val context: Context) : SettingsReposito
     override fun save(settings: Settings) = Store.save(context, settings)
     override fun loadRecentNotes(sortStarredFirst: Boolean): List<RecentNote> =
         RecentNotesStore.load(context, sortStarredFirst)
-    override fun pushRecentNote(note: String) = RecentNotesStore.push(context, note)
-    override fun toggleStarRecentNote(noteText: String) = RecentNotesStore.toggleStar(context, noteText)
-    override fun saveRecentNotes(notes: List<RecentNote>) = RecentNotesStore.save(context, notes)
+    override fun pushRecentNote(note: String, evaluation: Evaluation?) =
+        RecentNotesStore.push(context, note, evaluation)
+    override fun toggleStarRecentNote(noteText: String) =
+        RecentNotesStore.toggleStar(context, noteText)
+    override fun updateRecentNoteEvaluation(note: String, evaluation: Evaluation) =
+        RecentNotesStore.updateEvaluation(context, note, evaluation)
+    override fun findCachedEvaluation(note: String, goals: List<String>): Evaluation? =
+        RecentNotesStore.findCachedEvaluation(context, note, goals)
+    override fun saveRecentNotes(notes: List<RecentNote>) =
+        RecentNotesStore.save(context, notes)
 }
 
 class DefaultProfileRepository(private val context: Context) : ProfileRepository {
