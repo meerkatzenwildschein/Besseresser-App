@@ -99,7 +99,7 @@ class ProfileViewModel(
             notes = state.notesText.trim(),
             gender = state.gender
         )
-        profileRepository.save(updated)
+        viewModelScope.launch { profileRepository.save(updated) }
         onSaved(updated)
         return true
     }

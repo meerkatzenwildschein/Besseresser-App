@@ -131,13 +131,14 @@ class BackupManager(
     private val settingsRepository: SettingsRepository,
     private val profileRepository: ProfileRepository,
     private val historyRepository: HistoryRepository,
-    private val photoStorage: PhotoStorage
+    private val photoStorage: PhotoStorage,
+    private val uiPrefsRepository: UiPrefsRepository
 ) {
 
     /** Erstellt ein vollständiges In-Memory-Backup aller aktuell gespeicherten App-Daten inkl. Fotos als Base64. */
     suspend fun createBackup(nowMillis: Long = System.currentTimeMillis()): AppBackup {
-        val settings = settingsRepository.load()
-        val profile = profileRepository.load()
+        val settings = settingsRepository.currentSettings()
+        val profile = profileRepository.currentProfile()
         val recentNotes = settingsRepository.loadRecentNotes(sortStarredFirst = false)
         val entries = historyRepository.getAll()
         val dayFazits = historyRepository.loadAllDayFazits()
@@ -163,8 +164,8 @@ class BackupManager(
             historyEntries = backupEntries,
             dayFazits = dayFazits,
             weekFazits = weekFazits,
-            themeMode = UiPrefsStore.loadThemeMode(context),
-            language = UiPrefsStore.loadLanguage(context)
+            themeMode = uiPrefsRepository.currentThemeMode(),
+            language = uiPrefsRepository.currentLanguage()
         )
     }
 
@@ -238,13 +239,13 @@ class BackupManager(
         val backup = BackupLogic.deserializeBackup(rawJson)
 
         // 1. Einstellungen (inkl. API-Key) sowie Theme & Sprache zusammenführen & speichern
-        val mergedSettings = BackupLogic.mergeSettings(settingsRepository.load(), backup.settings)
+        val mergedSettings = BackupLogic.mergeSettings(settingsRepository.currentSettings(), backup.settings)
         settingsRepository.save(mergedSettings)
-        backup.themeMode?.let { UiPrefsStore.saveThemeMode(context, it) }
-        backup.language?.let { UiPrefsStore.saveLanguage(context, it) }
+        backup.themeMode?.let { uiPrefsRepository.saveThemeMode(it) }
+        backup.language?.let { uiPrefsRepository.saveLanguage(it) }
 
         // 2. Profil zusammenführen & speichern
-        val mergedProfile = BackupLogic.mergeProfile(profileRepository.load(), backup.profile)
+        val mergedProfile = BackupLogic.mergeProfile(profileRepository.currentProfile(), backup.profile)
         profileRepository.save(mergedProfile)
 
         // 3. Notiz-Schnellauswahl (inkl. Favoriten-Sternchen) zusammenführen & speichern

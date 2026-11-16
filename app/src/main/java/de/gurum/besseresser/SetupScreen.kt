@@ -96,14 +96,13 @@ fun SetupScreen(
     firstRun: Boolean,
     onCancel: () -> Unit,
     onDone: (Settings) -> Unit,
-    onBackupImported: ((Settings, Profile) -> Unit)? = null,
+    onBackupImported: ((Settings) -> Unit)? = null,
     viewModel: SetupViewModel = koinViewModel()
 ) {
     val ctx = LocalContext.current
-    // Übergangslösung (Phase 2): direkter Service-Zugriff; wird in Phase 5 verlagert.
+    // Übergangslösung (Phase 3): direkter Service-Zugriff; wird in Phase 5 verlagert.
     val backupManager: BackupManager = koinInject()
     val settingsRepository: SettingsRepository = koinInject()
-    val profileRepository: ProfileRepository = koinInject()
     val scope = rememberCoroutineScope()
     val defaultGoals = remember { ctx.resources.getStringArray(R.array.default_goals).toList() }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -119,8 +118,7 @@ fun SetupScreen(
                 backupManager.importFromUri(uri)
             }
             res.onSuccess { summary ->
-                val updatedSettings = settingsRepository.load()
-                val updatedProfile = profileRepository.load()
+                val updatedSettings = settingsRepository.currentSettings()
                 importingBackup = false
                 Toast.makeText(
                     ctx,
@@ -128,7 +126,7 @@ fun SetupScreen(
                     Toast.LENGTH_LONG
                 ).show()
                 viewModel.init(updatedSettings, defaultGoals)
-                onBackupImported?.invoke(updatedSettings, updatedProfile)
+                onBackupImported?.invoke(updatedSettings)
             }.onFailure { e ->
                 importingBackup = false
                 importError = e.message ?: ctx.getString(R.string.config_import_failed)

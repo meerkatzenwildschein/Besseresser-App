@@ -396,18 +396,18 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
                 val trimmed = newText.trim()
                 coroutineScope.launch {
                     historyRepository.updateErkannt(current.id, trimmed)
+                    if (current.note.isNotBlank()) {
+                        settingsRepository.updateRecentNoteEvaluation(
+                            current.note,
+                            Evaluation(
+                                goalResults = current.goalResults,
+                                summary = current.summary,
+                                erkannt = current.erkannt
+                            )
+                        )
+                    }
                 }
                 current = current.copy(erkannt = trimmed)
-                if (current.note.isNotBlank()) {
-                    settingsRepository.updateRecentNoteEvaluation(
-                        current.note,
-                        Evaluation(
-                            goalResults = current.goalResults,
-                            summary = current.summary,
-                            erkannt = current.erkannt
-                        )
-                    )
-                }
                 showErkanntEdit = false
                 if (trimmed.isNotBlank() && !reEvalBusy) reEvaluate(trimmed)
             },

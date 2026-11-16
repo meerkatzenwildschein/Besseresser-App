@@ -133,7 +133,7 @@ Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz 
 | UI-Framework | Jetpack Compose (BOM 2024.09.02), Material 3 |
 | Android Gradle Plugin | 8.9.1 (Gradle 8.11.1) |
 | SDK-Versionen | `compileSdk` / `targetSdk` = 36, `minSdk` = 26 |
-| Persistenz | Room Database 2.6.1 (`androidx.room:room-runtime`, `room-ktx`, `room-compiler` via KSP) |
+| Persistenz | Room Database 2.6.1 (`androidx.room:room-runtime`, `room-ktx`, `room-compiler` via KSP) + Preferences DataStore 1.1.1 (Settings, Profil, RecentNotes, Theme/Sprache; migriert aus SharedPreferences) |
 | Dependency Injection | Koin 4.0.4 (`koin-android`, `koin-androidx-compose`) – Container-Start in `BesseresserApp`, Modul in `di/AppModule.kt` |
 | State Management | Jetpack Lifecycle ViewModel & Compose (`lifecycle-viewmodel-compose:2.8.6`, `StateFlow`) |
 | Serialisierung | `kotlinx-serialization-json:1.7.3` |
@@ -161,9 +161,10 @@ Besseresser-App/
 │       │   ├── java/de/gurum/besseresser/
 │       │   │   ├── ApiClient.kt            ← OpenAI-Netzwerk-Koordinator, BesseresserApiService
 │       │   │   ├── AppDatabase.kt          ← Room SQLite-Datenbank, Entities, DAOs & TypeConverters
+│       │   │   ├── AppStateViewModel.kt    ← App-weiter Zustand (Settings, Profil, Theme, Sprache) als Flows
 │       │   │   ├── BesseresserApp.kt       ← Application-Klasse, startet Koin (im Manifest registriert)
 │       │   │   ├── di/
-│       │   │   │   └── AppModule.kt        ← Koin-Modul: DB, Repositories, ApiService, ViewModels
+│       │   │   │   └── AppModule.kt        ← Koin-Modul: DB, DataStore, Repositories, ApiService, ViewModels
 │       │   │   ├── BackupStore.kt          ← BackupManager (JSON-Export/Import) + BackupLogic (reine Merge-Logik)
 │       │   │   ├── PhotoStorage.kt         ← Datei-basierte Foto-Ablage (JPEG-Skalierung, Thumbnails)
 │       │   │   ├── CameraScreen.kt         ← CameraX-Live-Preview & Foto-Review
@@ -190,7 +191,7 @@ Besseresser-App/
 │       │   │   ├── Repositories.kt         ← Repository-Interfaces (Settings, Profile, History) & Default-Implementierungen
 │       │   │   ├── SetupScreen.kt          ← Ersteinrichtung, Provider- & Modell-Auswahl
 │       │   │   ├── SetupViewModel.kt       ← ViewModel für API-Konfiguration & Zielaufteilung
-│       │   │   └── Store.kt                ← Modelle (Profile, RecentNote), RecentNotesLogic, UiPrefsStore
+│       │   │   └── Store.kt                ← Modelle (Profile, RecentNote), RecentNotesLogic, withAppLanguage
 │       │   └── res/
 │       │       ├── values/             ← strings.xml (EN Default), themes.xml, colors.xml
 │       │       ├── values-de/          ← strings.xml (DE Übersetzung)
@@ -273,4 +274,4 @@ Besseresser-App/
 4. **Refactoring-Plan beachten:** Geplante Modernisierungen (Coroutines, Room, ViewModels) sind in `REFACTORING.md` priorisiert dokumentiert.
 5. **Dependency Injection über Koin:** Neue Abhängigkeiten (Repositories, Services, ViewModels) in `di/AppModule.kt` registrieren und per Konstruktor injizieren – keine manuelle Instanziierung, kein `Context`-Fallback in ViewModels. ViewModels in Compose über `koinViewModel()` beziehen.
    - Ausnahme (Phase 1, wird in späteren Phasen aufgelöst): Methoden, die Android-`Resources`/`ContentResolver` benötigen (`analyze`, `reEvaluate`, `generateFazit`, `generateWeekFazit`, `startSplitGoals`, `ProfileViewModel.save`), erhalten `Context` noch als Methodenparameter.
-6. **Persistenz nur über Repositories:** Datenzugriff (Room, SharedPreferences, Fotos) ausschließlich über die Repository-Interfaces aus `Repositories.kt` – keine `XxxStore`-Objekte mehr. Reine, kontextfreie Logik liegt in `RecentNotesLogic`, `HistoryEntryLogic` und `BackupLogic`. Einzige Ausnahme: `UiPrefsStore` (Theme/Sprache, wird in Phase 3 auf DataStore umgestellt). Suspendierende Repository-Aufrufe aus Composables heraus immer in einem `rememberCoroutineScope` starten (Übergangslösung, Phase 5 verschiebt sie in ViewModels).
+6. **Persistenz nur über Repositories:** Datenzugriff (Room, DataStore, Fotos) ausschließlich über die Repository-Interfaces aus `Repositories.kt` (suspend/Flow) – keine `XxxStore`-Objekte mehr. Reine, kontextfreie Logik liegt in `RecentNotesLogic`, `HistoryEntryLogic` und `BackupLogic`. Settings/Profil/Theme/Sprache fließen reaktiv über den `AppStateViewModel` in der MainActivity. Suspendierende Repository-Aufrufe aus Composables heraus immer in einem `rememberCoroutineScope` starten (Übergangslösung, Phase 5 verschiebt sie in ViewModels).

@@ -37,9 +37,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 
@@ -363,16 +366,22 @@ fun ErkanntEditDialog(initialText: String, onOk: (String) -> Unit, onDismiss: ()
 @Composable
 fun RecentNotesButton(onPick: (String) -> Unit) {
     val settingsRepository: SettingsRepository = koinInject()
-    var recent by remember { mutableStateOf(settingsRepository.loadRecentNotes()) }
+    val scope = rememberCoroutineScope()
+    var recent by remember { mutableStateOf<List<RecentNote>>(emptyList()) }
     var open by remember { mutableStateOf(false) }
-    val isEnabled = remember(open) { settingsRepository.loadRecentNotes().isNotEmpty() }
+    LaunchedEffect(Unit) {
+        recent = settingsRepository.loadRecentNotes()
+    }
+    val isEnabled = recent.isNotEmpty()
     Box {
         IconButton(
             onClick = {
-                // Anzeigereihenfolge NUR beim Öffnen: Sternchen nach oben (in-place-Toggling
-                // darf nicht hüpfen), unmarkierte behalten ihre MRU-Reihenfolge
-                recent = settingsRepository.loadRecentNotes(sortStarredFirst = true)
                 open = true
+                scope.launch {
+                    // Anzeigereihenfolge NUR beim Öffnen: Sternchen nach oben (in-place-Toggling
+                    // darf nicht hüpfen), unmarkierte behalten ihre MRU-Reihenfolge
+                    recent = settingsRepository.loadRecentNotes(sortStarredFirst = true)
+                }
             },
             enabled = isEnabled,
             modifier = Modifier.size(24.dp)
@@ -396,8 +405,8 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
                             val updated = recent.map {
                                 if (it.text == n.text) it.copy(starred = !it.starred) else it
                             }
-                            settingsRepository.saveRecentNotes(updated)
                             recent = updated
+                            scope.launch { settingsRepository.saveRecentNotes(updated) }
                         }, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 Icons.Filled.Star,
@@ -420,8 +429,9 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
                     },
                     onClick = {
                         open = false
-                        settingsRepository.pushRecentNote(n.text)   // Auswahl rutscht nach oben (MRU)
-                        recent = settingsRepository.loadRecentNotes()
+                        scope.launch {
+                            settingsRepository.pushRecentNote(n.text)   // Auswahl rutscht nach oben (MRU)
+                        }
                         onPick(n.text)
                     }
                 )

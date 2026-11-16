@@ -199,7 +199,7 @@ class HistoryViewModel(
     /** Prüft beim Nacherfassen (mit oder ohne Foto), ob für die aktuelle Anmerkung [addNote]
      *  bereits eine zu [settings.goals] passende KI-Bewertung im Menü-Speicher existiert.
      *  Falls ja, wird der Eintrag sofort ohne KI-Aufruf gespeichert. */
-    fun trySaveCachedBackdated(
+    suspend fun trySaveCachedBackdated(
         settings: Settings,
         photoUriIn: Uri?,
         onPick: (HistoryEntry) -> Unit = {}
