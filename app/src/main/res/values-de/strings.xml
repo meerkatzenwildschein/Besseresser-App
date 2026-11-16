@@ -55,6 +55,9 @@
     <string name="cam_hint_frame">Mahlzeit gut sichtbar im Bild platzieren</string>
     <string name="setup_section_api">KI-Verbindung</string>
     <string name="setup_section_goals">Persönliche Ziele</string>
+    <string name="setup_section_retention">Verlauf begrenzen</string>
+    <string name="setup_retention_label">Essen vorhalten für (Wochen)</string>
+    <string name="setup_retention_hint">Ältere Einträge (inkl. Fotos und Tages-/Wochenfazits) werden beim App-Start automatisch gelöscht. 0 = nie löschen.</string>
     <string name="profile_section_body">Körperdaten</string>
     <string name="profile_section_notes">Gesundheit &amp; Ernährung</string>
     <string name="history_empty_sub">Deine bewerteten Mahlzeiten, Tages- und Wochenfazits erscheinen übersichtlich an dieser Stelle.</string>

@@ -99,7 +99,8 @@ object BackupLogic {
         apiKey = imported.apiKey.trim().ifBlank { existing.apiKey },
         model = imported.model.trim().ifBlank { existing.model },
         goals = if (imported.goals.isNotEmpty()) imported.goals else existing.goals,
-        goalsWereSplit = if (imported.goals.isNotEmpty()) imported.goalsWereSplit else existing.goalsWereSplit
+        goalsWereSplit = if (imported.goals.isNotEmpty()) imported.goalsWereSplit else existing.goalsWereSplit,
+        retentionWeeks = imported.retentionWeeks
     )
 
     /** Importierte Profildaten überschreiben vorhandene Felder. */

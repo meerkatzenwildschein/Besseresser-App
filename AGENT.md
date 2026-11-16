@@ -36,6 +36,7 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
   - **API-URL:** Basis-URL einer OpenAI-kompatiblen Schnittstelle (z. B. `https://api.openai.com/v1`).
   - **API-Key:** AES-256-GCM-verschlüsselt via Android-Keystore (`KeyVault.kt`), im SharedPreference-Storage liegt nur das Chiffrat.
   - **Modell:** Name des Vision-fähigen Modells (z. B. `gpt-4o-mini`).
+  - **Historien-Begrenzung (`retentionWeeks`):** Einträge (inkl. Fotos und Tages-/Wochenfazits) werden nach so vielen vollen Wochen automatisch gelöscht (Default: `8`, `0` = nie löschen). Bereinigung läuft einmalig beim App-Start im Hintergrund via `AppStateViewModel` → `HistoryRepository.purgeOlderThanWeeks(weeks)`.
 - **Anbieter-Auswahl & Modell-Liste:**
   - Dialog zur schnellen Auswahl bekannter Provider (`PROVIDERS`).
   - `ModelListScreen`: Ruft `{baseUrl}/models` ab und filtert primär nach Vision-fähigen Modellen (inkl. Debug-Report bei Fehlern).
@@ -115,7 +116,7 @@ Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz 
 | `Gender` | Enum (`MALE`, `FEMALE`, `DIVERSE`, `NONE`) | `GenderSerializer` mit String-Fallback |
 | `GoalResult` | Ziel-Bewertung | Serialisiert mit `@SerialName("ziel")`, `@SerialName("ampel")`, `@SerialName("begruendung")` |
 | `Evaluation` | Gesamtbewertung einer Mahlzeit | Liste von `GoalResult`, `summary`, `erkannt` |
-| `Settings` | Setup-Einstellungen | URL, verschlüsselter Key, Modell, Ziele-Liste, `goalsWereSplit` |
+| `Settings` | Setup-Einstellungen | URL, verschlüsselter Key, Modell, Ziele-Liste, `goalsWereSplit`, `retentionWeeks` |
 | `Profile` | Nutzerdaten | `birthDate` (ISO), `weightKg`, `heightCm`, `notes`, `gender`, dynamisches `ageYears` |
 | `HistoryEntry` | Gespeicherte Mahlzeit | ID, Datum, Foto-Pfad, Zielergebnisse, Notiz, Score-Berechnung (0..100) |
 | `DayFazit` | Tagesbewertung | Ampel, Fazit-Text, Entry-IDs und `fingerprint` |

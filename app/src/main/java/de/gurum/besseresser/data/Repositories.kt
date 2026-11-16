@@ -20,6 +20,7 @@ import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import de.gurum.besseresser.model.retentionCutoffMillis
 import de.gurum.besseresser.model.AppJson
 import de.gurum.besseresser.model.AppLanguage
 import de.gurum.besseresser.model.AppThemeMode
@@ -108,6 +109,9 @@ interface HistoryRepository {
     suspend fun saveAllWeekFazits(fazits: List<DayFazit>)
     suspend fun deleteWeekFazit(weekKey: String)
     suspend fun deleteWeekFazitForEntry(entry: HistoryEntry)
+    /** Löscht alle Einträge (inkl. Fotos) sowie Tages-/Wochenfazits, die älter als [weeks]
+     *  volle Wochen sind. 0/negativ = nichts löschen. Liefert die Anzahl gelöschter Einträge. */
+    suspend fun purgeOlderThanWeeks(weeks: Int): Int
     fun photoFileOf(entry: HistoryEntry): File?
     fun decodeThumbnail(entry: HistoryEntry, target: Int = 200): Bitmap?
 }
@@ -122,6 +126,7 @@ class DefaultSettingsRepository(private val dataStore: DataStore<Preferences>) :
         val MODEL = stringPreferencesKey("model")
         val GOALS = stringPreferencesKey("goals")
         val GOALS_WERE_SPLIT = booleanPreferencesKey("goalsWereSplit")
+        val RETENTION_WEEKS = intPreferencesKey("retentionWeeks")
         val RECENT_NOTES = stringPreferencesKey("recentNotes")
         const val DEFAULT_MODEL = "gpt-4o-mini"
     }
@@ -137,7 +142,8 @@ class DefaultSettingsRepository(private val dataStore: DataStore<Preferences>) :
             apiKey = this[Keys.API_KEY]?.let { KeyVault.decrypt(it) } ?: "",
             model = this[Keys.MODEL] ?: Keys.DEFAULT_MODEL,
             goals = goals,
-            goalsWereSplit = this[Keys.GOALS_WERE_SPLIT] ?: false
+            goalsWereSplit = this[Keys.GOALS_WERE_SPLIT] ?: false,
+            retentionWeeks = this[Keys.RETENTION_WEEKS] ?: Settings.DEFAULT_RETENTION_WEEKS
         )
     }
 
@@ -150,6 +156,7 @@ class DefaultSettingsRepository(private val dataStore: DataStore<Preferences>) :
             p[Keys.MODEL] = settings.model.trim()
             p[Keys.GOALS] = settings.goals.joinToString("\n")
             p[Keys.GOALS_WERE_SPLIT] = settings.goalsWereSplit
+            p[Keys.RETENTION_WEEKS] = settings.retentionWeeks
         }
     }
 
@@ -453,6 +460,38 @@ class DefaultHistoryRepository(
         db.weekFazitDao().deleteAll()
         DayFazitSession.attempted.clear()
         DayFazitSession.attemptedWeekly.clear()
+    }
+
+    /** Löscht alle Einträge (inkl. Fotos) sowie Tages-/Wochenfazits, die älter als [weeks]
+     *  volle Wochen sind. 0/negativ = nichts löschen. Liefert die Anzahl gelöschter Einträge. */
+    override suspend fun purgeOlderThanWeeks(weeks: Int): Int {
+        if (weeks <= 0) return 0
+        ensureMigrated()
+        val cutoffMillis = retentionCutoffMillis(weeks)
+        val cutoffWeekKey = weekKeyOf(cutoffMillis)
+        val cutoffDayKey = dayKeyOf(cutoffMillis)
+
+        // 1. Einträge vor dem Stichtag inkl. Foto-Dateien löschen
+        val stale = db.historyDao().getAll().map { it.toDomain() }
+            .filter { it.dateMillis < cutoffMillis }
+        stale.forEach { entry ->
+            photoStorage.deletePhoto(entry.photoFile)
+            db.historyDao().deleteById(entry.id)
+        }
+
+        // 2. Tages-/Wochenfazits vor dem Stichtag löschen (inkl. verwaister)
+        db.dayFazitDao().getAll().map { it.dayKey }
+            .filter { it < cutoffDayKey }
+            .forEach { db.dayFazitDao().delete(it) }
+        db.weekFazitDao().getAll().map { it.weekKey }
+            .filter { it < cutoffWeekKey }
+            .forEach { db.weekFazitDao().delete(it) }
+
+        // 3. Session-Guard aufräumen (damit Fazits neuer Tage nicht irrtümlich „versucht" bleiben)
+        DayFazitSession.attempted.removeAll { it < cutoffDayKey }
+        DayFazitSession.attemptedWeekly.removeAll { it < cutoffWeekKey }
+
+        return stale.size
     }
 
     override suspend fun saveDayFazit(fazit: DayFazit) {

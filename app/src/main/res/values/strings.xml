@@ -55,6 +55,9 @@
     <string name="cam_hint_frame">Center your meal clearly in the frame</string>
     <string name="setup_section_api">AI Connection</string>
     <string name="setup_section_goals">Personal Goals</string>
+    <string name="setup_section_retention">History retention</string>
+    <string name="setup_retention_label">Keep meals for (weeks)</string>
+    <string name="setup_retention_hint">Older entries (incl. photos and daily/weekly summaries) are deleted automatically at app start. 0 = keep everything.</string>
     <string name="profile_section_body">Personal Details</string>
     <string name="profile_section_notes">Health &amp; Dietary Notes</string>
     <string name="history_empty_sub">Your rated meals, daily summaries, and weekly insights will appear here.</string>

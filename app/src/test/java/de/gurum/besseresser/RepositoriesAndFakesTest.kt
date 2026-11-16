@@ -57,6 +57,7 @@ import de.gurum.besseresser.data.SplitGoalsRequest
 import de.gurum.besseresser.model.TrafficLight
 import de.gurum.besseresser.model.weekKeyOf
 import de.gurum.besseresser.model.DayFazit
+import de.gurum.besseresser.model.DayFazitSession
 
 // ----------------------------------------------------------------- In-Memory Test Fakes
 
@@ -243,6 +244,21 @@ class FakeHistoryRepository : HistoryRepository {
 
     override fun photoFileOf(entry: HistoryEntry): File? = null
     override fun decodeThumbnail(entry: HistoryEntry, target: Int): Bitmap? = null
+
+    override suspend fun purgeOlderThanWeeks(weeks: Int): Int {
+        if (weeks <= 0) return 0
+        val cutoffMillis = de.gurum.besseresser.model.retentionCutoffMillis(weeks)
+        val cutoffWeekKey = weekKeyOf(cutoffMillis)
+        val cutoffDayKey = dayKeyOf(cutoffMillis)
+        val stale = entriesFlow.value.filter { it.dateMillis < cutoffMillis }
+        val staleDayKeys = stale.map { dayKeyOf(it.dateMillis) }.toSet()
+        entriesFlow.update { list -> list.filter { it.dateMillis >= cutoffMillis } }
+        dayFazitsFlow.update { map -> map - staleDayKeys }
+        weekFazitsFlow.update { map -> map.filterKeys { it >= cutoffWeekKey } }
+        staleDayKeys.forEach { DayFazitSession.attempted.remove(it) }
+        DayFazitSession.attemptedWeekly.removeIf { it < cutoffWeekKey }
+        return stale.size
+    }
 }
 
 class FakeApiService(
@@ -675,6 +691,38 @@ class RepositoriesAndFakesTest {
         assertTrue(vm.uiState.value.pendingDeleteIds.isEmpty())
         assertEquals(1, vm.uiState.value.entries.size)
         assertEquals(e1.id, vm.uiState.value.entries.first().id)
+    }
+
+    @Test
+    fun testHistoryRepositoryPurgeOlderThanWeeks() = runTest(testDispatcher) {
+        val repo = FakeHistoryRepository()
+        val today = java.time.LocalDate.now()
+        val thisWeek = today.atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val twoWeeksAgo = today.minusWeeks(2).atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val tenWeeksAgo = today.minusWeeks(10).atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+        val recent = repo.add(null, Evaluation(erkannt = "Heute"), dateOverride = thisWeek)
+        val old = repo.add(null, Evaluation(erkannt = "Vor 10 Wochen"), dateOverride = tenWeeksAgo)
+        repo.saveDayFazit(DayFazit(dayKeyOf(thisWeek), TrafficLight.GREEN, "Heute ok", listOf(recent.id), 1L, "fp1"))
+        repo.saveDayFazit(DayFazit(dayKeyOf(tenWeeksAgo), TrafficLight.RED, "Alt schlecht", listOf(old.id), 1L, "fp2"))
+        repo.saveWeekFazit(DayFazit(weekKeyOf(thisWeek), TrafficLight.GREEN, "Woche ok", listOf(recent.id), 1L, "fp3"))
+        repo.saveWeekFazit(DayFazit(weekKeyOf(tenWeeksAgo), TrafficLight.RED, "Woche alt", listOf(old.id), 1L, "fp4"))
+
+        assertEquals(2, repo.getAll().size)
+
+        // 8 Wochen Retention: Eintrag vor 10 Wochen muss gelöscht werden, heutiger bleibt
+        val deleted = repo.purgeOlderThanWeeks(8)
+        assertEquals(1, deleted)
+        assertEquals(listOf(recent.id), repo.getAll().map { it.id })
+        assertNotNull(repo.loadDayFazit(dayKeyOf(thisWeek)))
+        assertNull(repo.loadDayFazit(dayKeyOf(tenWeeksAgo)))
+        assertNotNull(repo.loadWeekFazit(weekKeyOf(thisWeek)))
+        assertNull(repo.loadWeekFazit(weekKeyOf(tenWeeksAgo)))
+
+        // 0 Wochen = deaktiviert, nichts wird gelöscht
+        val deletedZero = repo.purgeOlderThanWeeks(0)
+        assertEquals(0, deletedZero)
+        assertEquals(1, repo.getAll().size)
     }
 
     @Test

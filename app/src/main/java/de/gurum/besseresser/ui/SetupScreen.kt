@@ -57,18 +57,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
-import org.koin.compose.koinInject
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import de.gurum.besseresser.R
 import de.gurum.besseresser.BuildConfig
 import de.gurum.besseresser.data.ApiClient
 import de.gurum.besseresser.data.ApiClient.ModelsResult
 import de.gurum.besseresser.data.ApiException
 import de.gurum.besseresser.model.Settings
-import de.gurum.besseresser.data.BackupManager
-import de.gurum.besseresser.data.SettingsRepository
 
 // ----------------------------------------------------------------- Gängige Anbieter
 
@@ -107,10 +101,6 @@ fun SetupScreen(
     viewModel: SetupViewModel = koinViewModel()
 ) {
     val ctx = LocalContext.current
-    // Übergangslösung (Phase 3): direkter Service-Zugriff; wird in Phase 5 verlagert.
-    val backupManager: BackupManager = koinInject()
-    val settingsRepository: SettingsRepository = koinInject()
-    val scope = rememberCoroutineScope()
     val defaultGoals = remember { ctx.resources.getStringArray(R.array.default_goals).toList() }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var importingBackup by remember { mutableStateOf(false) }
@@ -120,22 +110,16 @@ fun SetupScreen(
         if (uri == null) return@rememberLauncherForActivityResult
         importingBackup = true
         importError = null
-        scope.launch {
-            val res = withContext(Dispatchers.IO) {
-                backupManager.importFromUri(uri)
-            }
-            res.onSuccess { summary ->
-                val updatedSettings = settingsRepository.currentSettings()
-                importingBackup = false
+        viewModel.importBackup(uri, defaultGoals) { res ->
+            importingBackup = false
+            res.onSuccess { (updatedSettings, summary) ->
                 Toast.makeText(
                     ctx,
                     ctx.getString(R.string.config_import_success, summary.entriesCount, summary.photosCount),
                     Toast.LENGTH_LONG
                 ).show()
-                viewModel.init(updatedSettings, defaultGoals)
                 onBackupImported?.invoke(updatedSettings)
             }.onFailure { e ->
-                importingBackup = false
                 importError = e.message ?: ctx.getString(R.string.config_import_failed)
             }
         }
@@ -161,7 +145,7 @@ fun SetupScreen(
     val valid = uiState.url.trim().startsWith("http") && uiState.key.isNotBlank() && uiState.model.isNotBlank() && !uiState.splitting
 
     val doSave: (List<String>, Boolean) -> Unit = { liste, wasSplit ->
-        onDone(Settings(uiState.url.trim(), uiState.key.trim(), uiState.model.trim(), liste.ifEmpty { defaultGoals }, wasSplit))
+        onDone(Settings(uiState.url.trim(), uiState.key.trim(), uiState.model.trim(), liste.ifEmpty { defaultGoals }, wasSplit, uiState.retentionWeeks.trim().toIntOrNull() ?: Settings.DEFAULT_RETENTION_WEEKS))
     }
 
     val save: () -> Unit = {
@@ -335,6 +319,25 @@ fun SetupScreen(
                         Text(stringResource(R.string.setup_ai_splitting_text), fontSize = 13.sp)
                     }
                 }
+            }
+
+            SectionCard(title = stringResource(R.string.setup_section_retention)) {
+                LabelledField(stringResource(R.string.setup_retention_label), required = false) {
+                    OutlinedTextField(
+                        value = uiState.retentionWeeks,
+                        onValueChange = { viewModel.setRetentionWeeks(it) },
+                        placeholder = { Text(Settings.DEFAULT_RETENTION_WEEKS.toString()) },
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Text(
+                    stringResource(R.string.setup_retention_hint),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             Spacer(Modifier.height(8.dp))

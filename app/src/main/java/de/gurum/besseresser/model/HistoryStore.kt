@@ -5,7 +5,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import de.gurum.besseresser.data.HistoryRepository
 
 /** Eine gespeicherte Foto-Bewertung. */
 @Serializable
@@ -112,6 +111,16 @@ object HistoryEntryLogic {
         }
         return ordered.mapIndexed { idx, e -> e.copy(sortOrder = baseSortOrders[idx]) }
     }
+}
+
+// ----------------------------------------------------------------- Historien-Begrenzung (retention)
+
+/** Montag (00:00) der Woche, die [weeks] Wochen vor [today] liegt – Einträge/Fazits
+ *  vor diesem Zeitpunkt gelten als „älter als [weeks] Wochen" und werden bereinigt. */
+fun retentionCutoffMillis(weeks: Int, today: LocalDate = LocalDate.now()): Long {
+    val cutoffMonday = today.minusWeeks(weeks.toLong())
+        .with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY))
+    return cutoffMonday.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 }
 
 // ----------------------------------------------------------------- Tagesfazit
