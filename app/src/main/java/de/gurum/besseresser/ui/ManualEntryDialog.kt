@@ -359,14 +359,15 @@ fun AddMealReviewScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopBarRow(title = stringResource(R.string.review_title), onBack = onBack, trailing = { })
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
             val reviewCtx = LocalContext.current
             val bmp = remember(photoUri) {
                 try {
@@ -401,6 +402,7 @@ fun AddMealReviewScreen(
                 maxLines = 4
             )
             Spacer(Modifier.height(100.dp))
+            }
         }
         Box(
             modifier = Modifier
@@ -452,19 +454,20 @@ fun AddMealNoPhotoScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopBarRow(
                 title = stringResource(R.string.nacherfassen_title),
                 onBack = onBack,
                 trailing = { },
                 icon = Icons.Filled.Add
             )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
             Surface(
                 shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
@@ -501,6 +504,7 @@ fun AddMealNoPhotoScreen(
             )
             if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(100.dp))
+            }
         }
         Box(
             modifier = Modifier

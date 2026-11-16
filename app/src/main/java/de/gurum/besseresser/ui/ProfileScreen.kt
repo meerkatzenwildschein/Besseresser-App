@@ -108,13 +108,7 @@ fun ProfileScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopBarRow(
                 title = stringResource(R.string.profile_title),
                 onBack = onCancel,
@@ -122,6 +116,13 @@ fun ProfileScreen(
                 icon = Icons.Filled.Person
             )
 
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
@@ -249,6 +250,7 @@ fun ProfileScreen(
             }
 
             Spacer(Modifier.height(100.dp))
+            }
         }
 
         Box(

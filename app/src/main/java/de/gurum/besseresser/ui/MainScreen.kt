@@ -258,18 +258,19 @@ private fun MainReviewScreen(
 ) {
     val ctx = LocalContext.current
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopBarRow(
                 title = stringResource(R.string.review_title),
                 onBack = onBack,
                 trailing = { }
             )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
             photoUri?.let { uri ->
                 val bmp = remember(uri) {
                     try {
@@ -318,6 +319,7 @@ private fun MainReviewScreen(
                 )
             }
             Spacer(Modifier.height(150.dp))
+            }
         }
         Box(
             modifier = Modifier
