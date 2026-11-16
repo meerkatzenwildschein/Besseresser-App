@@ -193,13 +193,7 @@ fun HistoryDetailScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    Column(modifier = Modifier.fillMaxSize()) {
         TopBarRow(
             title = if (entry.backdated)
                 SimpleDateFormat(DATE_FORMAT_PATTERN, Locale.getDefault()).format(Date(entry.dateMillis)) +
@@ -249,6 +243,14 @@ fun HistoryDetailScreen(
                 }
             }
         )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
 
         if (thumb != null) {
             Surface(
@@ -340,6 +342,7 @@ fun HistoryDetailScreen(
         entry.goalResults.forEach { GoalRow(it.goal, it) }
 
         Spacer(Modifier.height(16.dp))
+        }
     }
 
     if (showErkanntEdit) {

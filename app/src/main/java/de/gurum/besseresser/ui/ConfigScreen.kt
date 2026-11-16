@@ -109,13 +109,7 @@ fun ConfigScreen(
         if (state.cleared) onHistoryCleared()
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
-    ) {
+    Column(modifier = Modifier.fillMaxSize()) {
         TopBarRow(
             title = stringResource(R.string.menu_config),
             onBack = { if (!state.busy) onBack() },
@@ -123,6 +117,13 @@ fun ConfigScreen(
             icon = Icons.Filled.Build
         )
 
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
         Surface(
             shape = RoundedCornerShape(16.dp),
             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
@@ -418,6 +419,7 @@ fun ConfigScreen(
         )
 
         Spacer(Modifier.height(24.dp))
+        }
     }
 
     if (showClearConfirm) {

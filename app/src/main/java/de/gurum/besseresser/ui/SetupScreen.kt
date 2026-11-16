@@ -164,13 +164,7 @@ fun SetupScreen(
             .fillMaxSize()
             .imePadding()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             TopBarRow(
                 title = stringResource(R.string.menu_settings),
                 onBack = onCancel,
@@ -178,6 +172,13 @@ fun SetupScreen(
                 icon = Icons.Filled.Settings
             )
 
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
             Surface(
                 shape = RoundedCornerShape(18.dp),
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
@@ -349,6 +350,7 @@ fun SetupScreen(
             )
 
             Spacer(Modifier.height(95.dp))
+            }
         }
 
         Box(
