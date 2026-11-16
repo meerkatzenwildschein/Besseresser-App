@@ -1,15 +1,17 @@
 package de.gurum.besseresser.ui
-import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import de.gurum.besseresser.data.BesseresserApiService
+import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.data.PromptBundle
@@ -35,7 +37,8 @@ data class MainUiState(
 class MainViewModel(
     private val apiService: BesseresserApiService,
     private val historyRepository: HistoryRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val imagePreprocessor: ImagePreprocessor
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -108,14 +111,20 @@ class MainViewModel(
         return true
     }
 
-    fun analyze(ctx: Context, settings: Settings, promptBundle: PromptBundle) {
+    fun analyze(settings: Settings, promptBundle: PromptBundle) {
         val uri = _uiState.value.photoPreviewUri ?: return
         val currentNote = _uiState.value.note.trim()
         analyzeJob?.cancel()
         analyzeJob = viewModelScope.launch {
             if (tryUseCachedEvaluation(settings)) return@launch
             _uiState.update { it.copy(isBusy = true, error = null) }
-            val res = apiService.analyze(ctx, uri, settings, promptBundle)
+            val dataUri = runCatching {
+                withContext(Dispatchers.IO) { imagePreprocessor.prepareImageDataUri(uri) }
+            }.getOrElse { e ->
+                _uiState.update { it.copy(error = e.message ?: "Foto konnte nicht gelesen werden.", isBusy = false) }
+                return@launch
+            }
+            val res = apiService.analyze(dataUri, settings, promptBundle)
             res.onSuccess { ev ->
                 if (currentNote.isNotBlank()) {
                     settingsRepository.pushRecentNote(currentNote, ev)
@@ -171,32 +180,6 @@ class MainViewModel(
         if (entryId != null) {
             viewModelScope.launch {
                 historyRepository.updateErkannt(entryId, trimmed)
-            }
-        }
-    }
-
-    fun reEvaluate(ctx: Context, settings: Settings, promptBundle: PromptBundle, newText: String) {
-        val uri = _uiState.value.photoPreviewUri ?: return
-        val currentNote = _uiState.value.note.trim()
-        analyzeJob?.cancel()
-        analyzeJob = viewModelScope.launch {
-            _uiState.update { it.copy(isBusy = true, error = null) }
-            val res = apiService.analyze(ctx, uri, settings, promptBundle)
-            res.onSuccess { ev ->
-                val merged = ev.copy(erkannt = newText.trim())
-                if (currentNote.isNotBlank()) {
-                    settingsRepository.updateRecentNoteEvaluation(currentNote, merged)
-                }
-                _uiState.update { it.copy(evaluation = merged, isBusy = false) }
-                val entryId = _uiState.value.savedEntryId
-                if (entryId != null) {
-                    val dummyEntry = HistoryEntry(id = entryId, dateMillis = System.currentTimeMillis())
-                    historyRepository.updateEvaluation(entryId, merged.goalResults, merged.summary)
-                    historyRepository.deleteDayFazitForEntry(dummyEntry)
-                    historyRepository.deleteWeekFazitForEntry(dummyEntry)
-                }
-            }.onFailure { e ->
-                _uiState.update { it.copy(error = e.message ?: "Re-Evaluation fehlgeschlagen.", isBusy = false) }
             }
         }
     }

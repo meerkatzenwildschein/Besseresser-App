@@ -28,8 +28,11 @@ import java.io.File
 import java.time.LocalDate
 import de.gurum.besseresser.data.ApiClient
 import de.gurum.besseresser.data.ApiException
+import de.gurum.besseresser.data.BackupService
+import de.gurum.besseresser.data.BackupSummary
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.DayFazitResult
+import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.model.dayFingerprint
 import de.gurum.besseresser.model.dayKeyOf
 import de.gurum.besseresser.model.Evaluation
@@ -260,16 +263,14 @@ class FakeApiService(
 ) : BesseresserApiService {
 
     override suspend fun analyze(
-        ctx: Context,
-        photoUri: Uri,
+        imageDataUri: String,
         settings: Settings,
         promptBundle: PromptBundle
     ): Result<Evaluation> = analyzeResult
 
     override suspend fun analyzeText(
-        ctx: Context,
-        settings: Settings,
-        userDescription: String
+        prompt: String,
+        settings: Settings
     ): Result<Evaluation> = analyzeResult
 
     override suspend fun dayFazit(
@@ -286,6 +287,19 @@ class FakeApiService(
 
     override suspend fun fetchModels(baseUrl: String, apiKey: String): Result<ApiClient.ModelsResult> = modelsResult
 }
+
+class FakeBackupService(
+    var importResult: Result<BackupSummary> = Result.success(BackupSummary(entriesCount = 1)),
+    var exportResult: Result<BackupSummary> = Result.success(BackupSummary(fileName = "backup.json"))
+) : BackupService {
+    override suspend fun exportToDownloads(): Result<BackupSummary> = exportResult
+    override suspend fun importFromUri(uri: Uri): Result<BackupSummary> = importResult
+}
+
+class FakeImagePreprocessor : ImagePreprocessor {
+    override fun prepareImageDataUri(photoUri: Uri, maxSide: Int): String = "data:image/jpeg;base64,fake"
+}
+
 
 // ----------------------------------------------------------------- Tests
 
@@ -370,7 +384,7 @@ class RepositoriesAndFakesTest {
         val api = FakeApiService()
         val histRepo = FakeHistoryRepository()
         val setRepo = FakeSettingsRepository()
-        val vm = MainViewModel(apiService = api, historyRepository = histRepo, settingsRepository = setRepo)
+        val vm = MainViewModel(apiService = api, historyRepository = histRepo, settingsRepository = setRepo, imagePreprocessor = FakeImagePreprocessor())
 
         vm.setNote("Leckerer Snack")
         assertEquals("Leckerer Snack", vm.uiState.value.note)
@@ -427,7 +441,7 @@ class RepositoriesAndFakesTest {
     @Test
     fun testSetupViewModelWithFakes() = runTest(testDispatcher) {
         val api = FakeApiService(splitResult = Result.success(listOf("Ziel 1", "Ziel 2")))
-        val vm = SetupViewModel(apiService = api)
+        val vm = SetupViewModel(apiService = api, backupService = FakeBackupService(), settingsRepository = FakeSettingsRepository())
 
         val initial = Settings("https://api.openai.com/v1", "key123", "gpt-4o", listOf("Z1"))
         vm.init(initial, listOf("Default Ziel"))
@@ -448,7 +462,7 @@ class RepositoriesAndFakesTest {
         val api = FakeApiService()
         val histRepo = FakeHistoryRepository()
         val setRepo = FakeSettingsRepository()
-        val vm = HistoryViewModel(apiService = api, historyRepository = histRepo, settingsRepository = setRepo)
+        val vm = HistoryViewModel(apiService = api, historyRepository = histRepo, settingsRepository = setRepo, imagePreprocessor = FakeImagePreprocessor())
 
         vm.startObserving()
         advanceUntilIdle()
@@ -470,7 +484,7 @@ class RepositoriesAndFakesTest {
             day = LocalDate.of(2026, 11, 6),
             entriesOfDay = listOf(entry),
             settings = Settings("", "", "", emptyList()),
-            profile = Profile(),
+            promptContext = null,
             mealLines = listOf("12:00 · Suppe"),
             prompts = FazitPromptBundle("Intro", "Rules", "de", "Ehrlich")
         )
@@ -542,7 +556,7 @@ class RepositoriesAndFakesTest {
         val api = FakeApiService()
         val histRepo = FakeHistoryRepository()
         val setRepo = FakeSettingsRepository()
-        val vm = MainViewModel(apiService = api, historyRepository = histRepo, settingsRepository = setRepo)
+        val vm = MainViewModel(apiService = api, historyRepository = histRepo, settingsRepository = setRepo, imagePreprocessor = FakeImagePreprocessor())
 
         val cachedEv = Evaluation(
             goalResults = listOf(GoalResult("Ziel 1", TrafficLight.GREEN, "Sehr gut")),
@@ -581,7 +595,7 @@ class RepositoriesAndFakesTest {
         val api = FakeApiService(
             splitResult = Result.failure(ApiException("HTTP 401", "Debug: Unauthorized"))
         )
-        val vm = SetupViewModel(apiService = api)
+        val vm = SetupViewModel(apiService = api, backupService = FakeBackupService(), settingsRepository = FakeSettingsRepository())
 
         vm.startSplitGoals(rawGoals = "Weniger Salz, mehr Gemüse")
         advanceUntilIdle()
@@ -624,7 +638,8 @@ class RepositoriesAndFakesTest {
         val vm = HistoryViewModel(
             apiService = FakeApiService(),
             historyRepository = histRepo,
-            settingsRepository = FakeSettingsRepository()
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor()
         )
         vm.startObserving()
 
@@ -668,7 +683,8 @@ class RepositoriesAndFakesTest {
         val vm = HistoryViewModel(
             apiService = FakeApiService(),
             historyRepository = histRepo,
-            settingsRepository = FakeSettingsRepository()
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor()
         )
         vm.startObserving()
 

@@ -132,6 +132,12 @@ object BackupLogic {
     }
 }
 
+/** Schnittstelle für Backup-Export/-Import (ermöglicht einfache Test-Fakes). */
+interface BackupService {
+    suspend fun exportToDownloads(): Result<BackupSummary>
+    suspend fun importFromUri(uri: Uri): Result<BackupSummary>
+}
+
 /** Vollständiger JSON-Export/-Import aller App-Daten (inkl. API-Key & Base64-Fotos).
  *  Zugriff auf die Datenbestände läuft ausschließlich über die injizierten Repositories. */
 class BackupManager(
@@ -141,7 +147,7 @@ class BackupManager(
     private val historyRepository: HistoryRepository,
     private val photoStorage: PhotoStorage,
     private val uiPrefsRepository: UiPrefsRepository
-) {
+) : BackupService {
 
     /** Erstellt ein vollständiges In-Memory-Backup aller aktuell gespeicherten App-Daten inkl. Fotos als Base64. */
     suspend fun createBackup(nowMillis: Long = System.currentTimeMillis()): AppBackup {
@@ -178,7 +184,7 @@ class BackupManager(
     }
 
     /** Exportiert alle App-Daten als JSON-Datei direkt in den öffentlichen Ordner „Downloads". */
-    suspend fun exportToDownloads(): Result<BackupSummary> = runCatching {
+    override suspend fun exportToDownloads(): Result<BackupSummary> = runCatching {
         val now = System.currentTimeMillis()
         val backup = createBackup(now)
         val json = BackupLogic.serializeBackup(backup)
@@ -234,7 +240,7 @@ class BackupManager(
     }
 
     /** Liest eine Backup-JSON-Datei über ihre Content-URI ein und stellt alle Daten wieder her. */
-    suspend fun importFromUri(uri: Uri): Result<BackupSummary> = runCatching {
+    override suspend fun importFromUri(uri: Uri): Result<BackupSummary> = runCatching {
         val rawJson = context.contentResolver.openInputStream(uri)?.use { input ->
             input.bufferedReader(Charsets.UTF_8).readText()
         } ?: throw IllegalStateException("Datei konnte nicht gelesen werden.")

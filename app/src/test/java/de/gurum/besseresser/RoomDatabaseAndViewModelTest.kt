@@ -16,6 +16,9 @@ import de.gurum.besseresser.ui.MainViewModel
 import de.gurum.besseresser.ui.ProfileViewModel
 import de.gurum.besseresser.data.RoomConverters
 import de.gurum.besseresser.ui.SetupViewModel
+import de.gurum.besseresser.data.BackupService
+import de.gurum.besseresser.data.BackupSummary
+import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.data.toEntity
 import de.gurum.besseresser.data.toWeekEntity
 import de.gurum.besseresser.model.TrafficLight
@@ -133,7 +136,7 @@ class RoomDatabaseAndViewModelTest {
 
     @Test
     fun testMainViewModelUiStateTransitions() {
-        val viewModel = MainViewModel(FakeApiService(), FakeHistoryRepository(), FakeSettingsRepository())
+        val viewModel = MainViewModel(FakeApiService(), FakeHistoryRepository(), FakeSettingsRepository(), FakeImagePreprocessor())
         val initial = viewModel.uiState.value
         assertNull(initial.evaluation)
         assertFalse(initial.isBusy)
@@ -159,7 +162,7 @@ class RoomDatabaseAndViewModelTest {
 
     @Test
     fun testHistoryViewModelUiStateTransitions() {
-        val viewModel = HistoryViewModel(FakeApiService(), FakeHistoryRepository(), FakeSettingsRepository())
+        val viewModel = HistoryViewModel(FakeApiService(), FakeHistoryRepository(), FakeSettingsRepository(), FakeImagePreprocessor())
         val initial = viewModel.uiState.value
         assertTrue(initial.entries.isEmpty())
         assertTrue(initial.loadingFazits.isEmpty())
@@ -202,7 +205,7 @@ class RoomDatabaseAndViewModelTest {
 
     @Test
     fun testSetupViewModelUiStateTransitions() {
-        val viewModel = SetupViewModel(FakeApiService())
+        val viewModel = SetupViewModel(FakeApiService(), FakeBackupService(), FakeSettingsRepository())
         val settings = Settings(
             baseUrl = "https://api.openai.com/v1",
             apiKey = "sk-test",

@@ -3,7 +3,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.core.content.FileProvider
@@ -40,12 +39,13 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -58,8 +58,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -67,13 +65,13 @@ import java.time.format.DateTimeFormatter
 import java.util.Date
 import java.util.Locale
 import de.gurum.besseresser.R
-import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.model.Evaluation
 import de.gurum.besseresser.model.HistoryEntry
+import de.gurum.besseresser.data.PromptBuilder
 import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.model.Settings
-import de.gurum.besseresser.data.HistoryRepository
-import de.gurum.besseresser.data.SettingsRepository
+import org.koin.androidx.compose.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 /** Offizielles Material-Design „ContentCopy"-Icon als ImageVector (ohne Abhängigkeit von material-icons-extended). */
 private val DuplicateCopyIcon: ImageVector by lazy {
@@ -125,7 +123,7 @@ internal fun buildShareText(
     if (summary.isNotBlank()) add(formatSummary(summary.trim()))
 }.joinToString("\n\n")
 
-private fun shareHistoryEntry(ctx: Context, historyRepository: HistoryRepository, entry: HistoryEntry) {
+private fun shareHistoryEntry(ctx: Context, photoFile: java.io.File?, entry: HistoryEntry) {
     val shareText = buildShareText(
         erkannt = entry.erkannt,
         summary = entry.summary,
@@ -137,7 +135,6 @@ private fun shareHistoryEntry(ctx: Context, historyRepository: HistoryRepository
         clipboard?.setPrimaryClip(ClipData.newPlainText(ctx.getString(R.string.app_name), shareText))
         Toast.makeText(ctx, ctx.getString(R.string.share_clipboard_hint), Toast.LENGTH_SHORT).show()
     }
-    val photoFile = historyRepository.photoFileOf(entry)
     val photoUri = photoFile?.let {
         runCatching {
             FileProvider.getUriForFile(ctx, "${ctx.packageName}.fileprovider", it)
@@ -165,85 +162,34 @@ private fun shareHistoryEntry(ctx: Context, historyRepository: HistoryRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> Unit) {
+fun HistoryDetailScreen(
+    entryId: Long,
+    settings: Settings,
+    onBack: () -> Unit,
+    viewModel: HistoryDetailViewModel = koinViewModel { parametersOf(entryId) }
+) {
     val ctx = LocalContext.current
-    // Übergangslösung (Phase 2): direkter Repository-/Service-Zugriff; wird in Phase 5
-    // in ein eigenes HistoryDetailViewModel verlagert.
-    val historyRepository: HistoryRepository = koinInject()
-    val settingsRepository: SettingsRepository = koinInject()
-    val apiService: BesseresserApiService = koinInject()
-    val coroutineScope = rememberCoroutineScope()
+    val detailState by viewModel.uiState.collectAsStateWithLifecycle()
+    val entry = detailState.entry ?: run {
+        // Eintrag noch nicht geladen (oder nach Löschen entfernt): zurück
+        LaunchedEffect(Unit) { onBack() }
+        return
+    }
     // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
     BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf(false) }
     var showDuplicateDatePicker by remember { mutableStateOf(false) }
     var duplicateTargetDate by remember { mutableStateOf<LocalDate?>(null) }
     var showErkanntEdit by remember { mutableStateOf(false) }
-    var reEvalBusy by remember { mutableStateOf(false) }
-    var current by remember { mutableStateOf(entry) }
-    val thumb = remember(entry.id) {
-        historyRepository.decodeThumbnail(entry, target = 1280)
+    val thumb = remember(entry.id, entry.photoFile) {
+        viewModel.thumbnail(target = 1280)
     }
 
-    /** Re-Bewertung nach erkannt-Korrektur: Mit Foto wenn vorhanden, sonst text-only.
-     *  Ziele + Gesamteindruck werden 1:1 ersetzt; Tages-/Wochenfazit werden verworfen. */
-    fun reEvaluate(correctedText: String) {
-        val photoFile = historyRepository.photoFileOf(current)
-        // Acht-Pitfall: KEIN FileProvider für gespeicherte Fotos! Dessen file_paths.xml mappt
-        // nur cache-path/photos – getUriForFile auf filesDir/history wirft IllegalArgumentException
-        // (Crash nach Pencil-OK). analyzer liest intern via openInputStream: file://-Uri reicht.
-        val photoUri = photoFile?.let { Uri.fromFile(it) }
-        reEvalBusy = true
-        val onDone: (Evaluation) -> Unit = { ev ->
-            coroutineScope.launch {
-                historyRepository.updateEvaluation(current.id, ev.goalResults, ev.summary)
-                current = current.copy(goalResults = ev.goalResults, summary = ev.summary)
-                if (current.note.isNotBlank()) {
-                    settingsRepository.updateRecentNoteEvaluation(
-                        current.note,
-                        Evaluation(
-                            goalResults = current.goalResults,
-                            summary = current.summary,
-                            erkannt = current.erkannt
-                        )
-                    )
-                }
-                historyRepository.deleteDayFazitForEntry(current)
-                historyRepository.deleteWeekFazitForEntry(current)
-                reEvalBusy = false
-            }
-        }
-        val onFail: (String) -> Unit = { msg ->
+    // Fehler aus der Re-Evaluation als Toast anzeigen
+    LaunchedEffect(detailState.error) {
+        detailState.error?.let { msg ->
             Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_LONG).show()
-            reEvalBusy = false
-        }
-        coroutineScope.launch {
-            val result = if (photoUri != null) {
-                apiService.analyze(
-                    ctx = ctx,
-                    photoUri = photoUri,
-                    settings = settings,
-                    promptBundle = PromptBundle(
-                        intro = ctx.getString(R.string.prompt_eval_intro),
-                        formatIntro = ctx.getString(R.string.prompt_eval_format),
-                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                        recognized = ctx.getString(R.string.prompt_eval_recognized),
-                        honesty = ctx.getString(R.string.prompt_honesty),
-                        noteHeader = ctx.getString(R.string.prompt_reeval_header, correctedText)
-                    )
-                )
-            } else {
-                apiService.analyzeText(
-                    ctx = ctx,
-                    settings = settings,
-                    userDescription = correctedText
-                )
-            }
-            result.onSuccess(onDone).onFailure { e ->
-                onFail(e.message ?: e.javaClass.simpleName)
-            }
+            viewModel.clearError()
         }
     }
 
@@ -255,11 +201,11 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         TopBarRow(
-            title = if (current.backdated)
-                SimpleDateFormat(DATE_FORMAT_PATTERN, Locale.getDefault()).format(Date(current.dateMillis)) +
+            title = if (entry.backdated)
+                SimpleDateFormat(DATE_FORMAT_PATTERN, Locale.getDefault()).format(Date(entry.dateMillis)) +
                     " · " + stringResource(R.string.nacherfassen_label)
             else
-                SimpleDateFormat("$DATE_FORMAT_PATTERN HH:mm", Locale.getDefault()).format(Date(current.dateMillis)),
+                SimpleDateFormat("$DATE_FORMAT_PATTERN HH:mm", Locale.getDefault()).format(Date(entry.dateMillis)),
             onBack = onBack,
             trailing = {
                 Row(
@@ -321,7 +267,7 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
             }
         }
 
-        if (reEvalBusy) {
+        if (detailState.reEvalBusy) {
             // Re-Bewertung durch KI läuft (nach erkannt-Korrektur)
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
@@ -349,16 +295,16 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
             }
         }
 
-        val canShare = thumb != null || current.erkannt.isNotBlank() || current.summary.isNotBlank()
-        if (current.summary.isNotBlank() || current.erkannt.isNotBlank() || current.note.isNotBlank()) {
+        val canShare = thumb != null || entry.erkannt.isNotBlank() || entry.summary.isNotBlank()
+        if (entry.summary.isNotBlank() || entry.erkannt.isNotBlank() || entry.note.isNotBlank()) {
             // Gleicher antipbarer Block wie in der Auswertung: 🧠 sichtbar, 🍽️/📝 einklappbar,
             // 🍽️ mit Pencil → erkannt userkorrigierbar, unten rechts Teilen-Button
             CollapsibleSummaryBlock(
-                summary = current.summary,
-                erkannt = current.erkannt,
-                note = current.note,
-                onEditErkannt = { if (current.erkannt.isNotBlank()) showErkanntEdit = true },
-                onShare = if (canShare) ({ shareHistoryEntry(ctx, historyRepository, current) }) else null
+                summary = entry.summary,
+                erkannt = entry.erkannt,
+                note = entry.note,
+                onEditErkannt = { if (entry.erkannt.isNotBlank()) showErkanntEdit = true },
+                onShare = if (canShare) ({ shareHistoryEntry(ctx, viewModel.photoFile(), entry) }) else null
             )
         }
 
@@ -374,7 +320,7 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
-            if (current.score >= 0) {
+            if (entry.score >= 0) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -385,38 +331,41 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     ScoreCircle(
-                        score = current.score,
+                        score = entry.score,
                         tooltipRes = R.string.score_tooltip_ok
                     )
                 }
             }
         }
-        current.goalResults.forEach { GoalRow(it.goal, it) }
+        entry.goalResults.forEach { GoalRow(it.goal, it) }
 
         Spacer(Modifier.height(16.dp))
     }
 
     if (showErkanntEdit) {
         ErkanntEditDialog(
-            initialText = current.erkannt,
+            initialText = entry.erkannt,
             onOk = { newText ->
                 val trimmed = newText.trim()
-                coroutineScope.launch {
-                    historyRepository.updateErkannt(current.id, trimmed)
-                    if (current.note.isNotBlank()) {
-                        settingsRepository.updateRecentNoteEvaluation(
-                            current.note,
-                            Evaluation(
-                                goalResults = current.goalResults,
-                                summary = current.summary,
-                                erkannt = current.erkannt
-                            )
-                        )
-                    }
-                }
-                current = current.copy(erkannt = trimmed)
+                viewModel.updateErkannt(trimmed)
                 showErkanntEdit = false
-                if (trimmed.isNotBlank() && !reEvalBusy) reEvaluate(trimmed)
+                if (trimmed.isNotBlank() && !detailState.reEvalBusy) {
+                    viewModel.reEvaluate(
+                        correctedText = trimmed,
+                        settings = settings,
+                        photoPromptBundle = PromptBundle(
+                            intro = ctx.getString(R.string.prompt_eval_intro),
+                            formatIntro = ctx.getString(R.string.prompt_eval_format),
+                            ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                            exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                            responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                            recognized = ctx.getString(R.string.prompt_eval_recognized),
+                            honesty = ctx.getString(R.string.prompt_honesty),
+                            noteHeader = ctx.getString(R.string.prompt_reeval_header, trimmed)
+                        ),
+                        textPrompt = PromptBuilder.createAnalyzeTextPrompt(ctx, settings.goals, trimmed)
+                    )
+                }
             },
             onDismiss = { showErkanntEdit = false }
         )
@@ -429,8 +378,7 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
             text = { Text(stringResource(R.string.history_delete_confirm_text)) },
             confirmButton = {
                 TextButton(onClick = {
-                    coroutineScope.launch {
-                        historyRepository.delete(entry)
+                    viewModel.deleteEntry {
                         confirmDelete = false
                         onBack()
                     }
@@ -506,8 +454,7 @@ fun HistoryDetailScreen(entry: HistoryEntry, settings: Settings, onBack: () -> U
                 TextButton(
                     onClick = {
                         val targetTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
-                        coroutineScope.launch {
-                            historyRepository.duplicateToDate(current, targetDay, targetTime)
+                        viewModel.duplicateToDate(targetDay, targetTime) {
                             duplicateTargetDate = null
                             val formattedDateTime = "${targetDay.format(DATE_FORMATTER)}, ${targetTime.format(DateTimeFormatter.ofPattern("HH:mm"))}"
                             Toast.makeText(

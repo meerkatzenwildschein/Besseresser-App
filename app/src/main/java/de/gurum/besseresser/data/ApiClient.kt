@@ -86,19 +86,18 @@ class ApiException(
     cause: Throwable? = null
 ) : Exception(message, cause)
 
-/** Schnittstelle für Netzwerkoperationen mit der OpenAI-kompatiblen KI-Schnittstelle. */
+/** Schnittstelle für Netzwerkoperationen mit der OpenAI-kompatiblen KI-Schnittstelle.
+ *  Bild- und Prompt-Aufbereitung liegt beim Aufrufer (kein Context nötig). */
 interface BesseresserApiService {
     suspend fun analyze(
-        ctx: Context,
-        photoUri: Uri,
+        imageDataUri: String,
         settings: Settings,
         promptBundle: PromptBundle
     ): Result<Evaluation>
 
     suspend fun analyzeText(
-        ctx: Context,
-        settings: Settings,
-        userDescription: String
+        prompt: String,
+        settings: Settings
     ): Result<Evaluation>
 
     suspend fun dayFazit(
@@ -137,13 +136,10 @@ object ApiClient : BesseresserApiService {
     // ---------------------------------------------------------------- Foto bewerten
 
     override suspend fun analyze(
-        ctx: Context,
-        photoUri: Uri,
+        imageDataUri: String,
         settings: Settings,
         promptBundle: PromptBundle
     ): Result<Evaluation> = withContext(Dispatchers.IO) {
-        val dataUriResult = runCatching { ImagePreprocessor.prepareImageDataUri(ctx, photoUri) }
-        val dataUri = dataUriResult.getOrElse { return@withContext Result.failure(it) }
         val prompt = PromptBuilder.createAnalyzePrompt(settings.goals, promptBundle)
         val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
 
@@ -151,7 +147,7 @@ object ApiClient : BesseresserApiService {
             val text = OpenAiChatClient.postChat(
                 url,
                 settings.apiKey,
-                buildAnalyzeBody(settings, prompt, dataUri, highBudgetRetry = isRetry)
+                buildAnalyzeBody(settings, prompt, imageDataUri, highBudgetRetry = isRetry)
             )
             val resp = AppJson.parseToJsonElement(text).jsonObject
             val rawContent = OpenAiChatClient.extractContent(resp)
@@ -288,11 +284,9 @@ object ApiClient : BesseresserApiService {
     // ---------------------------------------------------------------- Text-only Analyse
 
     override suspend fun analyzeText(
-        ctx: Context,
-        settings: Settings,
-        userDescription: String
+        prompt: String,
+        settings: Settings
     ): Result<Evaluation> = withContext(Dispatchers.IO) {
-        val prompt = PromptBuilder.createAnalyzeTextPrompt(ctx, settings.goals, userDescription)
         val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
         val messages = buildJsonArray {
             add(buildJsonObject {

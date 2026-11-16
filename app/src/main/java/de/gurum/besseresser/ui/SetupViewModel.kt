@@ -1,5 +1,6 @@
 package de.gurum.besseresser.ui
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,7 +10,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import de.gurum.besseresser.R
 import de.gurum.besseresser.data.ApiException
+import de.gurum.besseresser.data.BackupService
 import de.gurum.besseresser.data.BesseresserApiService
+import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.data.SplitGoalsRequest
 
@@ -29,7 +32,9 @@ data class SetupUiState(
 )
 
 class SetupViewModel(
-    private val apiService: BesseresserApiService
+    private val apiService: BesseresserApiService,
+    private val backupService: BackupService,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SetupUiState())
@@ -76,6 +81,19 @@ class SetupViewModel(
 
     fun setSplitEdited(text: String) {
         _uiState.update { it.copy(splitEdited = text) }
+    }
+
+    fun importBackup(uri: Uri, defaultGoals: List<String>, onResult: (Result<Settings>) -> Unit) {
+        viewModelScope.launch {
+            val res = backupService.importFromUri(uri)
+            res.onSuccess {
+                val updated = settingsRepository.currentSettings()
+                init(updated, defaultGoals)
+                onResult(Result.success(updated))
+            }.onFailure { e ->
+                onResult(Result.failure(e))
+            }
+        }
     }
 
     fun startSplitGoals(
