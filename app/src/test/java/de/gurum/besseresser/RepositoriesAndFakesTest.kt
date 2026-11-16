@@ -8,6 +8,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -29,50 +30,52 @@ import java.time.LocalDate
 // ----------------------------------------------------------------- In-Memory Test Fakes
 
 class FakeSettingsRepository(
-    private var settings: Settings = Settings("https://api.openai.com/v1", "test-key", "gpt-4o-mini", listOf("Ziel 1")),
-    private val recentNotesList: MutableList<RecentNote> = mutableListOf()
+    initialSettings: Settings = Settings("https://api.openai.com/v1", "test-key", "gpt-4o-mini", listOf("Ziel 1")),
+    initialRecentNotes: List<RecentNote> = emptyList()
 ) : SettingsRepository {
-    override fun load(): Settings = settings
-    override fun save(settings: Settings) {
-        this.settings = settings
+    private val settingsFlow = MutableStateFlow(initialSettings)
+    private val recentNotesFlowInternal = MutableStateFlow(initialRecentNotes)
+
+    override val settings: Flow<Settings> = settingsFlow.asStateFlow()
+    override suspend fun currentSettings(): Settings = settingsFlow.value
+    override suspend fun save(settings: Settings) {
+        settingsFlow.value = settings
     }
 
-    override fun loadRecentNotes(sortStarredFirst: Boolean): List<RecentNote> =
-        RecentNotesLogic.formatLoadedNotes(recentNotesList.toList(), sortStarredFirst)
+    override fun recentNotesFlow(sortStarredFirst: Boolean): Flow<List<RecentNote>> =
+        recentNotesFlowInternal.asStateFlow().map { RecentNotesLogic.formatLoadedNotes(it, sortStarredFirst) }
 
-    override fun pushRecentNote(note: String, evaluation: Evaluation?) {
-        val updated = RecentNotesLogic.pushNote(recentNotesList, note, evaluation)
-        recentNotesList.clear()
-        recentNotesList.addAll(updated)
+    override suspend fun loadRecentNotes(sortStarredFirst: Boolean): List<RecentNote> =
+        RecentNotesLogic.formatLoadedNotes(recentNotesFlowInternal.value, sortStarredFirst)
+
+    override suspend fun pushRecentNote(note: String, evaluation: Evaluation?) {
+        recentNotesFlowInternal.value = RecentNotesLogic.pushNote(recentNotesFlowInternal.value, note, evaluation)
     }
 
-    override fun toggleStarRecentNote(noteText: String) {
-        val updated = RecentNotesLogic.toggleStarInList(recentNotesList, noteText)
-        recentNotesList.clear()
-        recentNotesList.addAll(updated)
+    override suspend fun toggleStarRecentNote(noteText: String) {
+        recentNotesFlowInternal.value = RecentNotesLogic.toggleStarInList(recentNotesFlowInternal.value, noteText)
     }
 
-    override fun updateRecentNoteEvaluation(note: String, evaluation: Evaluation) {
-        val updated = RecentNotesLogic.updateEvaluationInList(recentNotesList, note, evaluation)
-        recentNotesList.clear()
-        recentNotesList.addAll(updated)
+    override suspend fun updateRecentNoteEvaluation(note: String, evaluation: Evaluation) {
+        recentNotesFlowInternal.value = RecentNotesLogic.updateEvaluationInList(recentNotesFlowInternal.value, note, evaluation)
     }
 
-    override fun findCachedEvaluation(note: String, goals: List<String>): Evaluation? =
-        RecentNotesLogic.findMatchingEvaluation(recentNotesList, note, goals)
+    override suspend fun findCachedEvaluation(note: String, goals: List<String>): Evaluation? =
+        RecentNotesLogic.findMatchingEvaluation(recentNotesFlowInternal.value, note, goals)
 
-    override fun saveRecentNotes(notes: List<RecentNote>) {
-        recentNotesList.clear()
-        recentNotesList.addAll(RecentNotesLogic.normalizeAndPrune(notes))
+    override suspend fun saveRecentNotes(notes: List<RecentNote>) {
+        recentNotesFlowInternal.value = RecentNotesLogic.normalizeAndPrune(notes)
     }
 }
 
 class FakeProfileRepository(
-    private var profile: Profile = Profile()
+    initialProfile: Profile = Profile()
 ) : ProfileRepository {
-    override fun load(): Profile = profile
-    override fun save(profile: Profile) {
-        this.profile = profile
+    private val profileFlow = MutableStateFlow(initialProfile)
+    override val profile: Flow<Profile> = profileFlow.asStateFlow()
+    override suspend fun currentProfile(): Profile = profileFlow.value
+    override suspend fun save(profile: Profile) {
+        profileFlow.value = profile
     }
 }
 
@@ -274,13 +277,13 @@ class RepositoriesAndFakesTest {
     }
 
     @Test
-    fun testFakeSettingsRepository() {
+    fun testFakeSettingsRepository() = runTest(testDispatcher) {
         val repo = FakeSettingsRepository()
-        val s = repo.load()
+        val s = repo.currentSettings()
         assertEquals("gpt-4o-mini", s.model)
 
         repo.save(s.copy(model = "gpt-4o"))
-        assertEquals("gpt-4o", repo.load().model)
+        assertEquals("gpt-4o", repo.currentSettings().model)
 
         repo.pushRecentNote("Kaffee")
         repo.pushRecentNote("Tee")
@@ -300,13 +303,13 @@ class RepositoriesAndFakesTest {
     }
 
     @Test
-    fun testFakeProfileRepository() {
+    fun testFakeProfileRepository() = runTest(testDispatcher) {
         val repo = FakeProfileRepository()
-        assertEquals(Profile(), repo.load())
+        assertEquals(Profile(), repo.currentProfile())
 
         val updated = Profile(birthDate = "1990-05-15", weightKg = 72.5, heightCm = 180, gender = Gender.MALE)
         repo.save(updated)
-        assertEquals(updated, repo.load())
+        assertEquals(updated, repo.currentProfile())
     }
 
     @Test
@@ -341,13 +344,6 @@ class RepositoriesAndFakesTest {
         val setRepo = FakeSettingsRepository()
         val vm = MainViewModel(apiService = api, historyRepository = histRepo, settingsRepository = setRepo)
 
-        vm.loadRecentNotes()
-        assertEquals(0, vm.uiState.value.recentNotes.size)
-
-        setRepo.pushRecentNote("Snack")
-        vm.loadRecentNotes()
-        assertEquals(1, vm.uiState.value.recentNotes.size)
-
         vm.setNote("Leckerer Snack")
         assertEquals("Leckerer Snack", vm.uiState.value.note)
 
@@ -369,7 +365,7 @@ class RepositoriesAndFakesTest {
     }
 
     @Test
-    fun testProfileViewModelWithFakes() {
+    fun testProfileViewModelWithFakes() = runTest(testDispatcher) {
         val profileRepo = FakeProfileRepository()
         val vm = ProfileViewModel(profileRepository = profileRepo)
 
@@ -393,10 +389,11 @@ class RepositoriesAndFakesTest {
         // Valid save
         vm.setHeightText("178")
         val savedOk = vm.save()
+        advanceUntilIdle()
         assertTrue(savedOk)
         assertNull(vm.uiState.value.error)
-        assertEquals(75.0, profileRepo.load().weightKg)
-        assertEquals(178, profileRepo.load().heightCm)
+        assertEquals(75.0, profileRepo.currentProfile().weightKg)
+        assertEquals(178, profileRepo.currentProfile().heightCm)
     }
 
     @Test
@@ -536,6 +533,7 @@ class RepositoriesAndFakesTest {
         // Editing "erkannt" also updates the cached evaluation on the RecentNote entry
         vm.updateErkannt(newText = "Haferflocken mit Beeren und Nüssen")
         assertEquals("Haferflocken mit Beeren und Nüssen", vm.uiState.value.evaluation?.erkannt)
+        advanceUntilIdle()
         assertEquals(
             "Haferflocken mit Beeren und Nüssen",
             setRepo.findCachedEvaluation("Haferflocken", listOf("Ziel 1"))?.erkannt
@@ -567,7 +565,7 @@ class RepositoriesAndFakesTest {
     }
 
     @Test
-    fun testProfileViewModelCommaDecimalAndEmptyFields() {
+    fun testProfileViewModelCommaDecimalAndEmptyFields() = runTest(testDispatcher) {
         val profileRepo = FakeProfileRepository()
         val vm = ProfileViewModel(profileRepository = profileRepo)
 
@@ -576,9 +574,10 @@ class RepositoriesAndFakesTest {
         vm.setHeightText("180")
         vm.setNotesText("  Kein Zucker  ")
         assertTrue(vm.save())
-        assertEquals(74.5, profileRepo.load().weightKg ?: 0.0, 0.001)
-        assertEquals(180, profileRepo.load().heightCm)
-        assertEquals("Kein Zucker", profileRepo.load().notes)
+        advanceUntilIdle()
+        assertEquals(74.5, profileRepo.currentProfile().weightKg ?: 0.0, 0.001)
+        assertEquals(180, profileRepo.currentProfile().heightCm)
+        assertEquals("Kein Zucker", profileRepo.currentProfile().notes)
 
         // Clearing all optional fields is valid
         vm.setWeightText("")
@@ -587,7 +586,8 @@ class RepositoriesAndFakesTest {
         vm.setNotesText("")
         vm.setGender(Gender.NONE)
         assertTrue(vm.save())
-        assertTrue(profileRepo.load().isEmpty)
+        advanceUntilIdle()
+        assertTrue(profileRepo.currentProfile().isEmpty)
     }
 
     @Test

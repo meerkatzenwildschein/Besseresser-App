@@ -44,6 +44,7 @@ val cameraVersion = "1.4.2"
 val kotlinxSerializationVersion = "1.7.3"
 val roomVersion = "2.6.1"
 val koinVersion = "4.0.4"
+val datastoreVersion = "1.1.1"
 val junitVersion = "4.13.2"
 
 android {
@@ -124,6 +125,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
     implementation("io.insert-koin:koin-android:$koinVersion")
     implementation("io.insert-koin:koin-androidx-compose:$koinVersion")
+    implementation("androidx.datastore:datastore-preferences:$datastoreVersion")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:$junitVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")

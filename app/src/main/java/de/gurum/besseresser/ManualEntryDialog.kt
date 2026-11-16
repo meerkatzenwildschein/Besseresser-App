@@ -284,26 +284,26 @@ fun BackdatedOverlays(
             onConfirm = {
                 onDismissCamera()
                 val trimmedNote = addNote.trim()
-                val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
-                if (cachedEv != null) {
-                    settingsRepository.pushRecentNote(trimmedNote, cachedEv)
-                    onSaveBackdated(cachedEv, addPhotoUri)
-                } else {
-                    settingsRepository.pushRecentNote(trimmedNote)
-                    onSetBusy(true)
-                    val prompts = PromptBundle(
-                        intro = ctx.getString(R.string.prompt_eval_intro),
-                        formatIntro = ctx.getString(R.string.prompt_eval_format),
-                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                        recognized = ctx.getString(R.string.prompt_eval_recognized),
-                        honesty = ctx.getString(R.string.prompt_honesty),
-                        noteHeader = if (trimmedNote.isNotBlank())
-                            ctx.getString(R.string.prompt_note_header, trimmedNote)
-                        else ""
-                    )
-                    coroutineScope.launch {
+                coroutineScope.launch {
+                    val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
+                    if (cachedEv != null) {
+                        settingsRepository.pushRecentNote(trimmedNote, cachedEv)
+                        onSaveBackdated(cachedEv, addPhotoUri)
+                    } else {
+                        settingsRepository.pushRecentNote(trimmedNote)
+                        onSetBusy(true)
+                        val prompts = PromptBundle(
+                            intro = ctx.getString(R.string.prompt_eval_intro),
+                            formatIntro = ctx.getString(R.string.prompt_eval_format),
+                            ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                            exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                            responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                            recognized = ctx.getString(R.string.prompt_eval_recognized),
+                            honesty = ctx.getString(R.string.prompt_honesty),
+                            noteHeader = if (trimmedNote.isNotBlank())
+                                ctx.getString(R.string.prompt_note_header, trimmedNote)
+                            else ""
+                        )
                         val result = apiService.analyze(
                             ctx = ctx,
                             photoUri = addPhotoUri,
@@ -333,26 +333,26 @@ fun BackdatedOverlays(
             busy = showBusy,
             onRate = {
                 val trimmedNote = addNote.trim()
-                val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
-                if (cachedEv != null) {
-                    settingsRepository.pushRecentNote(trimmedNote, cachedEv)
-                    onSaveBackdated(cachedEv, addPhotoUri)
-                } else {
-                    settingsRepository.pushRecentNote(trimmedNote)
-                    onSetBusy(true)
-                    val prompts = PromptBundle(
-                        intro = ctx.getString(R.string.prompt_eval_intro),
-                        formatIntro = ctx.getString(R.string.prompt_eval_format),
-                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                        recognized = ctx.getString(R.string.prompt_eval_recognized),
-                        honesty = ctx.getString(R.string.prompt_honesty),
-                        noteHeader = if (trimmedNote.isNotBlank())
-                            ctx.getString(R.string.prompt_note_header, trimmedNote)
-                        else ""
-                    )
-                    coroutineScope.launch {
+                coroutineScope.launch {
+                    val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
+                    if (cachedEv != null) {
+                        settingsRepository.pushRecentNote(trimmedNote, cachedEv)
+                        onSaveBackdated(cachedEv, addPhotoUri)
+                    } else {
+                        settingsRepository.pushRecentNote(trimmedNote)
+                        onSetBusy(true)
+                        val prompts = PromptBundle(
+                            intro = ctx.getString(R.string.prompt_eval_intro),
+                            formatIntro = ctx.getString(R.string.prompt_eval_format),
+                            ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                            exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                            responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                            recognized = ctx.getString(R.string.prompt_eval_recognized),
+                            honesty = ctx.getString(R.string.prompt_honesty),
+                            noteHeader = if (trimmedNote.isNotBlank())
+                                ctx.getString(R.string.prompt_note_header, trimmedNote)
+                            else ""
+                        )
                         val result = apiService.analyze(
                             ctx = ctx,
                             photoUri = addPhotoUri,
@@ -382,14 +382,14 @@ fun BackdatedOverlays(
             busy = showBusy,
             onSend = {
                 val trimmedNote = addNote.trim()
-                val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
-                if (cachedEv != null) {
-                    settingsRepository.pushRecentNote(trimmedNote, cachedEv)
-                    onSaveBackdated(cachedEv, null)
-                } else {
-                    settingsRepository.pushRecentNote(trimmedNote)
-                    onSetBusy(true)
-                    coroutineScope.launch {
+                coroutineScope.launch {
+                    val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
+                    if (cachedEv != null) {
+                        settingsRepository.pushRecentNote(trimmedNote, cachedEv)
+                        onSaveBackdated(cachedEv, null)
+                    } else {
+                        settingsRepository.pushRecentNote(trimmedNote)
+                        onSetBusy(true)
                         val result = apiService.analyzeText(
                             ctx = ctx,
                             settings = settings,

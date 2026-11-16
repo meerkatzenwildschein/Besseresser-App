@@ -23,8 +23,7 @@ data class MainUiState(
     val showCamera: Boolean = false,
     val showErkanntEdit: Boolean = false,
     val savedEntryId: Long? = null,
-    val menuOpen: Boolean = false,
-    val recentNotes: List<RecentNote> = emptyList()
+    val menuOpen: Boolean = false
 )
 
 class MainViewModel(
@@ -38,22 +37,10 @@ class MainViewModel(
 
     private var analyzeJob: Job? = null
 
-    fun loadRecentNotes() {
-        _uiState.update { it.copy(recentNotes = settingsRepository.loadRecentNotes()) }
-    }
-
-    fun toggleStarNote(noteText: String) {
-        settingsRepository.toggleStarRecentNote(noteText)
-        _uiState.update {
-            it.copy(recentNotes = settingsRepository.loadRecentNotes(sortStarredFirst = false))
-        }
-    }
-
     /** MRU-Bump einer Anmerkung (ohne KI-Ergebnis), z. B. beim Start einer Analyse. */
     fun pushRecentNote(note: String) {
         if (note.isBlank()) return
-        settingsRepository.pushRecentNote(note)
-        _uiState.update { it.copy(recentNotes = settingsRepository.loadRecentNotes()) }
+        viewModelScope.launch { settingsRepository.pushRecentNote(note) }
     }
 
     fun setNote(note: String) {
@@ -100,18 +87,16 @@ class MainViewModel(
 
     /** Prüft, ob für die aktuelle Anmerkung bereits eine gültige KI-Bewertung im Menü-Speicher
      *  vorliegt, die zu [settings.goals] passt. Falls ja, wird sie direkt übernommen (ohne KI-Aufruf). */
-    fun tryUseCachedEvaluation(settings: Settings): Boolean {
+    suspend fun tryUseCachedEvaluation(settings: Settings): Boolean {
         val currentNote = _uiState.value.note.trim()
         val cachedEv = settingsRepository.findCachedEvaluation(currentNote, settings.goals) ?: return false
         analyzeJob?.cancel()
         settingsRepository.pushRecentNote(currentNote, cachedEv)
-        val updatedNotes = settingsRepository.loadRecentNotes()
         _uiState.update {
             it.copy(
                 evaluation = cachedEv,
                 isBusy = false,
-                error = null,
-                recentNotes = updatedNotes
+                error = null
             )
         }
         return true
@@ -119,18 +104,17 @@ class MainViewModel(
 
     fun analyze(ctx: Context, settings: Settings, promptBundle: PromptBundle) {
         val uri = _uiState.value.photoPreviewUri ?: return
-        if (tryUseCachedEvaluation(settings)) return
         val currentNote = _uiState.value.note.trim()
         analyzeJob?.cancel()
         analyzeJob = viewModelScope.launch {
+            if (tryUseCachedEvaluation(settings)) return@launch
             _uiState.update { it.copy(isBusy = true, error = null) }
             val res = apiService.analyze(ctx, uri, settings, promptBundle)
             res.onSuccess { ev ->
                 if (currentNote.isNotBlank()) {
                     settingsRepository.pushRecentNote(currentNote, ev)
                 }
-                val updatedNotes = settingsRepository.loadRecentNotes()
-                _uiState.update { it.copy(evaluation = ev, isBusy = false, recentNotes = updatedNotes) }
+                _uiState.update { it.copy(evaluation = ev, isBusy = false) }
             }.onFailure { e ->
                 _uiState.update { it.copy(error = e.message ?: "Analyse fehlgeschlagen.", isBusy = false) }
             }
@@ -152,13 +136,11 @@ class MainViewModel(
             historyRepository.deleteDayFazitForEntry(entry)
             historyRepository.deleteWeekFazitForEntry(entry)
             settingsRepository.pushRecentNote(note, ev)
-            val updatedNotes = settingsRepository.loadRecentNotes()
             _uiState.update {
                 it.copy(
                     savingHistory = false,
                     savedToHistory = true,
-                    savedEntryId = entry.id,
-                    recentNotes = updatedNotes
+                    savedEntryId = entry.id
                 )
             }
             onSaved(entry)
@@ -176,8 +158,9 @@ class MainViewModel(
         }
         val evToSave = updatedEv
         if (evToSave != null && currentNote.isNotBlank()) {
-            settingsRepository.updateRecentNoteEvaluation(currentNote, evToSave)
-            _uiState.update { it.copy(recentNotes = settingsRepository.loadRecentNotes()) }
+            viewModelScope.launch {
+                settingsRepository.updateRecentNoteEvaluation(currentNote, evToSave)
+            }
         }
         if (entryId != null) {
             viewModelScope.launch {
@@ -198,8 +181,7 @@ class MainViewModel(
                 if (currentNote.isNotBlank()) {
                     settingsRepository.updateRecentNoteEvaluation(currentNote, merged)
                 }
-                val updatedNotes = settingsRepository.loadRecentNotes()
-                _uiState.update { it.copy(evaluation = merged, isBusy = false, recentNotes = updatedNotes) }
+                _uiState.update { it.copy(evaluation = merged, isBusy = false) }
                 val entryId = _uiState.value.savedEntryId
                 if (entryId != null) {
                     val dummyEntry = HistoryEntry(id = entryId, dateMillis = System.currentTimeMillis())
@@ -215,10 +197,6 @@ class MainViewModel(
 
     fun reset() {
         analyzeJob?.cancel()
-        _uiState.update {
-            MainUiState(
-                recentNotes = it.recentNotes
-            )
-        }
+        _uiState.update { MainUiState() }
     }
 }

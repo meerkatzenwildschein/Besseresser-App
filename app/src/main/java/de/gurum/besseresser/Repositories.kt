@@ -3,8 +3,17 @@ package de.gurum.besseresser
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.SharedPreferencesMigration
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -16,20 +25,43 @@ import java.time.ZoneId
 // ----------------------------------------------------------------- Repository Interfaces
 
 interface SettingsRepository {
-    fun load(): Settings
-    fun save(settings: Settings)
-    fun loadRecentNotes(sortStarredFirst: Boolean = true): List<RecentNote>
-    fun pushRecentNote(note: String, evaluation: Evaluation? = null)
-    fun toggleStarRecentNote(noteText: String)
-    fun updateRecentNoteEvaluation(note: String, evaluation: Evaluation)
-    fun findCachedEvaluation(note: String, goals: List<String>): Evaluation?
-    fun saveRecentNotes(notes: List<RecentNote>)
+    val settings: Flow<Settings>
+    suspend fun currentSettings(): Settings
+    suspend fun save(settings: Settings)
+    fun recentNotesFlow(sortStarredFirst: Boolean = true): Flow<List<RecentNote>>
+    suspend fun loadRecentNotes(sortStarredFirst: Boolean = true): List<RecentNote>
+    suspend fun pushRecentNote(note: String, evaluation: Evaluation? = null)
+    suspend fun toggleStarRecentNote(noteText: String)
+    suspend fun updateRecentNoteEvaluation(note: String, evaluation: Evaluation)
+    suspend fun findCachedEvaluation(note: String, goals: List<String>): Evaluation?
+    suspend fun saveRecentNotes(notes: List<RecentNote>)
 }
 
 interface ProfileRepository {
-    fun load(): Profile
-    fun save(profile: Profile)
+    val profile: Flow<Profile>
+    suspend fun currentProfile(): Profile
+    suspend fun save(profile: Profile)
 }
+
+interface UiPrefsRepository {
+    val themeMode: Flow<AppThemeMode>
+    val language: Flow<AppLanguage>
+    suspend fun currentThemeMode(): AppThemeMode
+    suspend fun currentLanguage(): AppLanguage
+    suspend fun saveThemeMode(mode: AppThemeMode)
+    suspend fun saveLanguage(language: AppLanguage)
+}
+
+// ----------------------------------------------------------------- DataStore (mit SharedPreferences-Migration)
+
+/** Gemeinsame Preferences-DataStore für Einstellungen, Profil, Notizen und UI-Prefs.
+ *  Bestehende SharedPreferences ("besseresser_prefs") werden einmalig migriert. */
+val Context.appDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = BETTERESSER_PREFS,
+    produceMigrations = { context ->
+        listOf(SharedPreferencesMigration(context, BETTERESSER_PREFS))
+    }
+)
 
 interface HistoryRepository {
     fun ensureMigrated()
@@ -64,47 +96,68 @@ interface HistoryRepository {
     fun decodeThumbnail(entry: HistoryEntry, target: Int = 200): Bitmap?
 }
 
-// ----------------------------------------------------------------- Settings (SharedPreferences + KeyVault)
+// ----------------------------------------------------------------- Settings (DataStore + KeyVault)
 
-class DefaultSettingsRepository(private val context: Context) : SettingsRepository {
+class DefaultSettingsRepository(private val dataStore: DataStore<Preferences>) : SettingsRepository {
 
-    override fun load(): Settings {
-        val p = context.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
-        val goals = (p.getString(KEY_GOALS, "") ?: "").split("\n")
+    private object Keys {
+        val BASE_URL = stringPreferencesKey("baseUrl")
+        val API_KEY = stringPreferencesKey("apiKey")
+        val MODEL = stringPreferencesKey("model")
+        val GOALS = stringPreferencesKey("goals")
+        val GOALS_WERE_SPLIT = booleanPreferencesKey("goalsWereSplit")
+        val RECENT_NOTES = stringPreferencesKey("recentNotes")
+        const val DEFAULT_MODEL = "gpt-4o-mini"
+    }
+
+    override val settings: Flow<Settings> = dataStore.data.map { p -> p.toSettings() }
+
+    private fun Preferences.toSettings(): Settings {
+        val goals = (this[Keys.GOALS] ?: "").split("\n")
             .map { it.trim() }
             .filter { it.isNotBlank() }
         return Settings(
-            baseUrl = p.getString(KEY_BASE_URL, "") ?: "",
-            apiKey = p.getString(KEY_API_KEY, null)?.let { KeyVault.decrypt(it) } ?: "",
-            model = p.getString(KEY_MODEL, DEFAULT_MODEL) ?: DEFAULT_MODEL,
+            baseUrl = this[Keys.BASE_URL] ?: "",
+            apiKey = this[Keys.API_KEY]?.let { KeyVault.decrypt(it) } ?: "",
+            model = this[Keys.MODEL] ?: Keys.DEFAULT_MODEL,
             goals = goals,
-            goalsWereSplit = p.getBoolean(KEY_GOALS_WERE_SPLIT, false)
+            goalsWereSplit = this[Keys.GOALS_WERE_SPLIT] ?: false
         )
     }
 
-    override fun save(settings: Settings) {
-        context.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY_BASE_URL, settings.baseUrl.trim())
-            .putString(KEY_API_KEY, KeyVault.encrypt(settings.apiKey.trim()))
-            .putString(KEY_MODEL, settings.model.trim())
-            .putString(KEY_GOALS, settings.goals.joinToString("\n"))
-            .putBoolean(KEY_GOALS_WERE_SPLIT, settings.goalsWereSplit)
-            .apply()
+    override suspend fun currentSettings(): Settings = dataStore.data.first().toSettings()
+
+    override suspend fun save(settings: Settings) {
+        dataStore.edit { p ->
+            p[Keys.BASE_URL] = settings.baseUrl.trim()
+            p[Keys.API_KEY] = KeyVault.encrypt(settings.apiKey.trim())
+            p[Keys.MODEL] = settings.model.trim()
+            p[Keys.GOALS] = settings.goals.joinToString("\n")
+            p[Keys.GOALS_WERE_SPLIT] = settings.goalsWereSplit
+        }
     }
 
     // ----------------------------------------------------------------- Notiz-Schnellauswahl
 
-    override fun loadRecentNotes(sortStarredFirst: Boolean): List<RecentNote> = runCatching {
-        val raw = context.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
-            .getString(KEY_RECENT_NOTES, null) ?: return emptyList()
-        val parsed = RecentNotesLogic.parseRecentNotes(raw)
-        RecentNotesLogic.formatLoadedNotes(parsed, sortStarredFirst)
-    }.getOrDefault(emptyList())
+    override fun recentNotesFlow(sortStarredFirst: Boolean): Flow<List<RecentNote>> =
+        dataStore.data.map { p ->
+            val raw = p[Keys.RECENT_NOTES] ?: return@map emptyList()
+            runCatching {
+                RecentNotesLogic.formatLoadedNotes(RecentNotesLogic.parseRecentNotes(raw), sortStarredFirst)
+            }.getOrDefault(emptyList())
+        }
+
+    override suspend fun loadRecentNotes(sortStarredFirst: Boolean): List<RecentNote> {
+        val raw = dataStore.data.first()[Keys.RECENT_NOTES] ?: return emptyList()
+        return runCatching {
+            RecentNotesLogic.formatLoadedNotes(RecentNotesLogic.parseRecentNotes(raw), sortStarredFirst)
+        }.getOrDefault(emptyList())
+    }
 
     /** Nach vorne stellen (Dedup); unmarkierte rotieren max. 5 nach MRU, älteste fliegt raus.
      *  Sternchen-Einträge bleiben dauerhaft erhalten (bis abgewählt) und verlieren ihren Stern
      *  auch bei erneuter Nutzung / Speicherung keinesfalls. */
-    override fun pushRecentNote(note: String, evaluation: Evaluation?) {
+    override suspend fun pushRecentNote(note: String, evaluation: Evaluation?) {
         val t = note.trim()
         if (t.isBlank()) return
         val all = loadRecentNotes(sortStarredFirst = false)
@@ -114,7 +167,7 @@ class DefaultSettingsRepository(private val context: Context) : SettingsReposito
     /** Sternchen umschalten (beim Antippen des Sterns im Dropdown) — OHNE Neusortierung:
      *  der Eintrag bleibt an seiner Stelle stehen; die Anzeige sortiert (Sternchen oben)
      *  erst beim nächsten Öffnen der Liste. Persistenz folgt der neuen Markierung. */
-    override fun toggleStarRecentNote(noteText: String) {
+    override suspend fun toggleStarRecentNote(noteText: String) {
         val t = noteText.trim()
         if (t.isBlank()) return
         val list = RecentNotesLogic.toggleStarInList(loadRecentNotes(sortStarredFirst = false), t)
@@ -123,7 +176,7 @@ class DefaultSettingsRepository(private val context: Context) : SettingsReposito
 
     /** Aktualisiert die gespeicherte KI-Antwort eines bestehenden Menü-Eintrags, ohne Reihenfolge
      *  oder Stern-Status zu ändern. */
-    override fun updateRecentNoteEvaluation(note: String, evaluation: Evaluation) {
+    override suspend fun updateRecentNoteEvaluation(note: String, evaluation: Evaluation) {
         val t = note.trim()
         if (t.isBlank()) return
         val current = loadRecentNotes(sortStarredFirst = false)
@@ -132,66 +185,85 @@ class DefaultSettingsRepository(private val context: Context) : SettingsReposito
     }
 
     /** Sucht in den gespeicherten Menü-Einträgen nach einer passenden KI-Bewertung für [note] und [goals]. */
-    override fun findCachedEvaluation(note: String, goals: List<String>): Evaluation? =
+    override suspend fun findCachedEvaluation(note: String, goals: List<String>): Evaluation? =
         RecentNotesLogic.findMatchingEvaluation(loadRecentNotes(sortStarredFirst = false), note, goals)
 
     /** Sichtbaren Zustand persistieren (vom UI geführt, damit Klicks nichts umsortieren). */
-    override fun saveRecentNotes(notes: List<RecentNote>) {
+    override suspend fun saveRecentNotes(notes: List<RecentNote>) {
         writeRecentNotes(notes)
     }
 
-    private fun writeRecentNotes(notes: List<RecentNote>) {
-        val items = RecentNotesLogic.normalizeAndPrune(notes)
-        val json = AppJson.encodeToString(items)
-        context.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY_RECENT_NOTES, json)
-            .apply()
-    }
-
-    companion object {
-        private const val KEY_BASE_URL = "baseUrl"
-        private const val KEY_API_KEY = "apiKey"
-        private const val KEY_MODEL = "model"
-        private const val KEY_GOALS = "goals"
-        private const val KEY_GOALS_WERE_SPLIT = "goalsWereSplit"
-        private const val KEY_RECENT_NOTES = "recentNotes"
-        private const val DEFAULT_MODEL = "gpt-4o-mini"
+    private suspend fun writeRecentNotes(notes: List<RecentNote>) {
+        val json = AppJson.encodeToString(RecentNotesLogic.normalizeAndPrune(notes))
+        dataStore.edit { p -> p[Keys.RECENT_NOTES] = json }
     }
 }
 
-// ----------------------------------------------------------------- Profil (SharedPreferences)
+// ----------------------------------------------------------------- Profil (DataStore)
 
-class DefaultProfileRepository(private val context: Context) : ProfileRepository {
+class DefaultProfileRepository(private val dataStore: DataStore<Preferences>) : ProfileRepository {
 
-    override fun load(): Profile {
-        val p = context.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
-        return Profile(
-            birthDate = p.getString(KEY_BIRTH_DATE, null)?.takeIf { it.isNotBlank() },
-            weightKg = p.getString(KEY_WEIGHT, null)
-                ?.replace(',', '.')?.toDoubleOrNull()?.takeIf { it > 0 },
-            heightCm = p.getInt(KEY_HEIGHT, -1).takeIf { it > 0 },
-            notes = p.getString(KEY_NOTES, "") ?: "",
-            gender = Gender.fromString(p.getString(KEY_GENDER, null))
-        )
+    private object Keys {
+        val BIRTH_DATE = stringPreferencesKey("birthDate")
+        val WEIGHT = stringPreferencesKey("profileWeight")
+        val HEIGHT = intPreferencesKey("profileHeight")
+        val NOTES = stringPreferencesKey("profileNotes")
+        val GENDER = stringPreferencesKey("profileGender")
     }
 
-    /** Leere Eingaben speichern als "nicht gesetzt" – das Profil darf komplett leer bleiben. */
-    override fun save(profile: Profile) {
-        context.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY_BIRTH_DATE, profile.birthDate?.takeIf { it.isNotBlank() })
-            .putString(KEY_WEIGHT, profile.weightKg?.toString())
-            .putInt(KEY_HEIGHT, profile.heightCm ?: -1)
-            .putString(KEY_NOTES, profile.notes.trim())
-            .putString(KEY_GENDER, profile.gender.rawValue)
-            .apply()
+    override val profile: Flow<Profile> = dataStore.data.map { p -> p.toProfile() }
+
+    private fun Preferences.toProfile(): Profile = Profile(
+        birthDate = this[Keys.BIRTH_DATE]?.takeIf { it.isNotBlank() },
+        weightKg = this[Keys.WEIGHT]?.replace(',', '.')?.toDoubleOrNull()?.takeIf { it > 0 },
+        heightCm = this[Keys.HEIGHT]?.takeIf { it > 0 },
+        notes = this[Keys.NOTES] ?: "",
+        gender = Gender.fromString(this[Keys.GENDER])
+    )
+
+    override suspend fun currentProfile(): Profile = dataStore.data.first().toProfile()
+
+    /** Leere Eingaben speichern als "nicht gesetzt" – das Profil darf komplett leer bleiben.
+     *  (birthDate/weight bleiben bei "nicht gesetzt" als leere Strings erhalten, height als -1 –
+     *  identisch zur früheren SharedPreferences-Schreibweise.) */
+    override suspend fun save(profile: Profile) {
+        dataStore.edit { p ->
+            p[Keys.BIRTH_DATE] = profile.birthDate?.takeIf { it.isNotBlank() } ?: ""
+            p[Keys.WEIGHT] = profile.weightKg?.toString() ?: ""
+            p[Keys.HEIGHT] = profile.heightCm ?: -1
+            p[Keys.NOTES] = profile.notes.trim()
+            p[Keys.GENDER] = profile.gender.rawValue
+        }
+    }
+}
+
+// ----------------------------------------------------------------- UI-Einstellungen (DataStore)
+
+class DefaultUiPrefsRepository(private val dataStore: DataStore<Preferences>) : UiPrefsRepository {
+
+    private object Keys {
+        val THEME = stringPreferencesKey("appThemeMode")
+        val LANGUAGE = stringPreferencesKey("appLanguage")
     }
 
-    companion object {
-        private const val KEY_BIRTH_DATE = "birthDate"
-        private const val KEY_WEIGHT = "profileWeight"
-        private const val KEY_HEIGHT = "profileHeight"
-        private const val KEY_NOTES = "profileNotes"
-        private const val KEY_GENDER = "profileGender"
+    override val themeMode: Flow<AppThemeMode> = dataStore.data.map { p ->
+        AppThemeMode.fromString(p[Keys.THEME])
+    }
+
+    override val language: Flow<AppLanguage> = dataStore.data.map { p ->
+        AppLanguage.resolve(p[Keys.LANGUAGE])
+    }
+
+    override suspend fun currentThemeMode(): AppThemeMode = themeMode.first()
+
+    override suspend fun currentLanguage(): AppLanguage = language.first()
+
+    override suspend fun saveThemeMode(mode: AppThemeMode) {
+        dataStore.edit { p -> p[Keys.THEME] = mode.rawValue }
+    }
+
+    override suspend fun saveLanguage(language: AppLanguage) {
+        dataStore.edit { p -> p[Keys.LANGUAGE] = language.rawValue }
     }
 }
 

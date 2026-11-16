@@ -42,7 +42,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
-import org.koin.compose.koinInject
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.runBlocking
+import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
 
 // ----------------------------------------------------------------- Farb- & Form-Theme (Besseresser)
@@ -115,8 +117,13 @@ private val BesseresserShapes = Shapes(
 enum class AppScreen(val order: Int) { Main(0), Profile(1), History(1), Config(1), Detail(2) }
 
 class MainActivity : ComponentActivity() {
+
+    private val uiPrefsRepository: UiPrefsRepository by inject()
+
     override fun attachBaseContext(newBase: Context) {
-        val lang = UiPrefsStore.loadLanguage(newBase)
+        // Einmaliger synchroner Sprach-Read beim Activity-Start (Koin läuft bereits);
+        // danach fließt die Sprache reaktiv über den AppStateViewModel.
+        val lang = runBlocking { uiPrefsRepository.currentLanguage() }
         super.attachBaseContext(newBase.withAppLanguage(lang))
     }
 
@@ -130,18 +137,18 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GesundEssenApp() {
     val baseCtx = LocalContext.current
-    var themeMode by remember { mutableStateOf(UiPrefsStore.loadThemeMode(baseCtx)) }
-    var appLanguage by remember { mutableStateOf(UiPrefsStore.loadLanguage(baseCtx)) }
+    val appStateViewModel: AppStateViewModel = koinViewModel()
+    val appState by appStateViewModel.uiState.collectAsStateWithLifecycle()
 
-    val localizedCtx = remember(baseCtx, appLanguage) {
-        baseCtx.withAppLanguage(appLanguage)
+    val localizedCtx = remember(baseCtx, appState.language) {
+        baseCtx.withAppLanguage(appState.language)
     }
     val localizedConfig = remember(localizedCtx) {
         localizedCtx.resources.configuration
     }
 
     val systemDark = isSystemInDarkTheme()
-    val darkTheme = when (themeMode) {
+    val darkTheme = when (appState.themeMode) {
         AppThemeMode.LIGHT -> false
         AppThemeMode.DARK -> true
         AppThemeMode.SYSTEM -> systemDark
@@ -170,59 +177,43 @@ fun GesundEssenApp() {
                 color = MaterialTheme.colorScheme.background
             ) {
                 Box(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
-                val ctx = LocalContext.current
-                // Übergangslösung (Phase 2): direkter Repository-Zugriff; wird in Phase 3/5
-                // durch Flow-basierte State-Hoistings in ViewModels ersetzt.
-                val settingsRepository: SettingsRepository = koinInject()
-                val profileRepository: ProfileRepository = koinInject()
-                var loaded by remember { mutableStateOf(false) }
                 var showSetup by remember { mutableStateOf(true) }
-                var settings by remember { mutableStateOf(Settings("", "", "", emptyList())) }
                 var showHistory by remember { mutableStateOf(false) }
                 var historyEntry by remember { mutableStateOf<HistoryEntry?>(null) }
                 var showProfile by remember { mutableStateOf(false) }
                 var showConfig by remember { mutableStateOf(false) }
-                var profile by remember { mutableStateOf(Profile()) }
                 val mainViewModel: MainViewModel = koinViewModel()
 
-                LaunchedEffect(Unit) {
-                    settings = settingsRepository.load()
-                    profile = profileRepository.load()
-                    showSetup = !settings.isComplete
-                    loaded = true
+                // Einmalig nach dem ersten Laden der App-Daten entscheiden, ob das Setup nötig ist.
+                LaunchedEffect(appState.loaded) {
+                    if (appState.loaded) showSetup = !appState.settings.isComplete
                 }
 
                 // Einstellungs-Overlay über einem bestehenden Setup: Android-Zurück schließt
                 // es (wie der Zurückpfeil). Beim Erst-Setup (unvollständig) bleibt Zurück = App beenden.
-                if (loaded && showSetup && settings.isComplete) {
+                if (appState.loaded && showSetup && appState.settings.isComplete) {
                     BackHandler { showSetup = false }
                 }
 
                 when {
-                    !loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    !appState.loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
                     showSetup -> SetupScreen(
-                        initial = settings,
-                        firstRun = !settings.isComplete,
+                        initial = appState.settings,
+                        firstRun = !appState.settings.isComplete,
                         onCancel = {
-                            if (settings.isComplete) showSetup = false
+                            if (appState.settings.isComplete) showSetup = false
                             else (baseCtx as? Activity)?.finish()
                         },
                         onDone = { neu ->
-                            val firstRun = !settings.isComplete
-                            settingsRepository.save(neu)
-                            settings = neu
+                            val firstRun = !appState.settings.isComplete
+                            appStateViewModel.saveSettings(neu)
                             showSetup = false
                             // Nach dem ERSTEN Erfassen der KI-Zugangsdaten einmalig das Profil öffnen
                             if (firstRun) showProfile = true
                         },
-                        onBackupImported = { importedSettings, importedProfile ->
-                            settings = importedSettings
-                            profile = importedProfile
-                            themeMode = UiPrefsStore.loadThemeMode(ctx)
-                            appLanguage = UiPrefsStore.loadLanguage(ctx)
-                            mainViewModel.loadRecentNotes()
+                        onBackupImported = { importedSettings ->
                             if (importedSettings.isComplete) {
                                 showSetup = false
                                 showProfile = false
@@ -259,7 +250,7 @@ fun GesundEssenApp() {
                         ) { s ->
                             when (s) {
                                 AppScreen.Main -> MainScreen(
-                                    settings = settings,
+                                    settings = appState.settings,
                                     onEditSettings = { showSetup = true },
                                     onOpenProfile = { showProfile = true },
                                     onOpenHistory = {
@@ -270,41 +261,28 @@ fun GesundEssenApp() {
                                     viewModel = mainViewModel
                                 )
                                 AppScreen.Profile -> ProfileScreen(
-                                    initial = profile,
+                                    initial = appState.profile,
                                     onCancel = { showProfile = false },
                                     onSave = { p ->
-                                        profileRepository.save(p)
-                                        profile = p
+                                        appStateViewModel.saveProfile(p)
                                         showProfile = false
                                     }
                                 )
                                 AppScreen.Config -> ConfigScreen(
-                                    themeMode = themeMode,
-                                    onThemeModeChange = { newMode ->
-                                        UiPrefsStore.saveThemeMode(ctx, newMode)
-                                        themeMode = newMode
-                                    },
-                                    appLanguage = appLanguage,
-                                    onLanguageChange = { newLang ->
-                                        UiPrefsStore.saveLanguage(ctx, newLang)
-                                        appLanguage = newLang
-                                    },
+                                    themeMode = appState.themeMode,
+                                    onThemeModeChange = { appStateViewModel.setThemeMode(it) },
+                                    appLanguage = appState.language,
+                                    onLanguageChange = { appStateViewModel.setLanguage(it) },
                                     onBack = { showConfig = false },
-                                    onDataImported = { importedSettings, importedProfile ->
-                                        settings = importedSettings
-                                        profile = importedProfile
-                                        themeMode = UiPrefsStore.loadThemeMode(ctx)
-                                        appLanguage = UiPrefsStore.loadLanguage(ctx)
-                                        mainViewModel.loadRecentNotes()
-                                    },
+                                    onDataImported = { },
                                     onHistoryCleared = {
                                         historyEntry = null
                                         mainViewModel.reset()
                                     }
                                 )
                                 AppScreen.History -> HistoryScreen(
-                                    settings = settings,
-                                    profile = profile,
+                                    settings = appState.settings,
+                                    profile = appState.profile,
                                     onPick = { historyEntry = it },
                                     onBack = { showHistory = false }
                                 )
@@ -317,7 +295,7 @@ fun GesundEssenApp() {
                                     if (entry != null) {
                                         HistoryDetailScreen(
                                             entry = entry,
-                                            settings = settings,
+                                            settings = appState.settings,
                                             onBack = { historyEntry = null }
                                         )
                                     }

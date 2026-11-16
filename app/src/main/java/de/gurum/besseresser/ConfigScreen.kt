@@ -84,15 +84,14 @@ fun ConfigScreen(
     appLanguage: AppLanguage,
     onLanguageChange: (AppLanguage) -> Unit,
     onBack: () -> Unit,
-    onDataImported: (Settings, Profile) -> Unit,
+    onDataImported: () -> Unit = {},
     onHistoryCleared: () -> Unit
 ) {
     val ctx = LocalContext.current
-    // Übergangslösung (Phase 2): direkter Service-Zugriff; wird in Phase 5 in ein
-    // ConfigViewModel verlagert.
+    // Übergangslösung (Phase 3): direkter Service-Zugriff; wird in Phase 5 in ein
+    // ConfigViewModel verlagert. Settings/Profil/Theme/Sprache fließen reaktiv
+    // über den AppStateViewModel in der MainActivity.
     val backupManager: BackupManager = koinInject()
-    val settingsRepository: SettingsRepository = koinInject()
-    val profileRepository: ProfileRepository = koinInject()
     val historyRepository: HistoryRepository = koinInject()
     val scope = rememberCoroutineScope()
 
@@ -113,9 +112,7 @@ fun ConfigScreen(
                 backupManager.importFromUri(uri)
             }
             res.onSuccess { summary ->
-                val updatedSettings = settingsRepository.load()
-                val updatedProfile = profileRepository.load()
-                onDataImported(updatedSettings, updatedProfile)
+                onDataImported()
                 busy = false
                 statusMessage = ctx.getString(
                     R.string.config_import_success,
