@@ -36,10 +36,10 @@ val keystoreProps = Properties().apply {
 }
 val hasSigningConfig = keystoreProps.getProperty("storeFile") != null
 
-val composeBomVersion = "2024.09.02"
-val coreKtxVersion = "1.13.1"
-val activityComposeVersion = "1.9.2"
-val lifecycleVersion = "2.8.6"
+val composeBomVersion = "2024.12.01"
+val coreKtxVersion = "1.15.0"
+val activityComposeVersion = "1.9.3"
+val lifecycleVersion = "2.8.7"
 val cameraVersion = "1.4.2"
 val kotlinxSerializationVersion = "1.7.3"
 val roomVersion = "2.6.1"
@@ -130,6 +130,6 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:$navigationVersion")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:$junitVersion")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
 }
