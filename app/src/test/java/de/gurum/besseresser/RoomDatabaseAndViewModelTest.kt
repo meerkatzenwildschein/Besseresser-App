@@ -6,6 +6,21 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import de.gurum.besseresser.model.DayFazit
+import de.gurum.besseresser.model.Evaluation
+import de.gurum.besseresser.model.Gender
+import de.gurum.besseresser.model.GoalResult
+import de.gurum.besseresser.model.HistoryEntry
+import de.gurum.besseresser.ui.HistoryViewModel
+import de.gurum.besseresser.ui.MainViewModel
+import de.gurum.besseresser.ui.ProfileViewModel
+import de.gurum.besseresser.data.RoomConverters
+import de.gurum.besseresser.ui.SetupViewModel
+import de.gurum.besseresser.data.toEntity
+import de.gurum.besseresser.data.toWeekEntity
+import de.gurum.besseresser.model.TrafficLight
+import de.gurum.besseresser.model.Profile
+import de.gurum.besseresser.model.Settings
 
 class RoomDatabaseAndViewModelTest {
 

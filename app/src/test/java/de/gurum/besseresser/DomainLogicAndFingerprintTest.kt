@@ -8,6 +8,29 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 import java.time.ZoneId
+import de.gurum.besseresser.ui.buildShareText
+import de.gurum.besseresser.ui.color
+import de.gurum.besseresser.model.calendarWeekOf
+import de.gurum.besseresser.model.calendarWeekOfKey
+import de.gurum.besseresser.model.DayFazit
+import de.gurum.besseresser.model.DayFazitSession
+import de.gurum.besseresser.model.dayFingerprint
+import de.gurum.besseresser.ui.DayGroup
+import de.gurum.besseresser.model.dayKeyOf
+import de.gurum.besseresser.model.GoalResult
+import de.gurum.besseresser.ui.groupByDay
+import de.gurum.besseresser.ui.handleAutoDayFazit
+import de.gurum.besseresser.ui.handleAutoWeekFazitForKey
+import de.gurum.besseresser.model.HistoryEntry
+import de.gurum.besseresser.model.HistoryEntryLogic
+import de.gurum.besseresser.ui.isFazitOutdated
+import de.gurum.besseresser.ui.isWeekFazitDue
+import de.gurum.besseresser.ui.latestDueWeekKey
+import de.gurum.besseresser.ui.scoreColor
+import de.gurum.besseresser.model.TrafficLight
+import de.gurum.besseresser.model.weekKeyOf
+import de.gurum.besseresser.ui.zielePreview
+import de.gurum.besseresser.model.Profile
 
 class DomainLogicAndFingerprintTest {
 

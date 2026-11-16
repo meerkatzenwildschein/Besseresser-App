@@ -5,6 +5,22 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import de.gurum.besseresser.data.AppBackup
+import de.gurum.besseresser.model.AppJson
+import de.gurum.besseresser.model.AppLanguage
+import de.gurum.besseresser.model.AppThemeMode
+import de.gurum.besseresser.data.BackupHistoryEntry
+import de.gurum.besseresser.data.BackupLogic
+import de.gurum.besseresser.model.DayFazit
+import de.gurum.besseresser.model.Evaluation
+import de.gurum.besseresser.model.Gender
+import de.gurum.besseresser.model.GoalResult
+import de.gurum.besseresser.model.HistoryEntry
+import de.gurum.besseresser.model.Profile
+import de.gurum.besseresser.model.RecentNote
+import de.gurum.besseresser.model.RecentNotesLogic
+import de.gurum.besseresser.model.Settings
+import de.gurum.besseresser.model.TrafficLight
 
 class DataSerializationTest {
 
