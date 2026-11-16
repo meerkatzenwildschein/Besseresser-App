@@ -26,6 +26,34 @@ import org.junit.Before
 import org.junit.Test
 import java.io.File
 import java.time.LocalDate
+import de.gurum.besseresser.data.ApiClient
+import de.gurum.besseresser.data.ApiException
+import de.gurum.besseresser.data.BesseresserApiService
+import de.gurum.besseresser.data.DayFazitResult
+import de.gurum.besseresser.model.dayFingerprint
+import de.gurum.besseresser.model.dayKeyOf
+import de.gurum.besseresser.model.Evaluation
+import de.gurum.besseresser.data.FazitPromptBundle
+import de.gurum.besseresser.model.Gender
+import de.gurum.besseresser.model.GoalResult
+import de.gurum.besseresser.model.HistoryEntry
+import de.gurum.besseresser.model.HistoryEntryLogic
+import de.gurum.besseresser.data.HistoryRepository
+import de.gurum.besseresser.ui.HistoryViewModel
+import de.gurum.besseresser.ui.MainViewModel
+import de.gurum.besseresser.model.Profile
+import de.gurum.besseresser.data.ProfileRepository
+import de.gurum.besseresser.ui.ProfileViewModel
+import de.gurum.besseresser.data.PromptBundle
+import de.gurum.besseresser.model.RecentNote
+import de.gurum.besseresser.model.RecentNotesLogic
+import de.gurum.besseresser.model.Settings
+import de.gurum.besseresser.data.SettingsRepository
+import de.gurum.besseresser.ui.SetupViewModel
+import de.gurum.besseresser.data.SplitGoalsRequest
+import de.gurum.besseresser.model.TrafficLight
+import de.gurum.besseresser.model.weekKeyOf
+import de.gurum.besseresser.model.DayFazit
 
 // ----------------------------------------------------------------- In-Memory Test Fakes
 

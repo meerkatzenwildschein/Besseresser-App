@@ -20,7 +20,7 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
 - **Root-Screen:** Main (ohne Overlays) und Erst-Setup beenden die App bei System-Zurück (Android-Standard).
 - **Animierte Übergänge:** Main/Historie/Detail laufen über `AnimatedContent` (`MainActivity.kt`, `AppScreen.order`-Enum steuert Slide-/Fade-Richtung).
 
-### 2. Profil (`ProfileScreen.kt`, `ProfileStore` in `Store.kt`)
+### 2. Profil (`ui/ProfileScreen.kt`, `Profile` in `model/Store.kt`)
 - **Optionale Angaben:**
   - **Geburtsdatum:** Material-DatePickerDialog (ISO `yyyy-MM-dd`, Anzeige `dd.MM.yyyy`; Alter wird dynamisch lokal berechnet via `Profile.ageYears`).
   - **Gewicht & Größe:** Gewicht in kg (Komma erlaubt, 1–700 kg), Größe in cm (30–280 cm).
@@ -30,7 +30,7 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
 - **Automatischer Erststart:** Öffnet sich nach dem ersten erfolgreichen Setup automatisch (`firstRun`-Flag).
 - **Verwendung in KI-Prompts:** Fließt als Kontextzeile in das Tagesfazit ein (`profileContextLine`), nicht jedoch in die Einzelmahlzeiten-Auswertung.
 
-### 3. Setup & Einstellungen (`SetupScreen.kt`, `Store.kt`, `KeyVault.kt`)
+### 3. Setup & Einstellungen (`ui/SetupScreen.kt`, `data/Repositories.kt`, `data/KeyVault.kt`)
 - **Konfiguration:**
   - **Ziele:** Freitext, ein Ziel pro Zeile (Default: `DEFAULT_GOALS` aus `SetupScreen.kt`).
   - **API-URL:** Basis-URL einer OpenAI-kompatiblen Schnittstelle (z. B. `https://api.openai.com/v1`).
@@ -43,7 +43,7 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
   - Freitext-Ziele können beim Speichern per KI (`ApiClient.splitGoals`) in prägnante Einzelziele zerlegt werden.
   - `Settings.goalsWereSplit`-Flag verhindert redundante KI-Calls bei unveränderten Zielen.
 
-### 4. Hauptbildschirm & Kamera (`MainScreen.kt`, `CameraScreen.kt`)
+### 4. Hauptbildschirm & Kamera (`ui/MainScreen.kt`, `ui/CameraScreen.kt`)
 - **Hauptansicht:**
   - Burger-Menü oben rechts (Profil, Verlauf, Einstellungen).
   - Horizontale Wischgeste nach links öffnet den Verlauf (gesperrt bei laufender Auswertung oder ungespeichertem Zustand).
@@ -54,12 +54,12 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
   - EXIF-Orientierungskorrektur (`correctOrientation`).
   - Fallback auf Systemkamera (`TakePicture`), falls Kamera-Berechtigung fehlt oder Fehler auftreten.
 
-### 5. Ergebnis & Auswertung (`MainScreen.kt`, `CommonUi.kt`)
+### 5. Ergebnis & Auswertung (`ui/MainScreen.kt`, `ui/CommonUi.kt`)
 - Pro Ziel eine Ampel-Zeile (🟢 Grün / 🟡 Gelb / 🔴 Rot / ⚪ Unbekannt) mit kurzer Begründung.
 - `CollapsibleSummaryBlock`: Gesamteindruck-Satz, erkannte Mahlzeit mit Portionsschätzung (🍽️) und Nutzer-Notiz (📝).
 - `ErkanntEditDialog`: Nachträgliche Korrektur des erkannten Essens per Stift-Icon.
 
-### 6. Verlauf & Historie (`HistoryScreen.kt`, `HistoryStore.kt`)
+### 6. Verlauf & Historie (`ui/HistoryScreen.kt`, `model/HistoryStore.kt`)
 - **Tages-Gruppierung:** Mahlzeiten nach Kalendertag gruppiert (`DayGroupHeader`).
 - **KI-Tagesfazit:**
   - Tagesfazit-Chip mit Zustandsmaschine (Neu ermitteln, Lädt, Bereit, Veraltet).
@@ -70,11 +70,11 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
 - **Nacherfassung:**
   - Mahlzeiten können nachträglich mit oder ohne Foto hinzugefügt werden (`AddMealNoPhotoScreen` / `ApiClient.analyzeText`).
   - Werden als `backdated = true` markiert (keine fingierte Uhrzeit, Kennzeichnung „nachträglich erfasst").
-- **Notiz-Schnellauswahl (`RecentNotesStore`):**
+- **Notiz-Schnellauswahl (`RecentNotesLogic` + `SettingsRepository`):**
   - MRU-Speicher (max. 5 unmarkierte Einträge) plus dauerhafte Favoriten mit Sternchen (`RecentNote`).
   - Persistiert das KI-Ergebnis (`Evaluation` unter `"ev"`) direkt am `RecentNote`-Eintrag. Bei exaktem Text-Match und passenden Zielen wird die gespeicherte KI-Antwort direkt wiederverwendet (Startbildschirm sowie Nacherfassen mit/ohne Foto), ohne einen neuen KI-Request zu senden. Fällt ein unmarkierter Eintrag aus den Top 5 heraus, wird auch sein persistiertes KI-Ergebnis gelöscht.
 
-### 7. Konfiguration & Datensicherung (`ConfigScreen.kt`, `BackupStore.kt`)
+### 7. Konfiguration & Datensicherung (`ui/ConfigScreen.kt`, `data/BackupStore.kt`)
 - Im Burger-Menü ganz unten eingehängt (`Icons.Filled.Build`), zusätzlich beim Erststart direkt im `SetupScreen` erreichbar („Backup aus Datei importieren").
 - **JSON-Export:** Speichert sämtliche App-Daten (Einstellungen inkl. entschlüsseltem API-Key, Ziele, Profil, Favoriten-Notizen sowie alle Verlaufseinträge mit Base64-codierten JPEG-Fotos, Tages- und Wochenfazits) als JSON-Datei direkt in den öffentlichen Ordner `Downloads` (`MediaStore.Downloads`).
 - **JSON-Import:** Öffnet den System-Dateipicker (Startordner `Downloads`) und stellt alle Daten wieder her; doppelte oder vorhandene Einträge/Einstellungen werden überschrieben.
@@ -84,7 +84,7 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
 
 ## KI-Schnittstelle & Prompt-Kontrakt
 
-### JSON-Rückgabeformat (`ApiClient.kt`)
+### JSON-Rückgabeformat (`data/ApiClient.kt`)
 
 ```json
 {
@@ -105,13 +105,13 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
 
 ---
 
-## Datenmodelle & Serialisierung (`Data.kt`)
+## Datenmodelle & Serialisierung (`model/Data.kt`)
 
 Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz (`ignoreUnknownKeys = true`, `isLenient = true`, `coerceInputValues = true`).
 
 | Klasse / Enum | Beschreibung | Besonderheit |
 |---|---|---|
-| `TrafficLight` | Enum (`GREEN`, `YELLOW`, `RED`, `UNKNOWN`) | Eigener `TrafficLightSerializer`, Helfer für UI-Farben (`color()`) und Labels (`label()`) |
+| `TrafficLight` | Enum (`GREEN`, `YELLOW`, `RED`, `UNKNOWN`) | Eigener `TrafficLightSerializer`; UI-Farben/Labels als Compose-Extensions in `ui/AmpelUi.kt` |
 | `Gender` | Enum (`MALE`, `FEMALE`, `DIVERSE`, `NONE`) | `GenderSerializer` mit String-Fallback |
 | `GoalResult` | Ziel-Bewertung | Serialisiert mit `@SerialName("ziel")`, `@SerialName("ampel")`, `@SerialName("begruendung")` |
 | `Evaluation` | Gesamtbewertung einer Mahlzeit | Liste von `GoalResult`, `summary`, `erkannt` |
@@ -159,39 +159,43 @@ Besseresser-App/
 │       ├── main/
 │       │   ├── AndroidManifest.xml
 │       │   ├── java/de/gurum/besseresser/
-│       │   │   ├── ApiClient.kt            ← OpenAI-Netzwerk-Koordinator, BesseresserApiService
-│       │   │   ├── AppDatabase.kt          ← Room SQLite-Datenbank, Entities, DAOs & TypeConverters
-│       │   │   ├── AppStateViewModel.kt    ← App-weiter Zustand (Settings, Profil, Theme, Sprache) als Flows
 │       │   │   ├── BesseresserApp.kt       ← Application-Klasse, startet Koin (im Manifest registriert)
 │       │   │   ├── di/
 │       │   │   │   └── AppModule.kt        ← Koin-Modul: DB, DataStore, Repositories, ApiService, ViewModels
-│       │   │   ├── BackupStore.kt          ← BackupManager (JSON-Export/Import) + BackupLogic (reine Merge-Logik)
-│       │   │   ├── PhotoStorage.kt         ← Datei-basierte Foto-Ablage (JPEG-Skalierung, Thumbnails)
-│       │   │   ├── CameraScreen.kt         ← CameraX-Live-Preview & Foto-Review
-│       │   │   ├── CommonUi.kt             ← Wiederverwendbare UI-Elemente (TopBars, Dialoge, Badges)
-│       │   │   ├── ConfigScreen.kt         ← Konfigurations-Screen (Datensicherung & Verlauf löschen)
-│       │   │   ├── Data.kt                 ← Domänenmodelle, Enums (TrafficLight, Gender), AppJson
-│       │   │   ├── DayGroupHeader.kt       ← Tagesgruppen-Header, Score-Badges, Ziele-Preview
-│       │   │   ├── FazitCard.kt            ← Tages- und Wochenfazit-Karten, Chips & Auto-Fazit-Trigger
-│       │   │   ├── HistoryDetailScreen.kt  ← Detailansicht einzelner Mahlzeiten, Re-Evaluation
-│       │   │   ├── HistoryListScreen.kt    ← Verlaufslisten-UI, Swipe-To-Dismiss, HistoryItem
-│       │   │   ├── HistoryScreen.kt        ← Haupt-Verlaufsansicht & Navigation
-│       │   │   ├── HistoryStore.kt         ← Verlaufs-Domänenmodelle (HistoryEntry, DayFazit) & HistoryEntryLogic
-│       │   │   ├── HistoryViewModel.kt     ← ViewModel für Verlaufsdaten, Filter & Fazit-Generierung
-│       │   │   ├── ImagePreprocessor.kt    ← Bildskalierung & Base64-Data-URI-Aufbereitung
-│       │   │   ├── KeyVault.kt             ← Keystore-Verschlüsselung für API-Keys
-│       │   │   ├── MainActivity.kt         ← App-Einstiegspunkt, Theme, Root-Navigation
-│       │   │   ├── MainScreen.kt           ← Hauptbildschirm, CTA-Handling, Auswertungsansicht
-│       │   │   ├── MainViewModel.kt        ← ViewModel für Foto-Erfassung, Analyse & Review
-│       │   │   ├── ManualEntryDialog.kt    ← Dialoge & Overlays zur Nacherfassung (mit/ohne Foto)
-│       │   │   ├── OpenAiChatClient.kt     ← Reiner HTTP-Netzwerktransport & tolerantes JSON-Parsing
-│       │   │   ├── ProfileScreen.kt        ← Nutzerprofil-Verwaltung
-│       │   │   ├── ProfileViewModel.kt     ← ViewModel für Profil-Daten & Validierung
-│       │   │   ├── PromptBuilder.kt        ← Dynamische Prompt-Generierung (Analyse, Fazit, Ziele)
-│       │   │   ├── Repositories.kt         ← Repository-Interfaces (Settings, Profile, History) & Default-Implementierungen
-│       │   │   ├── SetupScreen.kt          ← Ersteinrichtung, Provider- & Modell-Auswahl
-│       │   │   ├── SetupViewModel.kt       ← ViewModel für API-Konfiguration & Zielaufteilung
-│       │   │   └── Store.kt                ← Modelle (Profile, RecentNote), RecentNotesLogic, withAppLanguage
+│       │   │   ├── model/                  ← Reine Domänenmodelle & Logik (kein Android-/Compose-Import)
+│       │   │   │   ├── Data.kt             ← Enums (TrafficLight, Gender, AppThemeMode, AppLanguage), Settings, Evaluation, AppJson
+│       │   │   │   ├── HistoryStore.kt     ← HistoryEntry, DayFazit, HistoryEntryLogic, Datums-/Fingerprint-Helper
+│       │   │   │   └── Store.kt            ← Profile, RecentNote, RecentNotesLogic, BETTERESSER_PREFS
+│       │   │   ├── data/                   ← Datenzugriffsschicht (Room, DataStore, HTTP, Dateien)
+│       │   │   │   ├── ApiClient.kt        ← OpenAI-Netzwerk-Koordinator, BesseresserApiService
+│       │   │   │   ├── AppDatabase.kt      ← Room SQLite-Datenbank, Entities, DAOs & TypeConverters
+│       │   │   │   ├── BackupStore.kt      ← BackupManager (JSON-Export/Import) + BackupLogic (reine Merge-Logik)
+│       │   │   │   ├── ImagePreprocessor.kt← Bildskalierung & Base64-Data-URI-Aufbereitung
+│       │   │   │   ├── KeyVault.kt         ← Keystore-Verschlüsselung für API-Keys
+│       │   │   │   ├── OpenAiChatClient.kt ← Reiner HTTP-Netzwerktransport & tolerantes JSON-Parsing
+│       │   │   │   ├── PhotoStorage.kt     ← Datei-basierte Foto-Ablage (JPEG-Skalierung, Thumbnails)
+│       │   │   │   ├── PromptBuilder.kt    ← Dynamische Prompt-Generierung (Analyse, Fazit, Ziele)
+│       │   │   │   └── Repositories.kt     ← Repository-Interfaces & Default-Implementierungen (DataStore/Room)
+│       │   │   └── ui/                     ← Compose-UI & ViewModels
+│       │   │       ├── AmpelUi.kt          ← TrafficLight.color()/label(), ampelColor()/ampelLabel() (Compose-Extensions)
+│       │   │       ├── AppStateViewModel.kt← App-weiter Zustand (Settings, Profil, Theme, Sprache) als Flows
+│       │   │       ├── CameraScreen.kt     ← CameraX-Live-Preview & Foto-Review
+│       │   │       ├── CommonUi.kt         ← Wiederverwendbare UI-Elemente (TopBars, Dialoge, Badges)
+│       │   │       ├── ConfigScreen.kt     ← Konfigurations-Screen (Datensicherung & Verlauf löschen)
+│       │   │       ├── DayGroupHeader.kt   ← Tagesgruppen-Header, Score-Badges, Ziele-Preview
+│       │   │       ├── FazitCard.kt        ← Tages- und Wochenfazit-Karten, Chips & Auto-Fazit-Trigger
+│       │   │       ├── HistoryDetailScreen.kt ← Detailansicht einzelner Mahlzeiten, Re-Evaluation
+│       │   │       ├── HistoryListScreen.kt← Verlaufslisten-UI, Swipe-To-Dismiss, HistoryItem
+│       │   │       ├── HistoryScreen.kt    ← Haupt-Verlaufsansicht & Navigation
+│       │   │       ├── HistoryViewModel.kt ← ViewModel für Verlaufsdaten, Filter & Fazit-Generierung
+│       │   │       ├── MainActivity.kt     ← App-Einstiegspunkt, Theme, Root-Navigation, withAppLanguage
+│       │   │       ├── MainScreen.kt       ← Hauptbildschirm, CTA-Handling, Auswertungsansicht
+│       │   │       ├── MainViewModel.kt    ← ViewModel für Foto-Erfassung, Analyse & Review
+│       │   │       ├── ManualEntryDialog.kt← Dialoge & Overlays zur Nacherfassung (mit/ohne Foto)
+│       │   │       ├── ProfileScreen.kt    ← Nutzerprofil-Verwaltung
+│       │   │       ├── ProfileViewModel.kt ← ViewModel für Profil-Daten & Validierung
+│       │   │       ├── SetupScreen.kt      ← Ersteinrichtung, Provider- & Modell-Auswahl
+│       │   │       └── SetupViewModel.kt   ← ViewModel für API-Konfiguration & Zielaufteilung
 │       │   └── res/
 │       │       ├── values/             ← strings.xml (EN Default), themes.xml, colors.xml
 │       │       ├── values-de/          ← strings.xml (DE Übersetzung)

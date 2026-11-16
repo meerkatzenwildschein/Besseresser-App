@@ -16,6 +16,16 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import de.gurum.besseresser.data.ApiClient
+import de.gurum.besseresser.data.ApiException
+import de.gurum.besseresser.model.AppJson
+import de.gurum.besseresser.data.DayFazitResult
+import de.gurum.besseresser.data.FazitPromptBundle
+import de.gurum.besseresser.data.OpenAiChatClient
+import de.gurum.besseresser.data.PromptBuilder
+import de.gurum.besseresser.data.PromptBundle
+import de.gurum.besseresser.data.SplitGoalsRequest
+import de.gurum.besseresser.model.TrafficLight
 
 class ApiClientTest {
 
