@@ -134,6 +134,7 @@ Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz 
 | Android Gradle Plugin | 8.9.1 (Gradle 8.11.1) |
 | SDK-Versionen | `compileSdk` / `targetSdk` = 36, `minSdk` = 26 |
 | Persistenz | Room Database 2.6.1 (`androidx.room:room-runtime`, `room-ktx`, `room-compiler` via KSP) |
+| Dependency Injection | Koin 4.0.4 (`koin-android`, `koin-androidx-compose`) – Container-Start in `BesseresserApp`, Modul in `di/AppModule.kt` |
 | State Management | Jetpack Lifecycle ViewModel & Compose (`lifecycle-viewmodel-compose:2.8.6`, `StateFlow`) |
 | Serialisierung | `kotlinx-serialization-json:1.7.3` |
 | Kamera | CameraX 1.4.2 (`camera-core`, `camera-camera2`, `camera-lifecycle`, `camera-view`) |
@@ -160,7 +161,11 @@ Besseresser-App/
 │       │   ├── java/de/gurum/besseresser/
 │       │   │   ├── ApiClient.kt            ← OpenAI-Netzwerk-Koordinator, BesseresserApiService
 │       │   │   ├── AppDatabase.kt          ← Room SQLite-Datenbank, Entities, DAOs & TypeConverters
-│       │   │   ├── BackupStore.kt          ← Vollständiger JSON-Export/Import (inkl. API-Key & Base64-Fotos)
+│       │   │   ├── BesseresserApp.kt       ← Application-Klasse, startet Koin (im Manifest registriert)
+│       │   │   ├── di/
+│       │   │   │   └── AppModule.kt        ← Koin-Modul: DB, Repositories, ApiService, ViewModels
+│       │   │   ├── BackupStore.kt          ← BackupManager (JSON-Export/Import) + BackupLogic (reine Merge-Logik)
+│       │   │   ├── PhotoStorage.kt         ← Datei-basierte Foto-Ablage (JPEG-Skalierung, Thumbnails)
 │       │   │   ├── CameraScreen.kt         ← CameraX-Live-Preview & Foto-Review
 │       │   │   ├── CommonUi.kt             ← Wiederverwendbare UI-Elemente (TopBars, Dialoge, Badges)
 │       │   │   ├── ConfigScreen.kt         ← Konfigurations-Screen (Datensicherung & Verlauf löschen)
@@ -170,7 +175,7 @@ Besseresser-App/
 │       │   │   ├── HistoryDetailScreen.kt  ← Detailansicht einzelner Mahlzeiten, Re-Evaluation
 │       │   │   ├── HistoryListScreen.kt    ← Verlaufslisten-UI, Swipe-To-Dismiss, HistoryItem
 │       │   │   ├── HistoryScreen.kt        ← Haupt-Verlaufsansicht & Navigation
-│       │   │   ├── HistoryStore.kt         ← Persistenzbrücke & automatische JSON-zu-Room-Migration
+│       │   │   ├── HistoryStore.kt         ← Verlaufs-Domänenmodelle (HistoryEntry, DayFazit) & HistoryEntryLogic
 │       │   │   ├── HistoryViewModel.kt     ← ViewModel für Verlaufsdaten, Filter & Fazit-Generierung
 │       │   │   ├── ImagePreprocessor.kt    ← Bildskalierung & Base64-Data-URI-Aufbereitung
 │       │   │   ├── KeyVault.kt             ← Keystore-Verschlüsselung für API-Keys
@@ -182,10 +187,10 @@ Besseresser-App/
 │       │   │   ├── ProfileScreen.kt        ← Nutzerprofil-Verwaltung
 │       │   │   ├── ProfileViewModel.kt     ← ViewModel für Profil-Daten & Validierung
 │       │   │   ├── PromptBuilder.kt        ← Dynamische Prompt-Generierung (Analyse, Fazit, Ziele)
-│       │   │   ├── Repositories.kt         ← Repository-Abstraktionen (Settings, Profile, History) & Provider
+│       │   │   ├── Repositories.kt         ← Repository-Interfaces (Settings, Profile, History) & Default-Implementierungen
 │       │   │   ├── SetupScreen.kt          ← Ersteinrichtung, Provider- & Modell-Auswahl
 │       │   │   ├── SetupViewModel.kt       ← ViewModel für API-Konfiguration & Zielaufteilung
-│       │   │   └── Store.kt                ← SharedPreferences-Speicher (Settings, Profile, RecentNotes)
+│       │   │   └── Store.kt                ← Modelle (Profile, RecentNote), RecentNotesLogic, UiPrefsStore
 │       │   └── res/
 │       │       ├── values/             ← strings.xml (EN Default), themes.xml, colors.xml
 │       │       ├── values-de/          ← strings.xml (DE Übersetzung)
@@ -266,3 +271,6 @@ Besseresser-App/
 2. **Typsichere Enums bevorzugen:** Ampel-Werte (`TrafficLight`) und Geschlechter (`Gender`) immer als Enum übergeben; UI-Farben über `TrafficLight.color()` bzw. `ampelColor()` beziehen.
 3. **Strings zweisprachig pflegen:** Neue UI-Texte, Fehlermeldungen oder Prompt-Bestandteile immer in beiden Ressourcen-Dateien anlegen: `res/values/strings.xml` und `res/values-de/strings.xml`.
 4. **Refactoring-Plan beachten:** Geplante Modernisierungen (Coroutines, Room, ViewModels) sind in `REFACTORING.md` priorisiert dokumentiert.
+5. **Dependency Injection über Koin:** Neue Abhängigkeiten (Repositories, Services, ViewModels) in `di/AppModule.kt` registrieren und per Konstruktor injizieren – keine manuelle Instanziierung, kein `Context`-Fallback in ViewModels. ViewModels in Compose über `koinViewModel()` beziehen.
+   - Ausnahme (Phase 1, wird in späteren Phasen aufgelöst): Methoden, die Android-`Resources`/`ContentResolver` benötigen (`analyze`, `reEvaluate`, `generateFazit`, `generateWeekFazit`, `startSplitGoals`, `ProfileViewModel.save`), erhalten `Context` noch als Methodenparameter.
+6. **Persistenz nur über Repositories:** Datenzugriff (Room, SharedPreferences, Fotos) ausschließlich über die Repository-Interfaces aus `Repositories.kt` – keine `XxxStore`-Objekte mehr. Reine, kontextfreie Logik liegt in `RecentNotesLogic`, `HistoryEntryLogic` und `BackupLogic`. Einzige Ausnahme: `UiPrefsStore` (Theme/Sprache, wird in Phase 3 auf DataStore umgestellt). Suspendierende Repository-Aufrufe aus Composables heraus immer in einem `rememberCoroutineScope` starten (Übergangslösung, Phase 5 verschiebt sie in ViewModels).

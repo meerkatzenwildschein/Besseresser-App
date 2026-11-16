@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import java.io.File
 import java.time.LocalDate
 import java.time.LocalTime
@@ -268,6 +269,10 @@ fun BackdatedOverlays(
     onSetBusy: (Boolean) -> Unit
 ) {
     val ctx = LocalContext.current
+    // Übergangslösung (Phase 2): direkter Service-Zugriff; wird in Phase 5 in das
+    // HistoryViewModel verlagert.
+    val settingsRepository: SettingsRepository = koinInject()
+    val apiService: BesseresserApiService = koinInject()
     val coroutineScope = rememberCoroutineScope()
     if (showCamera) {
         CameraCaptureScreen(
@@ -279,12 +284,12 @@ fun BackdatedOverlays(
             onConfirm = {
                 onDismissCamera()
                 val trimmedNote = addNote.trim()
-                val cachedEv = RecentNotesStore.findCachedEvaluation(ctx, trimmedNote, settings.goals)
+                val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
                 if (cachedEv != null) {
-                    RecentNotesStore.push(ctx, trimmedNote, cachedEv)
+                    settingsRepository.pushRecentNote(trimmedNote, cachedEv)
                     onSaveBackdated(cachedEv, addPhotoUri)
                 } else {
-                    RecentNotesStore.push(ctx, trimmedNote)
+                    settingsRepository.pushRecentNote(trimmedNote)
                     onSetBusy(true)
                     val prompts = PromptBundle(
                         intro = ctx.getString(R.string.prompt_eval_intro),
@@ -299,14 +304,14 @@ fun BackdatedOverlays(
                         else ""
                     )
                     coroutineScope.launch {
-                        val result = ApiClient.analyze(
+                        val result = apiService.analyze(
                             ctx = ctx,
                             photoUri = addPhotoUri,
                             settings = settings,
                             promptBundle = prompts
                         )
                         result.onSuccess { ev ->
-                            RecentNotesStore.push(ctx, trimmedNote, ev)
+                            settingsRepository.pushRecentNote(trimmedNote, ev)
                             onSetBusy(false)
                             onSaveBackdated(ev, addPhotoUri)
                         }.onFailure { e ->
@@ -328,12 +333,12 @@ fun BackdatedOverlays(
             busy = showBusy,
             onRate = {
                 val trimmedNote = addNote.trim()
-                val cachedEv = RecentNotesStore.findCachedEvaluation(ctx, trimmedNote, settings.goals)
+                val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
                 if (cachedEv != null) {
-                    RecentNotesStore.push(ctx, trimmedNote, cachedEv)
+                    settingsRepository.pushRecentNote(trimmedNote, cachedEv)
                     onSaveBackdated(cachedEv, addPhotoUri)
                 } else {
-                    RecentNotesStore.push(ctx, trimmedNote)
+                    settingsRepository.pushRecentNote(trimmedNote)
                     onSetBusy(true)
                     val prompts = PromptBundle(
                         intro = ctx.getString(R.string.prompt_eval_intro),
@@ -348,14 +353,14 @@ fun BackdatedOverlays(
                         else ""
                     )
                     coroutineScope.launch {
-                        val result = ApiClient.analyze(
+                        val result = apiService.analyze(
                             ctx = ctx,
                             photoUri = addPhotoUri,
                             settings = settings,
                             promptBundle = prompts
                         )
                         result.onSuccess { ev ->
-                            RecentNotesStore.push(ctx, trimmedNote, ev)
+                            settingsRepository.pushRecentNote(trimmedNote, ev)
                             onSetBusy(false)
                             onSaveBackdated(ev, addPhotoUri)
                         }.onFailure { e ->
@@ -377,21 +382,21 @@ fun BackdatedOverlays(
             busy = showBusy,
             onSend = {
                 val trimmedNote = addNote.trim()
-                val cachedEv = RecentNotesStore.findCachedEvaluation(ctx, trimmedNote, settings.goals)
+                val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
                 if (cachedEv != null) {
-                    RecentNotesStore.push(ctx, trimmedNote, cachedEv)
+                    settingsRepository.pushRecentNote(trimmedNote, cachedEv)
                     onSaveBackdated(cachedEv, null)
                 } else {
-                    RecentNotesStore.push(ctx, trimmedNote)
+                    settingsRepository.pushRecentNote(trimmedNote)
                     onSetBusy(true)
                     coroutineScope.launch {
-                        val result = ApiClient.analyzeText(
+                        val result = apiService.analyzeText(
                             ctx = ctx,
                             settings = settings,
                             userDescription = trimmedNote
                         )
                         result.onSuccess { ev ->
-                            RecentNotesStore.push(ctx, trimmedNote, ev)
+                            settingsRepository.pushRecentNote(trimmedNote, ev)
                             onSetBusy(false)
                             onSaveBackdated(ev, null)
                         }.onFailure { e ->

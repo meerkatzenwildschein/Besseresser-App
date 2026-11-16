@@ -1,10 +1,8 @@
 package de.gurum.besseresser
 
 import android.content.Context
-import android.content.SharedPreferences
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -15,35 +13,6 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /** Eine gemeinsame Prefs-Datei für Einstellungen UND Profil (lokal auf dem Gerät). */
 internal const val BETTERESSER_PREFS = "besseresser_prefs"
-
-/** Persistenz der Einstellungen in SharedPreferences; API-Key via KeyVault verschlüsselt. */
-object Store {
-    private const val PREFS = BETTERESSER_PREFS
-
-    fun load(ctx: Context): Settings {
-        val p: SharedPreferences = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val goals = (p.getString("goals", "") ?: "").split("\n")
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-        return Settings(
-            baseUrl = p.getString("baseUrl", "") ?: "",
-            apiKey = p.getString("apiKey", null)?.let { KeyVault.decrypt(it) } ?: "",
-            model = p.getString("model", "gpt-4o-mini") ?: "gpt-4o-mini",
-            goals = goals,
-            goalsWereSplit = p.getBoolean("goalsWereSplit", false)
-        )
-    }
-
-    fun save(ctx: Context, s: Settings) {
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString("baseUrl", s.baseUrl.trim())
-            .putString("apiKey", KeyVault.encrypt(s.apiKey.trim()))
-            .putString("model", s.model.trim())
-            .putString("goals", s.goals.joinToString("\n"))
-            .putBoolean("goalsWereSplit", s.goalsWereSplit)
-            .apply()
-    }
-}
 
 // ----------------------------------------------------------------- Profil
 
@@ -68,38 +37,6 @@ data class Profile(
         get() = birthDate == null && weightKg == null && heightCm == null && notes.isBlank() && gender == Gender.NONE
 }
 
-object ProfileStore {
-    fun load(ctx: Context): Profile {
-        val p: SharedPreferences = ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
-        return Profile(
-            birthDate = p.getString("birthDate", null)?.takeIf { it.isNotBlank() },
-            weightKg = p.getString("profileWeight", null)
-                ?.replace(',', '.')?.toDoubleOrNull()?.takeIf { it > 0 },
-            heightCm = p.getInt("profileHeight", -1).takeIf { it > 0 },
-            notes = p.getString("profileNotes", "") ?: "",
-            gender = Gender.fromString(p.getString("profileGender", null))
-        )
-    }
-
-    /** Leere Eingaben speichern als "nicht gesetzt" – das Profil darf komplett leer bleiben. */
-    fun save(
-        ctx: Context,
-        birthDateIso: String?,
-        weightKg: Double?,
-        heightCm: Int?,
-        notes: String,
-        gender: Gender = Gender.NONE
-    ) {
-        ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
-            .putString("birthDate", birthDateIso?.takeIf { it.isNotBlank() })
-            .putString("profileWeight", weightKg?.toString())
-            .putInt("profileHeight", heightCm ?: -1)
-            .putString("profileNotes", notes.trim())
-            .putString("profileGender", gender.rawValue)
-            .apply()
-    }
-}
-
 // ----------------------------------------------------------------- Notiz-Schnellauswahl (MRU + Favoriten)
 
 /** Eintrag der Schnellauswahl-Liste: Text + Favoriten-Sternchen + optional gecachtes KI-Ergebnis.
@@ -115,22 +52,16 @@ data class RecentNote(
     val evaluation: Evaluation? = null
 )
 
-object RecentNotesStore {
-    private const val KEY = "recentNotes"
+/** Reine Listen-Logik der Notiz-Schnellauswahl (komplett kontextfrei, direkt testbar).
+ *  Persistenz (SharedPreferences) übernimmt das SettingsRepository. */
+object RecentNotesLogic {
     internal const val MAX_UNSTARRED = 5
     internal const val MAX_TOTAL = 40
 
-    /** Liest die Liste. sortStarredFirst = true (Standard): Sternchen zuerst, dann unmarkierte
+    /** Anzeigereihenfolge. sortStarredFirst = true (Standard): Sternchen zuerst, dann unmarkierte
      *  (MRU-Anzeige beim Öffnen). false = exakt die gespeicherte Reihenfolge — für den
      *  Stern-Klick inPlace (kein Hüpfen beim Markieren). Unmarkierte immer max. 5. */
-    fun load(ctx: Context, sortStarredFirst: Boolean = true): List<RecentNote> = runCatching {
-        val raw = ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE)
-            .getString(KEY, null) ?: return emptyList()
-        val parsed = parseRecentNotes(raw)
-        formatLoadedNotes(parsed, sortStarredFirst)
-    }.getOrDefault(emptyList())
-
-    internal fun formatLoadedNotes(parsed: List<RecentNote>, sortStarredFirst: Boolean = true): List<RecentNote> {
+    fun formatLoadedNotes(parsed: List<RecentNote>, sortStarredFirst: Boolean = true): List<RecentNote> {
         return if (sortStarredFirst) {
             val starred = parsed.filter { it.starred }
             val unstarred = parsed.filter { !it.starred }.take(MAX_UNSTARRED)
@@ -147,7 +78,9 @@ object RecentNotesStore {
         }
     }
 
-    internal fun parseRecentNotes(raw: String): List<RecentNote> {
+    /** Tolerantes Parsen des persistierten JSON (inkl. Legacy-Formaten: String-Arrays,
+     *  ausgeschriebene Feldnamen, Bool als Int/String). */
+    fun parseRecentNotes(raw: String): List<RecentNote> {
         return try {
             AppJson.decodeFromString<List<RecentNote>>(raw)
         } catch (e: Exception) {
@@ -183,7 +116,7 @@ object RecentNotesStore {
      *  älteste fliegt (inkl. persistierter KI-Antwort) raus.
      *  Sternchen-Einträge bleiben dauerhaft erhalten und verlieren ihren Stern keinesfalls.
      *  Wird [evaluation] übergeben, wird sie am Eintrag gespeichert; sonst bleibt eine vorhandene erhalten. */
-    internal fun pushNote(
+    fun pushNote(
         all: List<RecentNote>,
         note: String,
         evaluation: Evaluation? = null
@@ -208,17 +141,7 @@ object RecentNotesStore {
         }
     }
 
-    /** Nach vorne stellen (Dedup); unmarkierte rotieren max. 5 nach MRU, älteste fliegt raus.
-     *  Sternchen-Einträge bleiben dauerhaft erhalten (bis abgewählt) und verlieren ihren Stern
-     *  auch bei erneuter Nutzung / Speicherung keinesfalls. */
-    fun push(ctx: Context, note: String, evaluation: Evaluation? = null) {
-        val t = note.trim()
-        if (t.isBlank()) return
-        val all = load(ctx, sortStarredFirst = false)
-        write(ctx, pushNote(all, t, evaluation))
-    }
-
-    internal fun toggleStarInList(all: List<RecentNote>, noteText: String): List<RecentNote> {
+    fun toggleStarInList(all: List<RecentNote>, noteText: String): List<RecentNote> {
         val t = noteText.trim()
         if (t.isBlank()) return all
         return normalizeAndPrune(
@@ -228,19 +151,9 @@ object RecentNotesStore {
         )
     }
 
-    /** Sternchen umschalten (beim Antippen des Sterns im Dropdown) — OHNE Neusortierung:
-     *  der Eintrag bleibt an seiner Stelle stehen; die Anzeige sortiert (Sternchen oben)
-     *  erst beim nächsten Öffnen der Liste. Persistenz folgt der neuen Markierung. */
-    fun toggleStar(ctx: Context, noteText: String) {
-        val t = noteText.trim()
-        if (t.isBlank()) return
-        val list = toggleStarInList(load(ctx, sortStarredFirst = false), t)
-        write(ctx, list)
-    }
-
     /** Aktualisiert die gespeicherte KI-Antwort eines bestehenden Menü-Eintrags (z. B. nach Korrektur
      *  des erkannt-Textes oder Re-Evaluierung), ohne Reihenfolge oder Stern-Status zu ändern. */
-    internal fun updateEvaluationInList(
+    fun updateEvaluationInList(
         all: List<RecentNote>,
         note: String,
         evaluation: Evaluation
@@ -252,17 +165,9 @@ object RecentNotesStore {
         }
     }
 
-    fun updateEvaluation(ctx: Context, note: String, evaluation: Evaluation) {
-        val t = note.trim()
-        if (t.isBlank()) return
-        val current = load(ctx, sortStarredFirst = false)
-        if (current.none { it.text == t }) return
-        write(ctx, updateEvaluationInList(current, t, evaluation))
-    }
-
     /** Sucht nach einem exakten Text-Match (getrimmt) in [notes] und liefert dessen gespeichertes
      *  KI-Ergebnis zurück, sofern es vorhanden ist und zu den aktuellen [goals] passt. */
-    internal fun findMatchingEvaluation(
+    fun findMatchingEvaluation(
         notes: List<RecentNote>,
         note: String,
         goals: List<String>
@@ -274,16 +179,7 @@ object RecentNotesStore {
         return if (ev.matchesGoals(goals)) ev else null
     }
 
-    /** Sucht in den gespeicherten Menü-Einträgen nach einer passenden KI-Bewertung für [note] und [goals]. */
-    fun findCachedEvaluation(ctx: Context, note: String, goals: List<String>): Evaluation? =
-        findMatchingEvaluation(load(ctx, sortStarredFirst = false), note, goals)
-
-    /** Sichtbaren Zustand persistieren (vom UI geführt, damit Klicks nichts umsortieren). */
-    fun save(ctx: Context, notes: List<RecentNote>) {
-        write(ctx, notes)
-    }
-
-    internal fun normalizeAndPrune(notes: List<RecentNote>): List<RecentNote> {
+    fun normalizeAndPrune(notes: List<RecentNote>): List<RecentNote> {
         var unstarredCount = 0
         return notes
             .map { it.copy(text = it.text.trim()) }
@@ -297,14 +193,6 @@ object RecentNotesStore {
                 }
             }
             .take(MAX_TOTAL)
-    }
-
-    private fun write(ctx: Context, notes: List<RecentNote>) {
-        val items = normalizeAndPrune(notes)
-        val json = AppJson.encodeToString(items)
-        ctx.getSharedPreferences(BETTERESSER_PREFS, Context.MODE_PRIVATE).edit()
-            .putString(KEY, json)
-            .commit()
     }
 }
 

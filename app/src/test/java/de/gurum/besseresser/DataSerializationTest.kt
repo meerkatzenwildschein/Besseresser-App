@@ -180,7 +180,7 @@ class DataSerializationTest {
         var list = emptyList<RecentNote>()
         // Push 6 unstarred notes with evaluations -> oldest ("Essen 1") and its evaluation JSON must be removed!
         for (i in 1..6) {
-            list = RecentNotesStore.pushNote(list, "Essen $i", makeEval("Essen $i"))
+            list = RecentNotesLogic.pushNote(list, "Essen $i", makeEval("Essen $i"))
         }
 
         assertEquals(5, list.size)
@@ -190,40 +190,40 @@ class DataSerializationTest {
         assertTrue(serialized.contains("Erkannt Essen 6"))
 
         // Pushing an existing note without passing evaluation preserves its cached evaluation
-        list = RecentNotesStore.pushNote(list, "Essen 2")
+        list = RecentNotesLogic.pushNote(list, "Essen 2")
         assertEquals("Essen 2", list.first().text)
         assertEquals("Erkannt Essen 2", list.first().evaluation?.erkannt)
 
         // Exact match returns cached evaluation when goals match
-        val matched = RecentNotesStore.findMatchingEvaluation(list, "  Essen 2  ", goals)
+        val matched = RecentNotesLogic.findMatchingEvaluation(list, "  Essen 2  ", goals)
         assertEquals(makeEval("Essen 2"), matched)
 
         // Modified text or different casing does not match (exact match required)
-        assertEquals(null, RecentNotesStore.findMatchingEvaluation(list, "Essen 2 extra", goals))
-        assertEquals(null, RecentNotesStore.findMatchingEvaluation(list, "essen 2", goals))
+        assertEquals(null, RecentNotesLogic.findMatchingEvaluation(list, "Essen 2 extra", goals))
+        assertEquals(null, RecentNotesLogic.findMatchingEvaluation(list, "essen 2", goals))
 
         // Outdated/changed goals -> returns null so AI is queried again
-        assertEquals(null, RecentNotesStore.findMatchingEvaluation(list, "Essen 2", listOf("Ziel 1", "Neues Ziel")))
-        assertEquals(null, RecentNotesStore.findMatchingEvaluation(list, "Essen 2", listOf("Ziel 1")))
+        assertEquals(null, RecentNotesLogic.findMatchingEvaluation(list, "Essen 2", listOf("Ziel 1", "Neues Ziel")))
+        assertEquals(null, RecentNotesLogic.findMatchingEvaluation(list, "Essen 2", listOf("Ziel 1")))
 
         // Updating evaluation in-place (e.g. after erkannt correction) keeps order and updates evaluation
         val correctedEval = makeEval("Essen 2").copy(erkannt = "Korrigiertes Essen 2")
-        list = RecentNotesStore.updateEvaluationInList(list, "Essen 2", correctedEval)
-        assertEquals("Korrigiertes Essen 2", RecentNotesStore.findMatchingEvaluation(list, "Essen 2", goals)?.erkannt)
+        list = RecentNotesLogic.updateEvaluationInList(list, "Essen 2", correctedEval)
+        assertEquals("Korrigiertes Essen 2", RecentNotesLogic.findMatchingEvaluation(list, "Essen 2", goals)?.erkannt)
     }
 
     @Test
     fun testRecentNotesParsingRobustness() {
         // 1. Legacy format: plain string array
         val legacy = """["Apfel", "Birne"]"""
-        val parsedLegacy = RecentNotesStore.parseRecentNotes(legacy)
+        val parsedLegacy = RecentNotesLogic.parseRecentNotes(legacy)
         assertEquals(2, parsedLegacy.size)
         assertEquals("Apfel", parsedLegacy[0].text)
         assertFalse(parsedLegacy[0].starred)
 
         // 2. Integer boolean: 1 = true, 0 = false
         val intBool = """[{"t":"Suppe","s":1},{"t":"Brot","s":0}]"""
-        val parsedInt = RecentNotesStore.parseRecentNotes(intBool)
+        val parsedInt = RecentNotesLogic.parseRecentNotes(intBool)
         assertEquals(2, parsedInt.size)
         assertEquals("Suppe", parsedInt[0].text)
         assertTrue(parsedInt[0].starred)
@@ -232,13 +232,13 @@ class DataSerializationTest {
 
         // 3. String boolean: "true"
         val strBool = """[{"t":"Tee","s":"true"}]"""
-        val parsedStr = RecentNotesStore.parseRecentNotes(strBool)
+        val parsedStr = RecentNotesLogic.parseRecentNotes(strBool)
         assertEquals(1, parsedStr.size)
         assertTrue(parsedStr[0].starred)
 
         // 4. Full property names: text / starred
         val fullNames = """[{"text":"Salat","starred":true}]"""
-        val parsedFull = RecentNotesStore.parseRecentNotes(fullNames)
+        val parsedFull = RecentNotesLogic.parseRecentNotes(fullNames)
         assertEquals(1, parsedFull.size)
         assertEquals("Salat", parsedFull[0].text)
         assertTrue(parsedFull[0].starred)
@@ -264,7 +264,7 @@ class DataSerializationTest {
     @Test
     fun testAppBackupRoundTripAndBase64Photos() {
         val samplePhotoBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 1, 2, 3, 4)
-        val encodedPhoto = BackupStore.encodePhotoBase64(samplePhotoBytes)
+        val encodedPhoto = BackupLogic.encodePhotoBase64(samplePhotoBytes)
 
         val backup = AppBackup(
             version = 1,
@@ -326,14 +326,14 @@ class DataSerializationTest {
             )
         )
 
-        val json = BackupStore.serializeBackup(backup)
+        val json = BackupLogic.serializeBackup(backup)
         assertTrue(json.contains("sk-or-v1-secret-key"))
         assertTrue(json.contains(encodedPhoto))
 
-        val restored = BackupStore.deserializeBackup(json)
+        val restored = BackupLogic.deserializeBackup(json)
         assertEquals(backup, restored)
 
-        val decodedBytes = BackupStore.decodePhotoBase64(restored.historyEntries.first().photoBase64!!)
+        val decodedBytes = BackupLogic.decodePhotoBase64(restored.historyEntries.first().photoBase64!!)
         org.junit.Assert.assertArrayEquals(samplePhotoBytes, decodedBytes)
     }
 
@@ -353,12 +353,12 @@ class DataSerializationTest {
             goals = listOf("Neues Ziel 1", "Neues Ziel 2"),
             goalsWereSplit = true
         )
-        val mergedSettings = BackupStore.mergeSettings(existingSettings, importedSettings)
+        val mergedSettings = BackupLogic.mergeSettings(existingSettings, importedSettings)
         assertEquals(importedSettings, mergedSettings)
 
         val existingProfile = Profile(birthDate = "1980-01-01", weightKg = 90.0, heightCm = 175, notes = "Alt", gender = Gender.FEMALE)
         val importedProfile = Profile(birthDate = "1990-05-20", weightKg = 74.0, heightCm = 180, notes = "Neu", gender = Gender.MALE)
-        val mergedProfile = BackupStore.mergeProfile(existingProfile, importedProfile)
+        val mergedProfile = BackupLogic.mergeProfile(existingProfile, importedProfile)
         assertEquals(importedProfile, mergedProfile)
 
         val existingNotes = listOf(
@@ -369,7 +369,7 @@ class DataSerializationTest {
             RecentNote("Salat", starred = true),
             RecentNote("Müsli", starred = false)
         )
-        val mergedNotes = BackupStore.mergeRecentNotes(existingNotes, importedNotes)
+        val mergedNotes = BackupLogic.mergeRecentNotes(existingNotes, importedNotes)
         assertEquals(3, mergedNotes.size)
         // Imported "Salat" overwrote existing unstarred "Salat" with starred = true
         assertEquals(RecentNote("Salat", starred = true), mergedNotes[0])
@@ -394,8 +394,8 @@ class DataSerializationTest {
             themeMode = AppThemeMode.DARK,
             language = AppLanguage.DE
         )
-        val json = BackupStore.serializeBackup(backup)
-        val restored = BackupStore.deserializeBackup(json)
+        val json = BackupLogic.serializeBackup(backup)
+        val restored = BackupLogic.deserializeBackup(json)
         assertEquals(AppThemeMode.DARK, restored.themeMode)
         assertEquals(AppLanguage.DE, restored.language)
     }

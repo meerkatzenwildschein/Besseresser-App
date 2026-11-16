@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
 
 /** Öffnet den System-Dateipicker direkt mit Startverzeichnis „Downloads". */
 class OpenBackupDocumentContract : ActivityResultContracts.OpenDocument() {
@@ -87,6 +88,12 @@ fun ConfigScreen(
     onHistoryCleared: () -> Unit
 ) {
     val ctx = LocalContext.current
+    // Übergangslösung (Phase 2): direkter Service-Zugriff; wird in Phase 5 in ein
+    // ConfigViewModel verlagert.
+    val backupManager: BackupManager = koinInject()
+    val settingsRepository: SettingsRepository = koinInject()
+    val profileRepository: ProfileRepository = koinInject()
+    val historyRepository: HistoryRepository = koinInject()
     val scope = rememberCoroutineScope()
 
     var busy by remember { mutableStateOf(false) }
@@ -103,11 +110,11 @@ fun ConfigScreen(
         errorMessage = null
         scope.launch {
             val res = withContext(Dispatchers.IO) {
-                BackupStore.importFromUri(ctx, uri)
+                backupManager.importFromUri(uri)
             }
             res.onSuccess { summary ->
-                val updatedSettings = Store.load(ctx)
-                val updatedProfile = ProfileStore.load(ctx)
+                val updatedSettings = settingsRepository.load()
+                val updatedProfile = profileRepository.load()
                 onDataImported(updatedSettings, updatedProfile)
                 busy = false
                 statusMessage = ctx.getString(
@@ -300,7 +307,7 @@ fun ConfigScreen(
                     errorMessage = null
                     scope.launch {
                         val res = withContext(Dispatchers.IO) {
-                            BackupStore.exportToDownloads(ctx)
+                            backupManager.exportToDownloads()
                         }
                         res.onSuccess { summary ->
                             busy = false
@@ -414,7 +421,7 @@ fun ConfigScreen(
                         scope.launch {
                             runCatching {
                                 withContext(Dispatchers.IO) {
-                                    HistoryStore.clearAll(ctx)
+                                    historyRepository.clearAll()
                                 }
                             }.onSuccess {
                                 onHistoryCleared()

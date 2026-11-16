@@ -62,7 +62,8 @@ data class BackupSummary(
     val hasProfile: Boolean = false
 )
 
-object BackupStore {
+/** Reine (De-)Serialisierungs- und Merge-Logik für Backups – kontextfrei und direkt testbar. */
+object BackupLogic {
 
     private val BackupJson = Json {
         ignoreUnknownKeys = true
@@ -72,20 +73,20 @@ object BackupStore {
         prettyPrint = true
     }
 
-    internal fun encodePhotoBase64(bytes: ByteArray): String =
+    fun encodePhotoBase64(bytes: ByteArray): String =
         Base64.getEncoder().encodeToString(bytes)
 
-    internal fun decodePhotoBase64(base64: String): ByteArray =
+    fun decodePhotoBase64(base64: String): ByteArray =
         Base64.getDecoder().decode(base64.trim())
 
-    internal fun serializeBackup(backup: AppBackup): String =
+    fun serializeBackup(backup: AppBackup): String =
         BackupJson.encodeToString(backup)
 
-    internal fun deserializeBackup(rawJson: String): AppBackup =
+    fun deserializeBackup(rawJson: String): AppBackup =
         BackupJson.decodeFromString<AppBackup>(rawJson)
 
     /** Importierte Einstellungen überschreiben vorhandene Werte (inkl. API-Key und Ziele). */
-    internal fun mergeSettings(existing: Settings, imported: Settings): Settings = Settings(
+    fun mergeSettings(existing: Settings, imported: Settings): Settings = Settings(
         baseUrl = imported.baseUrl.trim().ifBlank { existing.baseUrl },
         apiKey = imported.apiKey.trim().ifBlank { existing.apiKey },
         model = imported.model.trim().ifBlank { existing.model },
@@ -94,7 +95,7 @@ object BackupStore {
     )
 
     /** Importierte Profildaten überschreiben vorhandene Felder. */
-    internal fun mergeProfile(existing: Profile, imported: Profile): Profile {
+    fun mergeProfile(existing: Profile, imported: Profile): Profile {
         if (imported.isEmpty) return existing
         return Profile(
             birthDate = imported.birthDate?.takeIf { it.isNotBlank() } ?: existing.birthDate,
@@ -106,7 +107,7 @@ object BackupStore {
     }
 
     /** Importierte Notizen überschreiben gleichlautende vorhandene Notizen; Reihenfolge aus dem Backup hat Vorrang. */
-    internal fun mergeRecentNotes(existing: List<RecentNote>, imported: List<RecentNote>): List<RecentNote> {
+    fun mergeRecentNotes(existing: List<RecentNote>, imported: List<RecentNote>): List<RecentNote> {
         val existingByText = existing.associateBy { it.text.trim() }
         val cleanedImported = imported
             .map {
@@ -121,22 +122,33 @@ object BackupStore {
             .filter { it.text.isNotBlank() && it.text !in importedTexts }
         return cleanedImported + remainingExisting
     }
+}
+
+/** Vollständiger JSON-Export/-Import aller App-Daten (inkl. API-Key & Base64-Fotos).
+ *  Zugriff auf die Datenbestände läuft ausschließlich über die injizierten Repositories. */
+class BackupManager(
+    private val context: Context,
+    private val settingsRepository: SettingsRepository,
+    private val profileRepository: ProfileRepository,
+    private val historyRepository: HistoryRepository,
+    private val photoStorage: PhotoStorage
+) {
 
     /** Erstellt ein vollständiges In-Memory-Backup aller aktuell gespeicherten App-Daten inkl. Fotos als Base64. */
-    fun createBackup(ctx: Context, nowMillis: Long = System.currentTimeMillis()): AppBackup {
-        val settings = Store.load(ctx)
-        val profile = ProfileStore.load(ctx)
-        val recentNotes = RecentNotesStore.load(ctx, sortStarredFirst = false)
-        val entries = HistoryStore.entries(ctx)
-        val dayFazits = DayFazitStore.loadAll(ctx)
-        val weekFazits = WeekFazitStore.loadAll(ctx)
+    suspend fun createBackup(nowMillis: Long = System.currentTimeMillis()): AppBackup {
+        val settings = settingsRepository.load()
+        val profile = profileRepository.load()
+        val recentNotes = settingsRepository.loadRecentNotes(sortStarredFirst = false)
+        val entries = historyRepository.getAll()
+        val dayFazits = historyRepository.loadAllDayFazits()
+        val weekFazits = historyRepository.loadAllWeekFazits()
 
         val backupEntries = entries.map { entry ->
-            val photoFile = HistoryStore.photoFileOf(ctx, entry)
+            val photoFile = historyRepository.photoFileOf(entry)
             val base64 = photoFile?.let { file ->
                 runCatching {
                     val bytes = file.readBytes()
-                    if (bytes.isNotEmpty()) encodePhotoBase64(bytes) else null
+                    if (bytes.isNotEmpty()) BackupLogic.encodePhotoBase64(bytes) else null
                 }.getOrNull()
             }
             BackupHistoryEntry(entry = entry, photoBase64 = base64)
@@ -151,20 +163,20 @@ object BackupStore {
             historyEntries = backupEntries,
             dayFazits = dayFazits,
             weekFazits = weekFazits,
-            themeMode = UiPrefsStore.loadThemeMode(ctx),
-            language = UiPrefsStore.loadLanguage(ctx)
+            themeMode = UiPrefsStore.loadThemeMode(context),
+            language = UiPrefsStore.loadLanguage(context)
         )
     }
 
     /** Exportiert alle App-Daten als JSON-Datei direkt in den öffentlichen Ordner „Downloads". */
-    fun exportToDownloads(ctx: Context): Result<BackupSummary> = runCatching {
+    suspend fun exportToDownloads(): Result<BackupSummary> = runCatching {
         val now = System.currentTimeMillis()
-        val backup = createBackup(ctx, now)
-        val json = serializeBackup(backup)
+        val backup = createBackup(now)
+        val json = BackupLogic.serializeBackup(backup)
         val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date(now))
         val fileName = "besseresser-backup-$timestamp.json"
 
-        writeJsonToDownloads(ctx, fileName, json)
+        writeJsonToDownloads(fileName, json)
 
         BackupSummary(
             fileName = fileName,
@@ -178,10 +190,10 @@ object BackupStore {
         )
     }
 
-    private fun writeJsonToDownloads(ctx: Context, fileName: String, json: String) {
+    private fun writeJsonToDownloads(fileName: String, json: String) {
         val bytes = json.toByteArray(Charsets.UTF_8)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val resolver = ctx.contentResolver
+            val resolver = context.contentResolver
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
@@ -213,43 +225,35 @@ object BackupStore {
     }
 
     /** Liest eine Backup-JSON-Datei über ihre Content-URI ein und stellt alle Daten wieder her. */
-    fun importFromUri(ctx: Context, uri: Uri): Result<BackupSummary> = runCatching {
-        val rawJson = ctx.contentResolver.openInputStream(uri)?.use { input ->
+    suspend fun importFromUri(uri: Uri): Result<BackupSummary> = runCatching {
+        val rawJson = context.contentResolver.openInputStream(uri)?.use { input ->
             input.bufferedReader(Charsets.UTF_8).readText()
         } ?: throw IllegalStateException("Datei konnte nicht gelesen werden.")
-        importFromJson(ctx, rawJson).getOrThrow()
+        importFromJson(rawJson).getOrThrow()
     }
 
     /** Importiert ein JSON-Backup; vorhandene Daten und Duplikate (Einstellungen, API-Key, Profil,
      *  Notizen, Verlaufseinträge inkl. Fotos sowie Tages-/Wochenfazits) werden überschrieben. */
-    fun importFromJson(ctx: Context, rawJson: String): Result<BackupSummary> = runCatching {
-        val backup = deserializeBackup(rawJson)
+    suspend fun importFromJson(rawJson: String): Result<BackupSummary> = runCatching {
+        val backup = BackupLogic.deserializeBackup(rawJson)
 
         // 1. Einstellungen (inkl. API-Key) sowie Theme & Sprache zusammenführen & speichern
-        val mergedSettings = mergeSettings(Store.load(ctx), backup.settings)
-        Store.save(ctx, mergedSettings)
-        backup.themeMode?.let { UiPrefsStore.saveThemeMode(ctx, it) }
-        backup.language?.let { UiPrefsStore.saveLanguage(ctx, it) }
+        val mergedSettings = BackupLogic.mergeSettings(settingsRepository.load(), backup.settings)
+        settingsRepository.save(mergedSettings)
+        backup.themeMode?.let { UiPrefsStore.saveThemeMode(context, it) }
+        backup.language?.let { UiPrefsStore.saveLanguage(context, it) }
 
         // 2. Profil zusammenführen & speichern
-        val mergedProfile = mergeProfile(ProfileStore.load(ctx), backup.profile)
-        ProfileStore.save(
-            ctx = ctx,
-            birthDateIso = mergedProfile.birthDate,
-            weightKg = mergedProfile.weightKg,
-            heightCm = mergedProfile.heightCm,
-            notes = mergedProfile.notes,
-            gender = mergedProfile.gender
-        )
+        val mergedProfile = BackupLogic.mergeProfile(profileRepository.load(), backup.profile)
+        profileRepository.save(mergedProfile)
 
         // 3. Notiz-Schnellauswahl (inkl. Favoriten-Sternchen) zusammenführen & speichern
-        val existingNotes = RecentNotesStore.load(ctx, sortStarredFirst = false)
-        val mergedNotes = mergeRecentNotes(existingNotes, backup.recentNotes)
-        RecentNotesStore.save(ctx, mergedNotes)
+        val existingNotes = settingsRepository.loadRecentNotes(sortStarredFirst = false)
+        val mergedNotes = BackupLogic.mergeRecentNotes(existingNotes, backup.recentNotes)
+        settingsRepository.saveRecentNotes(mergedNotes)
 
         // 4. Verlaufseinträge & Base64-Fotos wiederherstellen (Duplikate überschreiben)
-        val histDir = HistoryStore.dir(ctx)
-        val existingEntries = HistoryStore.entries(ctx)
+        val existingEntries = historyRepository.getAll()
         var restoredPhotos = 0
 
         val entriesToSave = backup.historyEntries.map { item ->
@@ -262,16 +266,16 @@ object BackupStore {
                         existing.erkannt == rawEntry.erkannt &&
                         existing.note == rawEntry.note
             }.forEach { duplicate ->
-                HistoryStore.delete(ctx, duplicate)
+                historyRepository.delete(duplicate)
             }
 
             var photoFileName = rawEntry.photoFile
             val b64 = item.photoBase64
             if (!b64.isNullOrBlank()) {
-                val decodedBytes = runCatching { decodePhotoBase64(b64) }.getOrNull()
+                val decodedBytes = runCatching { BackupLogic.decodePhotoBase64(b64) }.getOrNull()
                 if (decodedBytes != null && decodedBytes.isNotEmpty()) {
                     val safeName = File(photoFileName.ifBlank { "${rawEntry.id}.jpg" }).name
-                    val targetFile = File(histDir, safeName)
+                    val targetFile = File(photoStorage.dir(), safeName)
                     targetFile.writeBytes(decodedBytes)
                     photoFileName = safeName
                     restoredPhotos++
@@ -279,11 +283,11 @@ object BackupStore {
             }
             rawEntry.copy(photoFile = photoFileName)
         }
-        HistoryStore.saveAll(ctx, entriesToSave)
+        historyRepository.saveAll(entriesToSave)
 
         // 5. Tages- und Wochenfazits speichern (überschreibt vorhandene Keys via REPLACE)
-        DayFazitStore.saveAll(ctx, backup.dayFazits)
-        WeekFazitStore.saveAll(ctx, backup.weekFazits)
+        historyRepository.saveAllDayFazits(backup.dayFazits)
+        historyRepository.saveAllWeekFazits(backup.weekFazits)
 
         BackupSummary(
             entriesCount = entriesToSave.size,

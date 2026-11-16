@@ -25,8 +25,7 @@ data class SetupUiState(
 )
 
 class SetupViewModel(
-    private val apiService: BesseresserApiService = ApiClient,
-    settingsRepository: SettingsRepository? = null
+    private val apiService: BesseresserApiService
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SetupUiState())

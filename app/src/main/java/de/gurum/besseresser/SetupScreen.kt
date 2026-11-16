@@ -57,7 +57,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -96,9 +97,13 @@ fun SetupScreen(
     onCancel: () -> Unit,
     onDone: (Settings) -> Unit,
     onBackupImported: ((Settings, Profile) -> Unit)? = null,
-    viewModel: SetupViewModel = viewModel()
+    viewModel: SetupViewModel = koinViewModel()
 ) {
     val ctx = LocalContext.current
+    // Übergangslösung (Phase 2): direkter Service-Zugriff; wird in Phase 5 verlagert.
+    val backupManager: BackupManager = koinInject()
+    val settingsRepository: SettingsRepository = koinInject()
+    val profileRepository: ProfileRepository = koinInject()
     val scope = rememberCoroutineScope()
     val defaultGoals = remember { ctx.resources.getStringArray(R.array.default_goals).toList() }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -111,11 +116,11 @@ fun SetupScreen(
         importError = null
         scope.launch {
             val res = withContext(Dispatchers.IO) {
-                BackupStore.importFromUri(ctx, uri)
+                backupManager.importFromUri(uri)
             }
             res.onSuccess { summary ->
-                val updatedSettings = Store.load(ctx)
-                val updatedProfile = ProfileStore.load(ctx)
+                val updatedSettings = settingsRepository.load()
+                val updatedProfile = profileRepository.load()
                 importingBackup = false
                 Toast.makeText(
                     ctx,

@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import org.koin.compose.koinInject
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -286,7 +287,7 @@ fun HistoryItem(
     onClick: () -> Unit,
     isLifted: Boolean = false
 ) {
-    val ctx = LocalContext.current
+    val historyRepository: HistoryRepository = koinInject()
     val scale by animateFloatAsState(
         targetValue = if (isLifted) 1.025f else 1f,
         animationSpec = tween(150),
@@ -318,7 +319,7 @@ fun HistoryItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             val thumb = remember(entry.id) {
-                HistoryStore.photoFileOf(ctx, entry)?.let { decodeThumb(it) }
+                historyRepository.decodeThumbnail(entry)
             }
             if (thumb != null) {
                 Image(
@@ -618,7 +619,7 @@ fun PendingDeleteHistoryItem(
     entry: HistoryEntry,
     onUndo: () -> Unit
 ) {
-    val ctx = LocalContext.current
+    val historyRepository: HistoryRepository = koinInject()
     val progress = remember(entry.id) { Animatable(1f) }
     LaunchedEffect(entry.id) {
         progress.animateTo(
@@ -644,7 +645,7 @@ fun PendingDeleteHistoryItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val thumb = remember(entry.id) {
-                    HistoryStore.photoFileOf(ctx, entry)?.let { decodeThumb(it) }
+                    historyRepository.decodeThumbnail(entry)
                 }
                 Box(modifier = Modifier.alpha(0.32f)) {
                     if (thumb != null) {

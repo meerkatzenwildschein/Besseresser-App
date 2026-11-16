@@ -20,14 +20,11 @@ data class ProfileUiState(
 )
 
 class ProfileViewModel(
-    private val profileRepository: ProfileRepository? = null
+    private val profileRepository: ProfileRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
-
-    private fun getProfileRepo(ctx: Context?): ProfileRepository? =
-        profileRepository ?: ctx?.let { RepositoryProvider.getProfileRepository(it) }
 
     fun initFromProfile(profile: Profile) {
         _uiState.update {
@@ -102,8 +99,7 @@ class ProfileViewModel(
             notes = state.notesText.trim(),
             gender = state.gender
         )
-        val repo = getProfileRepo(ctx)
-        repo?.save(updated)
+        profileRepository.save(updated)
         onSaved(updated)
         return true
     }

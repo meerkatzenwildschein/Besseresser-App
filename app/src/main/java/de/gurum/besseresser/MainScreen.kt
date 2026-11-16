@@ -68,7 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import org.koin.androidx.compose.koinViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.File
@@ -88,7 +88,7 @@ fun MainScreen(
     onOpenProfile: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenConfig: () -> Unit = {},
-    viewModel: MainViewModel = viewModel()
+    viewModel: MainViewModel = koinViewModel()
 ) {
     val ctx = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -148,7 +148,7 @@ fun MainScreen(
                 onConfirm = {
                     viewModel.setShowCamera(false)
                     val noteTrimmed = uiState.note.trim()
-                    RecentNotesStore.push(ctx, noteTrimmed)
+                    viewModel.pushRecentNote(noteTrimmed)
                     triggerAnalyze(noteTrimmed, photoUri)
                 }
             )
@@ -165,7 +165,7 @@ fun MainScreen(
                 },
                 onRate = {
                     val trimmed = uiState.note.trim()
-                    RecentNotesStore.push(ctx, trimmed)
+                    viewModel.pushRecentNote(trimmed)
                     triggerAnalyze(trimmed, photoUri)
                 },
                 onRetake = {
@@ -202,7 +202,7 @@ fun MainScreen(
                     }
                 },
                 onSaveToHistory = {
-                    viewModel.saveToHistory(ctx, settings)
+                    viewModel.saveToHistory()
                 },
                 onDiscard = { viewModel.reset() }
             )
@@ -231,7 +231,7 @@ fun MainScreen(
                 ErkanntEditDialog(
                     initialText = uiState.evaluation?.erkannt.orEmpty(),
                     onOk = { newText ->
-                        viewModel.updateErkannt(ctx, newText)
+                        viewModel.updateErkannt(newText)
                     },
                     onDismiss = { viewModel.setShowErkanntEdit(false) }
                 )
@@ -869,20 +869,6 @@ private fun createAnalyzePrompts(ctx: Context, trimmedNote: String): PromptBundl
         ctx.getString(R.string.prompt_note_header, trimmedNote)
     else ""
 )
-
-private fun saveMainEntryToHistory(
-    ctx: Context,
-    photoUri: Uri,
-    evaluation: Evaluation?,
-    note: String
-): HistoryEntry? {
-    val ev = evaluation ?: return null
-    return try {
-        HistoryStore.add(ctx, photoUri, ev, note.trim())
-    } catch (e: Exception) {
-        null
-    }
-}
 
 private class MainSwipeState(
     private val isBlocked: Boolean,
