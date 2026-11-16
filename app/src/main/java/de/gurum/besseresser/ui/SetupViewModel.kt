@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import de.gurum.besseresser.R
 import de.gurum.besseresser.data.ApiException
 import de.gurum.besseresser.data.BackupService
+import de.gurum.besseresser.data.BackupSummary
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.model.Settings
@@ -28,7 +29,8 @@ data class SetupUiState(
     val showSplit: Boolean = false,
     val splitEdited: String = "",
     val splitRaw: String = "",
-    val splitDebug: String? = null
+    val splitDebug: String? = null,
+    val retentionWeeks: String = Settings.DEFAULT_RETENTION_WEEKS.toString()
 )
 
 class SetupViewModel(
@@ -46,7 +48,8 @@ class SetupViewModel(
                 url = initial.baseUrl,
                 key = initial.apiKey,
                 model = initial.model.ifBlank { "gpt-4o-mini" },
-                goals = initial.goals.joinToString("\n").ifBlank { defaultGoals.joinToString("\n") }
+                goals = initial.goals.joinToString("\n").ifBlank { defaultGoals.joinToString("\n") },
+                retentionWeeks = initial.retentionWeeks.toString()
             )
         }
     }
@@ -83,13 +86,17 @@ class SetupViewModel(
         _uiState.update { it.copy(splitEdited = text) }
     }
 
-    fun importBackup(uri: Uri, defaultGoals: List<String>, onResult: (Result<Settings>) -> Unit) {
+    fun setRetentionWeeks(text: String) {
+        _uiState.update { it.copy(retentionWeeks = text) }
+    }
+
+    fun importBackup(uri: Uri, defaultGoals: List<String>, onResult: (Result<Pair<Settings, BackupSummary>>) -> Unit) {
         viewModelScope.launch {
             val res = backupService.importFromUri(uri)
-            res.onSuccess {
+            res.onSuccess { summary ->
                 val updated = settingsRepository.currentSettings()
                 init(updated, defaultGoals)
-                onResult(Result.success(updated))
+                onResult(Result.success(updated to summary))
             }.onFailure { e ->
                 onResult(Result.failure(e))
             }

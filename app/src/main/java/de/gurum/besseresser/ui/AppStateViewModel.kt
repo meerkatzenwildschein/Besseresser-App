@@ -1,11 +1,13 @@
 package de.gurum.besseresser.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.model.AppLanguage
 import de.gurum.besseresser.model.AppThemeMode
 import de.gurum.besseresser.data.ProfileRepository
@@ -30,7 +32,8 @@ data class AppState(
 class AppStateViewModel(
     private val settingsRepository: SettingsRepository,
     private val profileRepository: ProfileRepository,
-    private val uiPrefsRepository: UiPrefsRepository
+    private val uiPrefsRepository: UiPrefsRepository,
+    private val historyRepository: HistoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AppState())
@@ -46,6 +49,14 @@ class AppStateViewModel(
             ) { settings, profile, themeMode, language ->
                 AppState(loaded = true, settings = settings, profile = profile, themeMode = themeMode, language = language)
             }.collect { _uiState.value = it }
+        }
+        // Historien-Begrenzung: einmalig beim App-Start im Hintergrund alte Einträge löschen
+        // (Einträge inkl. Fotos sowie Tages-/Wochenfazits, die älter als retentionWeeks sind).
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val weeks = settingsRepository.currentSettings().retentionWeeks
+                if (weeks > 0) historyRepository.purgeOlderThanWeeks(weeks)
+            }
         }
     }
 

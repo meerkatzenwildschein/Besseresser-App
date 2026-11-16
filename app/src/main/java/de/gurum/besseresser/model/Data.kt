@@ -174,10 +174,17 @@ data class Settings(
     val model: String = "gpt-4o-mini",
     val goals: List<String> = emptyList(),
     // true = Ziele sind bereits als saubere Ein-Zeile-ein-Ziel-Liste gespeichert (KI-Aufteilung bestätigt)
-    val goalsWereSplit: Boolean = false
+    val goalsWereSplit: Boolean = false,
+    // Historien-Begrenzung: Einträge (inkl. Tages-/Wochenfazits & Fotos) werden nach so vielen
+    // Wochen automatisch gelöscht. 0 = automatisches Löschen deaktiviert.
+    val retentionWeeks: Int = DEFAULT_RETENTION_WEEKS
 ) {
     val isComplete: Boolean
         get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && model.isNotBlank() && goals.isNotEmpty()
+
+    companion object {
+        const val DEFAULT_RETENTION_WEEKS = 8
+    }
 }
 
 /** Bewertung fuer EIN Ziel: Ampel + Begruendung. */
