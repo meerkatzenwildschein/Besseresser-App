@@ -185,6 +185,7 @@ Besseresser-App/
 │       │   │       ├── DayGroupHeader.kt   ← Tagesgruppen-Header, Score-Badges, Ziele-Preview
 │       │   │       ├── FazitCard.kt        ← Tages- und Wochenfazit-Karten, Chips & Auto-Fazit-Trigger
 │       │   │       ├── HistoryDetailScreen.kt ← Detailansicht einzelner Mahlzeiten, Re-Evaluation
+│       │   │       ├── HistoryDetailViewModel.kt ← ViewModel für die Detailansicht (pro entryId)
 │       │   │       ├── HistoryListScreen.kt← Verlaufslisten-UI, Swipe-To-Dismiss, HistoryItem
 │       │   │       ├── HistoryScreen.kt    ← Haupt-Verlaufsansicht & Navigation
 │       │   │       ├── HistoryViewModel.kt ← ViewModel für Verlaufsdaten, Filter & Fazit-Generierung
@@ -276,6 +277,5 @@ Besseresser-App/
 2. **Typsichere Enums bevorzugen:** Ampel-Werte (`TrafficLight`) und Geschlechter (`Gender`) immer als Enum übergeben; UI-Farben über `TrafficLight.color()` bzw. `ampelColor()` beziehen.
 3. **Strings zweisprachig pflegen:** Neue UI-Texte, Fehlermeldungen oder Prompt-Bestandteile immer in beiden Ressourcen-Dateien anlegen: `res/values/strings.xml` und `res/values-de/strings.xml`.
 4. **Refactoring-Plan beachten:** Geplante Modernisierungen (Coroutines, Room, ViewModels) sind in `REFACTORING.md` priorisiert dokumentiert.
-5. **Dependency Injection über Koin:** Neue Abhängigkeiten (Repositories, Services, ViewModels) in `di/AppModule.kt` registrieren und per Konstruktor injizieren – keine manuelle Instanziierung, kein `Context`-Fallback in ViewModels. ViewModels in Compose über `koinViewModel()` beziehen.
-   - Ausnahme (Phase 1, wird in späteren Phasen aufgelöst): Methoden, die Android-`Resources`/`ContentResolver` benötigen (`analyze`, `reEvaluate`, `generateFazit`, `generateWeekFazit`, `startSplitGoals`, `ProfileViewModel.save`), erhalten `Context` noch als Methodenparameter.
-6. **Persistenz nur über Repositories:** Datenzugriff (Room, DataStore, Fotos) ausschließlich über die Repository-Interfaces aus `Repositories.kt` (suspend/Flow) – keine `XxxStore`-Objekte mehr. Reine, kontextfreie Logik liegt in `RecentNotesLogic`, `HistoryEntryLogic` und `BackupLogic`. Settings/Profil/Theme/Sprache fließen reaktiv über den `AppStateViewModel` in der MainActivity. Suspendierende Repository-Aufrufe aus Composables heraus immer in einem `rememberCoroutineScope` starten (Übergangslösung, Phase 5 verschiebt sie in ViewModels).
+5. **Dependency Injection über Koin:** Neue Abhängigkeiten (Repositories, Services, ViewModels) in `di/AppModule.kt` registrieren und per Konstruktor injizieren – keine manuelle Instanziierung, kein `Context`-Fallback in ViewModels. ViewModels in Compose über `koinViewModel()` beziehen (mit `parametersOf(...)` für Argumente wie `entryId`).
+6. **Persistenz nur über Repositories:** Datenzugriff (Room, DataStore, Fotos) ausschließlich über die Repository-Interfaces aus `data/Repositories.kt` (suspend/Flow) – keine `XxxStore`-Objekte mehr. Reine, kontextfreie Logik liegt in `RecentNotesLogic`, `HistoryEntryLogic` und `BackupLogic`. Settings/Profil/Theme/Sprache fließen reaktiv über den `AppStateViewModel` in der MainActivity. UI ruft Datenzugriffe ausschließlich über ViewModels auf (kein `koinInject` von Repositories/Services in Composables).

@@ -54,8 +54,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.androidx.compose.koinViewModel
 import de.gurum.besseresser.R
 import de.gurum.besseresser.model.GoalResult
 import de.gurum.besseresser.model.RecentNote
@@ -369,24 +369,13 @@ fun ErkanntEditDialog(initialText: String, onOk: (String) -> Unit, onDismiss: ()
  *  Auswahl setzt den Text und verschiebt den Eintrag an die Spitze (MRU). */
 @Composable
 fun RecentNotesButton(onPick: (String) -> Unit) {
-    val settingsRepository: SettingsRepository = koinInject()
-    val scope = rememberCoroutineScope()
-    var recent by remember { mutableStateOf<List<RecentNote>>(emptyList()) }
+    val viewModel: RecentNotesViewModel = koinViewModel()
+    val notes by viewModel.notes.collectAsStateWithLifecycle()
     var open by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        recent = settingsRepository.loadRecentNotes()
-    }
-    val isEnabled = recent.isNotEmpty()
+    val isEnabled = notes.isNotEmpty()
     Box {
         IconButton(
-            onClick = {
-                open = true
-                scope.launch {
-                    // Anzeigereihenfolge NUR beim Öffnen: Sternchen nach oben (in-place-Toggling
-                    // darf nicht hüpfen), unmarkierte behalten ihre MRU-Reihenfolge
-                    recent = settingsRepository.loadRecentNotes(sortStarredFirst = true)
-                }
-            },
+            onClick = { open = true },
             enabled = isEnabled,
             modifier = Modifier.size(24.dp)
         ) {
@@ -398,19 +387,14 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
             )
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            recent.forEach { n ->
+            notes.forEach { n ->
                 DropdownMenuItem(
                     leadingIcon = {
                         // Sternchen = Favorit: ausgefüllt/umrissen; Toggle schließt das Menü NICHT
                         IconButton(onClick = {
-                            // Eintrag vesconcem in der SICHTBAREN Liste kippen und genau diese
-                            // Reihenfolge persistieren — kein Laden/Sortieren zwischendurch,
-                            // sonst springt der Eintrag (unds dass sortierende load() lagern lässt)
-                            val updated = recent.map {
-                                if (it.text == n.text) it.copy(starred = !it.starred) else it
-                            }
-                            recent = updated
-                            scope.launch { settingsRepository.saveRecentNotes(updated) }
+                            // Eintrag in der SICHTBAREN Liste kippen und persistieren —
+                            // kein Neusortieren zwischendurch, sonst springt der Eintrag
+                            viewModel.toggleStar(n)
                         }, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 Icons.Filled.Star,
@@ -433,9 +417,7 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
                     },
                     onClick = {
                         open = false
-                        scope.launch {
-                            settingsRepository.pushRecentNote(n.text)   // Auswahl rutscht nach oben (MRU)
-                        }
+                        viewModel.push(n)   // Auswahl rutscht nach oben (MRU)
                         onPick(n.text)
                     }
                 )

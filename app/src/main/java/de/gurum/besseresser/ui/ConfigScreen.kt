@@ -40,11 +40,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -52,17 +53,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.koin.compose.koinInject
+import org.koin.androidx.compose.koinViewModel
 import de.gurum.besseresser.R
 import de.gurum.besseresser.BuildConfig
 import de.gurum.besseresser.model.AppLanguage
 import de.gurum.besseresser.model.AppThemeMode
-import de.gurum.besseresser.model.Settings
-import de.gurum.besseresser.data.BackupManager
-import de.gurum.besseresser.data.HistoryRepository
 
 /** Öffnet den System-Dateipicker direkt mit Startverzeichnis „Downloads". */
 class OpenBackupDocumentContract : ActivityResultContracts.OpenDocument() {
@@ -91,45 +86,27 @@ fun ConfigScreen(
     onLanguageChange: (AppLanguage) -> Unit,
     onBack: () -> Unit,
     onDataImported: () -> Unit = {},
-    onHistoryCleared: () -> Unit
+    onHistoryCleared: () -> Unit,
+    viewModel: ConfigViewModel = koinViewModel()
 ) {
     val ctx = LocalContext.current
-    // Übergangslösung (Phase 3): direkter Service-Zugriff; wird in Phase 5 in ein
-    // ConfigViewModel verlagert. Settings/Profil/Theme/Sprache fließen reaktiv
-    // über den AppStateViewModel in der MainActivity.
-    val backupManager: BackupManager = koinInject()
-    val historyRepository: HistoryRepository = koinInject()
-    val scope = rememberCoroutineScope()
-
-    var busy by remember { mutableStateOf(false) }
-    var statusMessage by remember { mutableStateOf<String?>(null) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     var showClearConfirm by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = !busy) { onBack() }
+    BackHandler(enabled = !state.busy) { onBack() }
 
     val importLauncher = rememberLauncherForActivityResult(OpenBackupDocumentContract()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
-        busy = true
-        statusMessage = null
-        errorMessage = null
-        scope.launch {
-            val res = withContext(Dispatchers.IO) {
-                backupManager.importFromUri(uri)
-            }
-            res.onSuccess { summary ->
-                onDataImported()
-                busy = false
-                statusMessage = ctx.getString(
-                    R.string.config_import_success,
-                    summary.entriesCount,
-                    summary.photosCount
-                )
-            }.onFailure { e ->
-                busy = false
-                errorMessage = e.message ?: ctx.getString(R.string.config_import_failed)
-            }
-        }
+        viewModel.importBackup(uri)
+    }
+
+    // Import-Erfolg: UI-Meldung + AppState-Refresh auslösen
+    LaunchedEffect(state.importSummary) {
+        state.importSummary?.let { onDataImported() }
+    }
+    // Clear-Erfolg: MainScreen-State zurücksetzen
+    LaunchedEffect(state.cleared) {
+        if (state.cleared) onHistoryCleared()
     }
 
     Column(
@@ -141,7 +118,7 @@ fun ConfigScreen(
     ) {
         TopBarRow(
             title = stringResource(R.string.menu_config),
-            onBack = { if (!busy) onBack() },
+            onBack = { if (!state.busy) onBack() },
             trailing = { },
             icon = Icons.Filled.Build
         )
@@ -171,11 +148,11 @@ fun ConfigScreen(
             }
         }
 
-        errorMessage?.let { msg ->
+        state.error?.let { msg ->
             ErrorBanner(msg)
         }
 
-        statusMessage?.let { msg ->
+        state.exportSummary?.let { summary ->
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer,
                 shape = RoundedCornerShape(14.dp),
@@ -196,7 +173,7 @@ fun ConfigScreen(
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        msg,
+                        stringResource(R.string.config_export_success, summary.fileName, summary.entriesCount, summary.photosCount),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
@@ -206,7 +183,69 @@ fun ConfigScreen(
             }
         }
 
-        if (busy) {
+        state.importSummary?.let { summary ->
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(top = 2.dp)
+                            .size(20.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        stringResource(R.string.config_import_success, summary.entriesCount, summary.photosCount),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        if (state.cleared) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(top = 2.dp)
+                            .size(20.dp)
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        stringResource(R.string.config_clear_success),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        if (state.busy) {
             Surface(
                 shape = RoundedCornerShape(14.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
@@ -304,29 +343,8 @@ fun ConfigScreen(
             )
 
             Button(
-                onClick = {
-                    busy = true
-                    statusMessage = null
-                    errorMessage = null
-                    scope.launch {
-                        val res = withContext(Dispatchers.IO) {
-                            backupManager.exportToDownloads()
-                        }
-                        res.onSuccess { summary ->
-                            busy = false
-                            statusMessage = ctx.getString(
-                                R.string.config_export_success,
-                                summary.fileName,
-                                summary.entriesCount,
-                                summary.photosCount
-                            )
-                        }.onFailure { e ->
-                            busy = false
-                            errorMessage = e.message ?: ctx.getString(R.string.config_export_failed)
-                        }
-                    }
-                },
-                enabled = !busy,
+                onClick = { viewModel.exportBackup() },
+                enabled = !state.busy,
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -343,7 +361,7 @@ fun ConfigScreen(
                 onClick = {
                     importLauncher.launch(arrayOf("*/*"))
                 },
-                enabled = !busy,
+                enabled = !state.busy,
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -367,7 +385,7 @@ fun ConfigScreen(
 
             OutlinedButton(
                 onClick = { showClearConfirm = true },
-                enabled = !busy,
+                enabled = !state.busy,
                 shape = RoundedCornerShape(14.dp),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
                 colors = ButtonDefaults.outlinedButtonColors(
@@ -418,23 +436,7 @@ fun ConfigScreen(
                 TextButton(
                     onClick = {
                         showClearConfirm = false
-                        busy = true
-                        statusMessage = null
-                        errorMessage = null
-                        scope.launch {
-                            runCatching {
-                                withContext(Dispatchers.IO) {
-                                    historyRepository.clearAll()
-                                }
-                            }.onSuccess {
-                                onHistoryCleared()
-                                busy = false
-                                statusMessage = ctx.getString(R.string.config_clear_success)
-                            }.onFailure { e ->
-                                busy = false
-                                errorMessage = e.message ?: ctx.getString(R.string.config_clear_failed)
-                            }
-                        }
+                        viewModel.clearHistory()
                     }
                 ) {
                     Text(

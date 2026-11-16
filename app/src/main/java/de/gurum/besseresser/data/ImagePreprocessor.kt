@@ -6,16 +6,22 @@ import android.net.Uri
 import android.util.Base64
 import java.io.ByteArrayOutputStream
 
+/** Schnittstelle für die Bild-Aufbereitung (ermöglicht einfache Test-Fakes). */
+interface ImagePreprocessor {
+    fun prepareImageDataUri(photoUri: Uri, maxSide: Int = 1280): String
+}
+
 /**
  * Aufbereitung und Transformation von Bilddaten für die KI-Analyse.
+ * Als injizierbare Klasse, damit ViewModels ohne Context-Parameter auskommen.
  */
-object ImagePreprocessor {
+class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor {
 
     /**
      * Lädt das Bild von der übergebenen URI, skaliert es herunter und kodiert es als Base64 JPEG Data-URI.
      */
-    fun prepareImageDataUri(ctx: Context, photoUri: Uri, maxSide: Int = 1280): String {
-        val resolver = ctx.contentResolver
+    override fun prepareImageDataUri(photoUri: Uri, maxSide: Int): String {
+        val resolver = context.contentResolver
         val bitmap = resolver.openInputStream(photoUri)?.use { BitmapFactory.decodeStream(it) }
             ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
         val scaled = scaleDown(bitmap, maxSide)

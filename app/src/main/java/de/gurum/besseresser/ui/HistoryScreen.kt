@@ -28,6 +28,8 @@ import de.gurum.besseresser.R
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.Profile
 import de.gurum.besseresser.model.Settings
+import de.gurum.besseresser.model.calendarWeekOfKey
+import de.gurum.besseresser.model.weekKeyOf
 
 @Composable
 fun HistoryScreen(
@@ -80,8 +82,25 @@ fun HistoryScreen(
         loadingFazits = uiState.loadingFazits.toList(),
         weekFazitMap = uiState.weekFazitMap,
         loadingWeeks = uiState.loadingWeeks,
-        onGenerateFazit = { day, list -> viewModel.generateFazit(ctx, day, list, settings, profile) },
-        onGenerateWeekFazit = { wk -> viewModel.generateWeekFazit(ctx, settings, profile, weekKey = wk) }
+        onGenerateFazit = { day, list ->
+            viewModel.generateFazit(
+                day = day,
+                entriesOfDay = list,
+                settings = settings,
+                promptContext = profileContextLine(ctx, profile),
+                mealLines = dayFazitMealLines(ctx, list),
+                prompts = createDayFazitPrompts(ctx)
+            )
+        },
+        onGenerateWeekFazit = { wk ->
+            viewModel.generateWeekFazit(
+                settings = settings,
+                promptContext = profileContextLine(ctx, profile),
+                weekKey = wk,
+                mealLines = weekFazitMealLines(ctx, uiState.entries.filter { weekKeyOf(it.dateMillis) == wk }),
+                prompts = createWeekFazitPrompts(ctx, calendarWeekOfKey(wk))
+            )
+        }
     )
 
     val anyOverlayOpen = uiState.showAddCamera || uiState.showAddReview || uiState.showAddText || uiState.addDialogForDay != null || uiState.showAddBusyCard
@@ -116,8 +135,25 @@ fun HistoryScreen(
                     viewModel.flushPendingDeletes()
                     onPick(entry)
                 },
-                onGenerateFazit = { day, list -> viewModel.generateFazit(ctx, day, list, settings, profile) },
-                onGenerateWeekFazit = { wk -> viewModel.generateWeekFazit(ctx, settings, profile, weekKey = wk) },
+                onGenerateFazit = { day, list ->
+                    viewModel.generateFazit(
+                        day = day,
+                        entriesOfDay = list,
+                        settings = settings,
+                        promptContext = profileContextLine(ctx, profile),
+                        mealLines = dayFazitMealLines(ctx, list),
+                        prompts = createDayFazitPrompts(ctx)
+                    )
+                },
+                onGenerateWeekFazit = { wk ->
+                    viewModel.generateWeekFazit(
+                        settings = settings,
+                        promptContext = profileContextLine(ctx, profile),
+                        weekKey = wk,
+                        mealLines = weekFazitMealLines(ctx, uiState.entries.filter { weekKeyOf(it.dateMillis) == wk }),
+                        prompts = createWeekFazitPrompts(ctx, calendarWeekOfKey(wk))
+                    )
+                },
                 onToggleExpandWeek = { wk -> viewModel.toggleWeekExpanded(wk) },
                 onToggleExpandFazit = { viewModel.toggleFazitExpanded(it) },
                 onAddMealForDay = { day -> viewModel.setAddDialogForDay(day) },
@@ -168,11 +204,24 @@ fun HistoryScreen(
                 viewModel.setShowAddCamera(false)
                 addSystemCameraLauncher.launch(addPhotoUri)
             },
-            onSaveBackdated = { ev, uri ->
-                viewModel.saveBackdatedEntry(ev, uri, onPick)
-            },
-            onSetBusy = { viewModel.setShowAddBusyCard(it) }
+            onSubmitBackdated = { uri, promptBundle, textPrompt ->
+                viewModel.submitBackdated(
+                    photoUri = uri,
+                    settings = settings,
+                    promptBundle = promptBundle,
+                    textPrompt = textPrompt,
+                    onPick = onPick
+                )
+            }
         )
+
+        // Fehler aus der Nacherfassen-Analyse als Toast anzeigen
+        LaunchedEffect(uiState.addError) {
+            uiState.addError?.let { msg ->
+                Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
+                viewModel.clearAddError()
+            }
+        }
     }
 }
 

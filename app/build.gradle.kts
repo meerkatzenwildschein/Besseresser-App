@@ -45,6 +45,7 @@ val kotlinxSerializationVersion = "1.7.3"
 val roomVersion = "2.6.1"
 val koinVersion = "4.0.4"
 val datastoreVersion = "1.1.1"
+val navigationVersion = "2.8.4"
 val junitVersion = "4.13.2"
 
 android {
@@ -126,6 +127,7 @@ dependencies {
     implementation("io.insert-koin:koin-android:$koinVersion")
     implementation("io.insert-koin:koin-androidx-compose:$koinVersion")
     implementation("androidx.datastore:datastore-preferences:$datastoreVersion")
+    implementation("androidx.navigation:navigation-compose:$navigationVersion")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:$junitVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")

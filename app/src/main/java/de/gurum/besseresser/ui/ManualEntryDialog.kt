@@ -61,10 +61,9 @@ import java.time.LocalDate
 import java.time.LocalTime
 import de.gurum.besseresser.R
 import de.gurum.besseresser.data.BesseresserApiService
-import de.gurum.besseresser.model.Evaluation
+import de.gurum.besseresser.data.PromptBuilder
 import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.model.Settings
-import de.gurum.besseresser.data.SettingsRepository
 
 @Composable
 fun BackdatedBusyDialog() {
@@ -270,15 +269,9 @@ fun BackdatedOverlays(
     onDismissReview: () -> Unit,
     onDismissText: () -> Unit,
     onFallbackSystemCamera: () -> Unit,
-    onSaveBackdated: (Evaluation, Uri?) -> Unit,
-    onSetBusy: (Boolean) -> Unit
+    onSubmitBackdated: (photoUri: Uri?, promptBundle: PromptBundle?, textPrompt: String?) -> Unit
 ) {
     val ctx = LocalContext.current
-    // Übergangslösung (Phase 2): direkter Service-Zugriff; wird in Phase 5 in das
-    // HistoryViewModel verlagert.
-    val settingsRepository: SettingsRepository = koinInject()
-    val apiService: BesseresserApiService = koinInject()
-    val coroutineScope = rememberCoroutineScope()
     if (showCamera) {
         CameraCaptureScreen(
             outputFile = addPhotoFile,
@@ -289,43 +282,11 @@ fun BackdatedOverlays(
             onConfirm = {
                 onDismissCamera()
                 val trimmedNote = addNote.trim()
-                coroutineScope.launch {
-                    val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
-                    if (cachedEv != null) {
-                        settingsRepository.pushRecentNote(trimmedNote, cachedEv)
-                        onSaveBackdated(cachedEv, addPhotoUri)
-                    } else {
-                        settingsRepository.pushRecentNote(trimmedNote)
-                        onSetBusy(true)
-                        val prompts = PromptBundle(
-                            intro = ctx.getString(R.string.prompt_eval_intro),
-                            formatIntro = ctx.getString(R.string.prompt_eval_format),
-                            ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                            exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                            responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                            recognized = ctx.getString(R.string.prompt_eval_recognized),
-                            honesty = ctx.getString(R.string.prompt_honesty),
-                            noteHeader = if (trimmedNote.isNotBlank())
-                                ctx.getString(R.string.prompt_note_header, trimmedNote)
-                            else ""
-                        )
-                        val result = apiService.analyze(
-                            ctx = ctx,
-                            photoUri = addPhotoUri,
-                            settings = settings,
-                            promptBundle = prompts
-                        )
-                        result.onSuccess { ev ->
-                            settingsRepository.pushRecentNote(trimmedNote, ev)
-                            onSetBusy(false)
-                            onSaveBackdated(ev, addPhotoUri)
-                        }.onFailure { e ->
-                            onSetBusy(false)
-                            val msg = e.message ?: e.javaClass.simpleName
-                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
+                onSubmitBackdated(
+                    addPhotoUri,
+                    buildAnalyzePromptBundle(ctx, trimmedNote),
+                    null
+                )
             }
         )
     }
@@ -338,43 +299,11 @@ fun BackdatedOverlays(
             busy = showBusy,
             onRate = {
                 val trimmedNote = addNote.trim()
-                coroutineScope.launch {
-                    val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
-                    if (cachedEv != null) {
-                        settingsRepository.pushRecentNote(trimmedNote, cachedEv)
-                        onSaveBackdated(cachedEv, addPhotoUri)
-                    } else {
-                        settingsRepository.pushRecentNote(trimmedNote)
-                        onSetBusy(true)
-                        val prompts = PromptBundle(
-                            intro = ctx.getString(R.string.prompt_eval_intro),
-                            formatIntro = ctx.getString(R.string.prompt_eval_format),
-                            ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                            exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                            responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                            recognized = ctx.getString(R.string.prompt_eval_recognized),
-                            honesty = ctx.getString(R.string.prompt_honesty),
-                            noteHeader = if (trimmedNote.isNotBlank())
-                                ctx.getString(R.string.prompt_note_header, trimmedNote)
-                            else ""
-                        )
-                        val result = apiService.analyze(
-                            ctx = ctx,
-                            photoUri = addPhotoUri,
-                            settings = settings,
-                            promptBundle = prompts
-                        )
-                        result.onSuccess { ev ->
-                            settingsRepository.pushRecentNote(trimmedNote, ev)
-                            onSetBusy(false)
-                            onSaveBackdated(ev, addPhotoUri)
-                        }.onFailure { e ->
-                            onSetBusy(false)
-                            val msg = e.message ?: e.javaClass.simpleName
-                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
+                onSubmitBackdated(
+                    addPhotoUri,
+                    buildAnalyzePromptBundle(ctx, trimmedNote),
+                    null
+                )
             }
         )
     }
@@ -387,34 +316,31 @@ fun BackdatedOverlays(
             busy = showBusy,
             onSend = {
                 val trimmedNote = addNote.trim()
-                coroutineScope.launch {
-                    val cachedEv = settingsRepository.findCachedEvaluation(trimmedNote, settings.goals)
-                    if (cachedEv != null) {
-                        settingsRepository.pushRecentNote(trimmedNote, cachedEv)
-                        onSaveBackdated(cachedEv, null)
-                    } else {
-                        settingsRepository.pushRecentNote(trimmedNote)
-                        onSetBusy(true)
-                        val result = apiService.analyzeText(
-                            ctx = ctx,
-                            settings = settings,
-                            userDescription = trimmedNote
-                        )
-                        result.onSuccess { ev ->
-                            settingsRepository.pushRecentNote(trimmedNote, ev)
-                            onSetBusy(false)
-                            onSaveBackdated(ev, null)
-                        }.onFailure { e ->
-                            onSetBusy(false)
-                            val msg = e.message ?: e.javaClass.simpleName
-                            Toast.makeText(ctx, ctx.getString(R.string.error_prefix, msg), Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
+                onSubmitBackdated(
+                    null,
+                    null,
+                    buildAnalyzeTextPrompt(ctx, settings.goals, trimmedNote)
+                )
             }
         )
     }
 }
+
+/** PromptBundle für die Foto-Bewertung (Anmerkung als Header). */
+private fun buildAnalyzePromptBundle(ctx: android.content.Context, trimmedNote: String): PromptBundle = PromptBundle(
+    intro = ctx.getString(R.string.prompt_eval_intro),
+    formatIntro = ctx.getString(R.string.prompt_eval_format),
+    ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+    exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+    responseLanguage = ctx.getString(R.string.prompt_eval_language),
+    recognized = ctx.getString(R.string.prompt_eval_recognized),
+    honesty = ctx.getString(R.string.prompt_honesty),
+    noteHeader = if (trimmedNote.isNotBlank()) ctx.getString(R.string.prompt_note_header, trimmedNote) else ""
+)
+
+/** Vollständiger Prompt für die reine Text-Analyse (Nacherfassen ohne Foto). */
+private fun buildAnalyzeTextPrompt(ctx: android.content.Context, goals: List<String>, description: String): String =
+    PromptBuilder.createAnalyzeTextPrompt(ctx, goals = goals, userDescription = description)
 
 /** Nachtrage-Zweig MIT Foto (Systemkamera-Fallback): Foto prüfen + Anmerkung → bewerten.
  *  Kein Abschluss-/Speichern-Screen: das Ergebnis geht direkt ins Tagesdatum.

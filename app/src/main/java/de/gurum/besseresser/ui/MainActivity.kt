@@ -3,10 +3,8 @@ import android.app.Activity
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -27,12 +25,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,15 +37,19 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
+import org.koin.core.parameter.parametersOf
+import de.gurum.besseresser.data.UiPrefsRepository
 import de.gurum.besseresser.model.AppLanguage
 import de.gurum.besseresser.model.AppThemeMode
-import de.gurum.besseresser.model.HistoryEntry
-import de.gurum.besseresser.model.Profile
-import de.gurum.besseresser.model.Settings
-import de.gurum.besseresser.data.UiPrefsRepository
 
 /** Erzeugt einen ContextWrapper mit der gewählten App-Sprache, behält aber den Basis-Activity-Context bei. */
 fun Context.withAppLanguage(language: AppLanguage): Context {
@@ -132,8 +131,16 @@ private val BesseresserShapes = Shapes(
 
 // ----------------------------------------------------------------- Activity & Navigation
 
-/** Reihenfolge für Animationsrichtung: vor = nach rechts tiefer, zurück = nach links höher. */
-enum class AppScreen(val order: Int) { Main(0), Profile(1), History(1), Config(1), Detail(2) }
+/** Routen der Root-Navigation (Navigation Compose). */
+object Routes {
+    const val MAIN = "main"
+    const val SETUP = "setup"
+    const val PROFILE = "profile"
+    const val HISTORY = "history"
+    const val CONFIG = "config"
+    const val DETAIL = "detail/{entryId}"
+    fun detail(entryId: Long) = "detail/$entryId"
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -149,12 +156,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setContent { GesundEssenApp() }
+        setContent { BesseresserAppContent() }
     }
 }
 
 @Composable
-fun GesundEssenApp() {
+fun BesseresserAppContent() {
     val baseCtx = LocalContext.current
     val appStateViewModel: AppStateViewModel = koinViewModel()
     val appState by appStateViewModel.uiState.collectAsStateWithLifecycle()
@@ -196,135 +203,132 @@ fun GesundEssenApp() {
                 color = MaterialTheme.colorScheme.background
             ) {
                 Box(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
-                var showSetup by remember { mutableStateOf(true) }
-                var showHistory by remember { mutableStateOf(false) }
-                var historyEntry by remember { mutableStateOf<HistoryEntry?>(null) }
-                var showProfile by remember { mutableStateOf(false) }
-                var showConfig by remember { mutableStateOf(false) }
-                val mainViewModel: MainViewModel = koinViewModel()
-
-                // Einmalig nach dem ersten Laden der App-Daten entscheiden, ob das Setup nötig ist.
-                LaunchedEffect(appState.loaded) {
-                    if (appState.loaded) showSetup = !appState.settings.isComplete
-                }
-
-                // Einstellungs-Overlay über einem bestehenden Setup: Android-Zurück schließt
-                // es (wie der Zurückpfeil). Beim Erst-Setup (unvollständig) bleibt Zurück = App beenden.
-                if (appState.loaded && showSetup && appState.settings.isComplete) {
-                    BackHandler { showSetup = false }
-                }
-
-                when {
-                    !appState.loaded -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                    if (!appState.loaded) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                        }
+                    } else {
+                        AppNavHost(
+                            appState = appState,
+                            appStateViewModel = appStateViewModel,
+                            baseCtx = baseCtx
+                        )
                     }
-                    showSetup -> SetupScreen(
-                        initial = appState.settings,
-                        firstRun = !appState.settings.isComplete,
-                        onCancel = {
-                            if (appState.settings.isComplete) showSetup = false
-                            else (baseCtx as? Activity)?.finish()
-                        },
-                        onDone = { neu ->
-                            val firstRun = !appState.settings.isComplete
-                            appStateViewModel.saveSettings(neu)
-                            showSetup = false
-                            // Nach dem ERSTEN Erfassen der KI-Zugangsdaten einmalig das Profil öffnen
-                            if (firstRun) showProfile = true
-                        },
-                        onBackupImported = { importedSettings ->
-                            if (importedSettings.isComplete) {
-                                showSetup = false
-                                showProfile = false
-                            }
-                        }
-                    )
-                    else -> {
-                        val target = when {
-                            historyEntry != null -> AppScreen.Detail
-                            showProfile -> AppScreen.Profile
-                            showConfig -> AppScreen.Config
-                            showHistory -> AppScreen.History
-                            else -> AppScreen.Main
-                        }
-                        AnimatedContent(
-                            targetState = target,
-                            label = "screen-switch",
-                            transitionSpec = {
-                                // vorwärts: neuer Screen von rechts; rückwärts: von links
-                                val forward = targetState.order > initialState.order
-                                val slideSpec = tween<androidx.compose.ui.unit.IntOffset>(
-                                    durationMillis = 280,
-                                    easing = FastOutSlowInEasing
-                                )
-                                val fadeSpec = tween<Float>(durationMillis = 220)
-                                if (forward) {
-                                    slideInHorizontally(slideSpec) { it } + fadeIn(fadeSpec) togetherWith
-                                            slideOutHorizontally(slideSpec) { -it / 3 } + fadeOut(fadeSpec)
-                                } else {
-                                    slideInHorizontally(slideSpec) { -it / 3 } + fadeIn(fadeSpec) togetherWith
-                                            slideOutHorizontally(slideSpec) { it } + fadeOut(fadeSpec)
-                                }
-                            }
-                        ) { s ->
-                            when (s) {
-                                AppScreen.Main -> MainScreen(
-                                    settings = appState.settings,
-                                    onEditSettings = { showSetup = true },
-                                    onOpenProfile = { showProfile = true },
-                                    onOpenHistory = {
-                                        showHistory = true
-                                        historyEntry = null
-                                    },
-                                    onOpenConfig = { showConfig = true },
-                                    viewModel = mainViewModel
-                                )
-                                AppScreen.Profile -> ProfileScreen(
-                                    initial = appState.profile,
-                                    onCancel = { showProfile = false },
-                                    onSave = { p ->
-                                        appStateViewModel.saveProfile(p)
-                                        showProfile = false
-                                    }
-                                )
-                                AppScreen.Config -> ConfigScreen(
-                                    themeMode = appState.themeMode,
-                                    onThemeModeChange = { appStateViewModel.setThemeMode(it) },
-                                    appLanguage = appState.language,
-                                    onLanguageChange = { appStateViewModel.setLanguage(it) },
-                                    onBack = { showConfig = false },
-                                    onDataImported = { },
-                                    onHistoryCleared = {
-                                        historyEntry = null
-                                        mainViewModel.reset()
-                                    }
-                                )
-                                AppScreen.History -> HistoryScreen(
-                                    settings = appState.settings,
-                                    profile = appState.profile,
-                                    onPick = { historyEntry = it },
-                                    onBack = { showHistory = false }
-                                )
-                                AppScreen.Detail -> {
-                                    // Wichtig-Pitfall: onBack nullt historyEntry, während der Detail-Screen
-                                    // als outgoing-Content der Back-Animation NOCH komponiert ist. Ein
-                                    // `historyEntry!!` direkt im Branch würde beim Re-Compose mit null
-                                    // crashen. Deshalb: Eintrag einmalig per remember einfrieren.
-                                    val entry = remember { historyEntry }
-                                    if (entry != null) {
-                                        HistoryDetailScreen(
-                                            entry = entry,
-                                            settings = appState.settings,
-                                            onBack = { historyEntry = null }
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun AppNavHost(
+    appState: AppState,
+    appStateViewModel: AppStateViewModel,
+    baseCtx: Context
+) {
+    val navController = rememberNavController()
+    val mainViewModel: MainViewModel = koinViewModel()
+    val startDestination = if (appState.settings.isComplete) Routes.MAIN else Routes.SETUP
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+        enterTransition = {
+            slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(220))
+        },
+        exitTransition = {
+            slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(220))
+        },
+        popEnterTransition = {
+            slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(220))
+        },
+        popExitTransition = {
+            slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(220))
+        }
+    ) {
+        composable(Routes.MAIN) {
+            MainScreen(
+                settings = appState.settings,
+                onEditSettings = { navController.navigate(Routes.SETUP) },
+                onOpenProfile = { navController.navigate(Routes.PROFILE) },
+                onOpenHistory = { navController.navigate(Routes.HISTORY) },
+                onOpenConfig = { navController.navigate(Routes.CONFIG) },
+                viewModel = mainViewModel
+            )
+        }
+        composable(Routes.SETUP) {
+            SetupScreen(
+                initial = appState.settings,
+                firstRun = !appState.settings.isComplete,
+                onCancel = {
+                    if (appState.settings.isComplete) navController.popBackStack()
+                    else (baseCtx as? Activity)?.finish()
+                },
+                onDone = { neu ->
+                    val firstRun = !appState.settings.isComplete
+                    appStateViewModel.saveSettings(neu)
+                    if (firstRun) {
+                        // Nach dem ERSTEN Erfassen einmalig das Profil öffnen (Setup aus dem Stack lösen)
+                        navController.navigate(Routes.MAIN) { popUpTo(Routes.SETUP) { inclusive = true } }
+                        navController.navigate(Routes.PROFILE)
+                    } else {
+                        navController.popBackStack()
+                    }
+                },
+                onBackupImported = { importedSettings ->
+                    if (importedSettings.isComplete) {
+                        navController.navigate(Routes.MAIN) { popUpTo(Routes.SETUP) { inclusive = true } }
+                    }
+                },
+                viewModel = koinViewModel()
+            )
+        }
+        composable(Routes.PROFILE) {
+            ProfileScreen(
+                initial = appState.profile,
+                onCancel = { navController.popBackStack() },
+                onSave = { p ->
+                    appStateViewModel.saveProfile(p)
+                    navController.popBackStack()
+                },
+                viewModel = koinViewModel()
+            )
+        }
+        composable(Routes.HISTORY) {
+            HistoryScreen(
+                settings = appState.settings,
+                profile = appState.profile,
+                onPick = { navController.navigate(Routes.detail(it.id)) },
+                onBack = { navController.popBackStack() },
+                viewModel = koinViewModel()
+            )
+        }
+        composable(Routes.CONFIG) {
+            ConfigScreen(
+                themeMode = appState.themeMode,
+                onThemeModeChange = { appStateViewModel.setThemeMode(it) },
+                appLanguage = appState.language,
+                onLanguageChange = { appStateViewModel.setLanguage(it) },
+                onBack = { navController.popBackStack() },
+                onDataImported = { },
+                onHistoryCleared = {
+                    mainViewModel.reset()
+                    navController.popBackStack(Routes.MAIN, inclusive = false)
+                },
+                viewModel = koinViewModel()
+            )
+        }
+        composable(
+            route = Routes.DETAIL,
+            arguments = listOf(navArgument("entryId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val entryId = backStackEntry.arguments?.getLong("entryId") ?: return@composable
+            HistoryDetailScreen(
+                entryId = entryId,
+                settings = appState.settings,
+                onBack = { navController.popBackStack() },
+                viewModel = koinViewModel { parametersOf(entryId) }
+            )
         }
     }
 }

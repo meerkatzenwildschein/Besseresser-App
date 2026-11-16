@@ -1,8 +1,8 @@
 package de.gurum.besseresser.ui
-import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,10 +10,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import de.gurum.besseresser.data.BesseresserApiService
+import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.model.calendarWeekOfKey
 import de.gurum.besseresser.model.DayFazit
 import de.gurum.besseresser.model.dayFingerprint
@@ -22,7 +24,7 @@ import de.gurum.besseresser.model.Evaluation
 import de.gurum.besseresser.data.FazitPromptBundle
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.data.HistoryRepository
-import de.gurum.besseresser.model.Profile
+import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.model.weekKeyOf
@@ -48,13 +50,15 @@ data class HistoryUiState(
     val showAddBusyCard: Boolean = false,
     val addNote: String = "",
     val addTargetDay: LocalDate? = null,
-    val addTargetTime: LocalTime? = null
+    val addTargetTime: LocalTime? = null,
+    val addError: String? = null
 )
 
 class HistoryViewModel(
     private val apiService: BesseresserApiService,
     private val historyRepository: HistoryRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val imagePreprocessor: ImagePreprocessor
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HistoryUiState())
@@ -208,6 +212,55 @@ class HistoryViewModel(
         _uiState.update { it.copy(addTargetTime = time) }
     }
 
+    fun clearAddError() {
+        _uiState.update { it.copy(addError = null) }
+    }
+
+    /** Nacherfassen (mit oder ohne Foto): nutzt eine gecachte Bewertung, falls vorhanden,
+     *  ruft sonst die KI an und speichert danach. Prompts werden von der UI geliefert. */
+    fun submitBackdated(
+        photoUri: Uri?,
+        settings: Settings,
+        promptBundle: PromptBundle?,
+        textPrompt: String?,
+        onPick: (HistoryEntry) -> Unit = {}
+    ) {
+        val note = _uiState.value.addNote.trim()
+        viewModelScope.launch {
+            val cached = settingsRepository.findCachedEvaluation(note, settings.goals)
+            if (cached != null) {
+                settingsRepository.pushRecentNote(note, cached)
+                saveBackdatedEntry(cached, photoUri, onPick)
+                return@launch
+            }
+            settingsRepository.pushRecentNote(note)
+            _uiState.update { it.copy(showAddBusyCard = true) }
+            val result: Result<Evaluation> = when {
+                photoUri != null && promptBundle != null -> {
+                    val dataUri = runCatching {
+                        withContext(Dispatchers.IO) { imagePreprocessor.prepareImageDataUri(photoUri) }
+                    }.getOrElse { e ->
+                        _uiState.update { it.copy(showAddBusyCard = false, addError = e.message) }
+                        return@launch
+                    }
+                    apiService.analyze(dataUri, settings, promptBundle)
+                }
+                textPrompt != null -> apiService.analyzeText(textPrompt, settings)
+                else -> {
+                    _uiState.update { it.copy(showAddBusyCard = false) }
+                    return@launch
+                }
+            }
+            result.onSuccess { ev ->
+                settingsRepository.pushRecentNote(note, ev)
+                _uiState.update { it.copy(showAddBusyCard = false) }
+                saveBackdatedEntry(ev, photoUri, onPick)
+            }.onFailure { e ->
+                _uiState.update { it.copy(showAddBusyCard = false, addError = e.message ?: e.javaClass.simpleName) }
+            }
+        }
+    }
+
     /** Prüft beim Nacherfassen (mit oder ohne Foto), ob für die aktuelle Anmerkung [addNote]
      *  bereits eine zu [settings.goals] passende KI-Bewertung im Menü-Speicher existiert.
      *  Falls ja, wird der Eintrag sofort ohne KI-Aufruf gespeichert. */
@@ -352,13 +405,12 @@ class HistoryViewModel(
     }
 
     fun generateFazit(
-        ctx: Context? = null,
         day: LocalDate,
         entriesOfDay: List<HistoryEntry>,
         settings: Settings,
-        profile: Profile,
-        mealLines: List<String>? = null,
-        prompts: FazitPromptBundle? = null
+        promptContext: String?,
+        mealLines: List<String>,
+        prompts: FazitPromptBundle
     ) {
         val key = dayKeyOf(day)
         if (key in _uiState.value.loadingFazits) return
@@ -368,23 +420,13 @@ class HistoryViewModel(
                 expandedFazits = it.expandedFazits + key
             )
         }
-        val lines = when {
-            mealLines != null -> mealLines
-            ctx != null -> dayFazitMealLines(ctx, entriesOfDay)
-            else -> entriesOfDay.map { it.erkannt }
-        }
-        val promptBundle = when {
-            prompts != null -> prompts
-            ctx != null -> FazitPromptBundle.forDay(ctx)
-            else -> FazitPromptBundle("", "", "", "")
-        }
         viewModelScope.launch {
             val result = apiService.dayFazit(
                 settings = settings,
                 goals = settings.goals,
-                promptContext = ctx?.let { profileContextLine(it, profile) },
-                mealLines = lines,
-                prompts = promptBundle
+                promptContext = promptContext,
+                mealLines = mealLines,
+                prompts = prompts
             )
             result.onSuccess { res ->
                 val fazit = DayFazit(
@@ -404,9 +446,8 @@ class HistoryViewModel(
     }
 
     fun generateWeekFazit(
-        ctx: Context? = null,
         settings: Settings,
-        profile: Profile,
+        promptContext: String?,
         weekKey: String? = null,
         mealLines: List<String>? = null,
         prompts: FazitPromptBundle? = null
@@ -424,21 +465,13 @@ class HistoryViewModel(
             )
         }
         val wkEntries = _uiState.value.entries.filter { weekKeyOf(it.dateMillis) == wk }
-        val lines = when {
-            mealLines != null -> mealLines
-            ctx != null -> weekFazitMealLines(ctx, wkEntries)
-            else -> wkEntries.map { it.erkannt }
-        }
-        val promptBundle = when {
-            prompts != null -> prompts
-            ctx != null -> FazitPromptBundle.forWeek(ctx, calendarWeekOfKey(wk))
-            else -> FazitPromptBundle("", "", "", "")
-        }
+        val lines = mealLines ?: wkEntries.map { it.erkannt }
+        val promptBundle = prompts ?: FazitPromptBundle("", "", "", "")
         viewModelScope.launch {
             val result = apiService.dayFazit(
                 settings = settings,
                 goals = settings.goals,
-                promptContext = ctx?.let { profileContextLine(it, profile) },
+                promptContext = promptContext,
                 mealLines = lines,
                 prompts = promptBundle
             )

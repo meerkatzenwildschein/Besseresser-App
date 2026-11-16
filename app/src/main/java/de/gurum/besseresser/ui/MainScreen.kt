@@ -123,7 +123,7 @@ fun MainScreen(
     val triggerAnalyze: (String, Uri) -> Unit = { trimmedNote, targetUri ->
         val prompts = createAnalyzePrompts(ctx, trimmedNote)
         viewModel.onPhotoTaken(targetUri)
-        viewModel.analyze(ctx, settings, prompts)
+        viewModel.analyze(settings, prompts)
     }
 
     val lastGoaled = uiState.evaluation != null || uiState.savedToHistory
