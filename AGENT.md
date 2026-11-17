@@ -251,15 +251,38 @@ Besseresser-App/
 ### Versionsanhebung & Release-Build
 
 1. `appVersion` und `versionCode` in `app/build.gradle.kts` erhöhen und committen
-   (`versionCode = 4 ↔ 1.3.0`, `5 ↔ 1.4.0`, …).
-2. Tag `vX.Y.Z` auf den Versionsbump-Commit setzen und mit `git push --tags` pushen.
-3. `.\gradlew.bat assembleRelease` → signierte APK liegt unter `app\build\outputs\apk\release\app-release.apk`.
-4. APK als Release-Asset zum GitHub-Release des Tags hochladen (Name: `Besseresser-X.Y.Z.apk`),
-   alternativ über die GitHub-API (Token aus dem Git Credential Manager ziehen; nie ausgeben).
+   (`versionCode = 6 ↔ 1.5.0`, `7 ↔ 1.6.0`, …).
+2. Tag `vX.Y.Z` auf den Versionsbump-Commit setzen:
+   ```powershell
+   git tag vX.Y.Z
+   git push origin main
+   git push origin vX.Y.Z
+   ```
+3. `.\gradlew.bat clean testDebugUnitTest assembleRelease` → signierte APK unter
+   `app\build\outputs\apk\release\app-release.apk`; Signatur danach immer prüfen (s. o.).
+4. GitHub Release anlegen und APK hochladen – **vollständig manuell im Browser**, weil
+   auf dieser Maschine `api.github.com` per DNS auf `192.168.137.1` (lokaler Redirect / VPN)
+   umgeleitet wird und direkte HTTPS-Verbindungen zur GitHub REST-API daher scheitern.
+   Git-Push selbst funktioniert trotzdem (der Windows Credential Manager / GCM nutzt einen
+   anderen Transportweg). Konkret:
+   - `Invoke-RestMethod` und `curl.exe` (System & Git-Bundle) schlagen beide fehl.
+   - Den Token aus dem Credential Manager via `git credential fill` zu lesen dauert unbegrenzt
+     (blockierender Prompt) und liefert keinen nutzbaren Rückgabekanal für API-Calls.
+   - **Daher: APK in ein Temp-Verzeichnis kopieren und dem Nutzer die URL + Felder mitteilen.**
+
+   Schritte für den Nutzer:
+   a. Browser öffnen:
+      `https://github.com/meerkatzenwildschein/Besseresser-App/releases/new?tag=vX.Y.Z`
+   b. Tag `vX.Y.Z` auswählen (bereits vorhanden), Titel `vX.Y.Z` eintragen.
+   c. Release-Notes einfügen (s. u.) und die APK-Datei anhängen
+      (liegt z. B. unter `C:\Users\gurum\AppData\Local\Temp\opencode\besseresser-vX.Y.Z.apk`,
+      wohin sie der Agent kopiert hat).
+   d. „Publish release" klicken.
+
 5. **Release-Notes auf GitHub immer auf Englisch verfassen** (internationaler Leserkreis, F-Droid).
    Format: `**What's new in Besseresser vX.Y.Z (versionCode N)**` als Überschrift, darunter
    Stichpunkte mit den Nutzer-Features (Fach-Jargon und interne Refactorings weglassen),
-   am Ende primär die `Full changelog:`-Vergleichslinks.
+   am Ende optional `Full changelog:`-Vergleichslinks.
 
 ### Hinweise zur Reproduzierbarkeit
 
