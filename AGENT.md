@@ -260,24 +260,11 @@ Besseresser-App/
    ```
 3. `.\gradlew.bat clean testDebugUnitTest assembleRelease` → signierte APK unter
    `app\build\outputs\apk\release\app-release.apk`; Signatur danach immer prüfen (s. o.).
-4. GitHub Release anlegen und APK hochladen – **vollständig manuell im Browser**, weil
-   auf dieser Maschine `api.github.com` per DNS auf `192.168.137.1` (lokaler Redirect / VPN)
-   umgeleitet wird und direkte HTTPS-Verbindungen zur GitHub REST-API daher scheitern.
-   Git-Push selbst funktioniert trotzdem (der Windows Credential Manager / GCM nutzt einen
-   anderen Transportweg). Konkret:
-   - `Invoke-RestMethod` und `curl.exe` (System & Git-Bundle) schlagen beide fehl.
-   - Den Token aus dem Credential Manager via `git credential fill` zu lesen dauert unbegrenzt
-     (blockierender Prompt) und liefert keinen nutzbaren Rückgabekanal für API-Calls.
-   - **Daher: APK in ein Temp-Verzeichnis kopieren und dem Nutzer die URL + Felder mitteilen.**
-
-   Schritte für den Nutzer:
-   a. Browser öffnen:
-      `https://github.com/meerkatzenwildschein/Besseresser-App/releases/new?tag=vX.Y.Z`
-   b. Tag `vX.Y.Z` auswählen (bereits vorhanden), Titel `vX.Y.Z` eintragen.
-   c. Release-Notes einfügen (s. u.) und die APK-Datei anhängen
-      (liegt z. B. unter `C:\Users\gurum\AppData\Local\Temp\opencode\besseresser-vX.Y.Z.apk`,
-      wohin sie der Agent kopiert hat).
-   d. „Publish release" klicken.
+4. GitHub Release anlegen und APK hochladen – **vollständig manuell im Browser**, da die
+   GitHub REST-API von dieser Maschine aus nicht erreichbar ist (DNS leitet `api.github.com`
+   auf einen lokalen Redirect um; `Invoke-RestMethod` und `curl.exe` scheitern beide).
+   APK dazu in ein Temp-Verzeichnis kopieren und dem Nutzer URL + Felder nennen:
+   `https://github.com/meerkatzenwildschein/Besseresser-App/releases/new?tag=vX.Y.Z`
 
 5. **Release-Notes auf GitHub immer auf Englisch verfassen** (internationaler Leserkreis, F-Droid).
    Format: `**What's new in Besseresser vX.Y.Z (versionCode N)**` als Überschrift, darunter
