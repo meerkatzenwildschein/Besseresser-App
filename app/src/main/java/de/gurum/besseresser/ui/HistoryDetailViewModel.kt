@@ -34,6 +34,7 @@ class HistoryDetailViewModel(
 
     data class DetailUiState(
         val entry: HistoryEntry? = null,
+        val loaded: Boolean = false,
         val reEvalBusy: Boolean = false,
         val error: String? = null
     )
@@ -44,7 +45,10 @@ class HistoryDetailViewModel(
     init {
         viewModelScope.launch {
             historyRepository.getAllFlow().collect { list ->
-                _uiState.update { it.copy(entry = list.find { e -> e.id == entryId } ?: it.entry) }
+                _uiState.update { it.copy(
+                    entry = list.find { e -> e.id == entryId } ?: it.entry,
+                    loaded = true
+                ) }
             }
         }
     }

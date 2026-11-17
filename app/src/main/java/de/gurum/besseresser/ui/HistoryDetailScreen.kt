@@ -171,8 +171,11 @@ fun HistoryDetailScreen(
     val ctx = LocalContext.current
     val detailState by viewModel.uiState.collectAsStateWithLifecycle()
     val entry = detailState.entry ?: run {
-        // Eintrag noch nicht geladen (oder nach Löschen entfernt): zurück
-        LaunchedEffect(Unit) { onBack() }
+        // Nur zurück, wenn der erste DB-Load abgeschlossen ist und der Eintrag wirklich fehlt.
+        // Sonst würde das initiale null-State die Navigation sofort zurück auslösen.
+        if (detailState.loaded) {
+            LaunchedEffect(Unit) { onBack() }
+        }
         return
     }
     // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
