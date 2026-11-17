@@ -289,9 +289,7 @@ Besseresser-App/
        -ContentType "application/vnd.android.package-archive" `
        -InFile $apk
    ```
-   Falls `api.github.com` nicht erreichbar ist (DNS-Problem), zuerst prüfen:
-   `Resolve-DnsName api.github.com` — sollte eine öffentliche GitHub-IP liefern, nicht `192.168.x.x`.
-   Ggf. `C:\Windows\System32\drivers\etc\hosts` auf fehlerhafte Einträge prüfen (erfordert Admin).
+
 
 5. **Release-Notes auf GitHub immer auf Englisch verfassen** (internationaler Leserkreis, F-Droid).
    Format: `**What's new in Besseresser vX.Y.Z (versionCode N)**` als Überschrift, darunter
