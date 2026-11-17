@@ -260,25 +260,38 @@ Besseresser-App/
    ```
 3. `.\gradlew.bat clean testDebugUnitTest assembleRelease` → signierte APK unter
    `app\build\outputs\apk\release\app-release.apk`; Signatur danach immer prüfen (s. o.).
-4. GitHub Release anlegen und APK hochladen – **per PowerShell + Windows Credential Manager**,
-   da `api.github.com` in der lokalen `hosts`-Datei auf `192.168.137.1` umgeleitet ist und
-   direkte DNS-basierte Verbindungen daher scheitern. Der Workaround:
-   - Echte IP von `api.github.com` per alternativer DNS ermitteln:
-     `Resolve-DnsName api.github.com -Server 8.8.8.8` → z. B. `140.82.121.6`
-   - Token aus dem Windows Credential Manager lesen (kein `git credential fill` —
-     der blockiert):
-     ```csharp
-     // C# via Add-Type
-     [DllImport("advapi32.dll")] CredRead("git:https://github.com", 1, 0, out ptr)
-     // Blob als UTF-16 dekodieren → OAuth-Token
-     ```
-   - `HttpClient` mit `ServerCertificateCustomValidationCallback` und festem
-     `Host: api.github.com`-Header gegen die echte IP aufbauen.
-   - Release per `POST /repos/.../releases` anlegen (HTTP 201 → `upload_url`).
-   - APK per `POST` gegen `uploads.github.com` hochladen (`uploads.github.com`
-     löst korrekt auf, kein IP-Bypass nötig).
-   - **Alles in einem einzigen `& { ... }`-Scriptblock** ausführen, damit die
-     per `Add-Type` kompilierten Typen im selben PowerShell-Scope verfügbar bleiben.
+4. GitHub Release anlegen und APK hochladen – **per PowerShell + `Invoke-RestMethod`**:
+   ```powershell
+   # Token aus dem Windows Credential Manager lesen
+   $token = (
+       "protocol=https`nhost=github.com`n" |
+       git credential fill 2>$null |
+       Select-String "^password=(.+)" |
+       ForEach-Object { $_.Matches[0].Groups[1].Value }
+   )
+
+   # Release anlegen (tag muss bereits gepusht sein)
+   $notes = "## What's new in vX.Y.Z`n`n- ..."
+   $release = Invoke-RestMethod `
+       -Uri "https://api.github.com/repos/meerkatzenwildschein/Besseresser-App/releases" `
+       -Method Post `
+       -Headers @{ Authorization = "token $token"; "User-Agent" = "Besseresser-Agent" } `
+       -ContentType "application/json" `
+       -Body (@{ tag_name="vX.Y.Z"; name="vX.Y.Z"; body=$notes; draft=$false; prerelease=$false } | ConvertTo-Json)
+
+   # APK hochladen
+   $apk = "app\build\outputs\apk\release\app-release.apk"
+   $uploadUrl = $release.upload_url -replace '\{.*\}', ''
+   Invoke-RestMethod `
+       -Uri "${uploadUrl}?name=besseresser-vX.Y.Z.apk" `
+       -Method Post `
+       -Headers @{ Authorization = "token $token"; "User-Agent" = "Besseresser-Agent" } `
+       -ContentType "application/vnd.android.package-archive" `
+       -InFile $apk
+   ```
+   Falls `api.github.com` nicht erreichbar ist (DNS-Problem), zuerst prüfen:
+   `Resolve-DnsName api.github.com` — sollte eine öffentliche GitHub-IP liefern, nicht `192.168.x.x`.
+   Ggf. `C:\Windows\System32\drivers\etc\hosts` auf fehlerhafte Einträge prüfen (erfordert Admin).
 
 5. **Release-Notes auf GitHub immer auf Englisch verfassen** (internationaler Leserkreis, F-Droid).
    Format: `**What's new in Besseresser vX.Y.Z (versionCode N)**` als Überschrift, darunter
