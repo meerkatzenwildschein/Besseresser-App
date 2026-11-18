@@ -65,17 +65,11 @@ class HistoryViewModel(
     private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
 
-    private var dbObserving = false
     private val pendingDeleteJobs = mutableMapOf<Long, Job>()
     private val pendingDeleteEntries = mutableMapOf<Long, HistoryEntry>()
 
-    fun startObserving() {
-        if (dbObserving) return
-        dbObserving = true
-        viewModelScope.launch {
-            historyRepository.ensureMigrated()
-        }
-
+    init {
+        viewModelScope.launch { historyRepository.ensureMigrated() }
         observeEntries(historyRepository)
         observeDayFazits(historyRepository)
         observeWeekFazits(historyRepository)

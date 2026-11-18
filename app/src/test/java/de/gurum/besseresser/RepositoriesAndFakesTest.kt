@@ -508,7 +508,6 @@ class RepositoriesAndFakesTest {
         val setRepo = FakeSettingsRepository()
         val vm = HistoryViewModel(apiService = api, historyRepository = histRepo, settingsRepository = setRepo, imagePreprocessor = FakeImagePreprocessor())
 
-        vm.startObserving()
         advanceUntilIdle()
         assertEquals(0, vm.uiState.value.entries.size)
 
@@ -687,7 +686,6 @@ class RepositoriesAndFakesTest {
             settingsRepository = FakeSettingsRepository(),
             imagePreprocessor = FakeImagePreprocessor()
         )
-        vm.startObserving()
 
         val e1 = histRepo.add(null, Evaluation(erkannt = "Mahlzeit 1"), dateOverride = 1000L)
         val e2 = histRepo.add(null, Evaluation(erkannt = "Mahlzeit 2"), dateOverride = 2000L)
@@ -763,7 +761,6 @@ class RepositoriesAndFakesTest {
             settingsRepository = FakeSettingsRepository(),
             imagePreprocessor = FakeImagePreprocessor()
         )
-        vm.startObserving()
 
         val day = LocalDate.of(2026, 11, 6)
         val m1 = day.atTime(8, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -868,7 +865,6 @@ class RepositoriesAndFakesTest {
             settingsRepository = setRepo,
             imagePreprocessor = FakeImagePreprocessor()
         )
-        vm.startObserving()
 
         val pastDay = LocalDate.now().minusDays(1)
         val pastDayMillis = pastDay.atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()

@@ -9,7 +9,6 @@ Dieses Dokument fasst die Ergebnisse des umfassenden Code-Reviews der **Besseres
 2. [Prioritäten-Matrix](#2-prioritäten-matrix)
 3. [Detaillierte Findings & Best Practice Empfehlungen](#3-detaillierte-findings--best-practice-empfehlungen)
    - [3.1 UI & Jetpack Compose](#31-ui--jetpack-compose)
-   - [3.2 Architektur & State Management (MVVM / Clean Architecture)](#32-architektur--state-management-mvvm--clean-architecture)
    - [3.3 Threading, Concurrency & Coroutines](#33-threading-concurrency--coroutines)
    - [3.4 Datenhaltung, Persistence & Room](#34-datenhaltung-persistence--room)
    - [3.5 Android Lifecycle & Lokalisierung](#35-android-lifecycle--lokalisierung)
@@ -57,29 +56,6 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
   Dateierstellung und Temp-File-Management sollten in eine dedizierte Helper-Klasse (`FileManager` / `PhotoCaptureManager`) ausgelagert werden, die erst bei tatsächlichem Auslösen des Kamera-Events eine neue Datei anlegt.
 
 ---
-
-### 3.2 Architektur & State Management (MVVM / Clean Architecture)
-
-#### Finding 3.2.1: Imperative ViewModel-Initialisierung (`startObserving()`)
-- **Betroffene Dateien:** `HistoryViewModel.kt` (Z. 71), `HistoryScreen.kt` (Z. 51–53)
-- **Problem:**
-  In `HistoryScreen` wird über `LaunchedEffect(Unit) { viewModel.startObserving() }` eine Methode aufgerufen, um Flows zu starten.
-- **Empfohlene Best Practice:**
-  Nutzung von reaktiven State-Pipelines mit `stateIn`:
-  ```kotlin
-  val uiState: StateFlow<HistoryUiState> = combine(
-      historyRepository.getAllFlow(),
-      historyRepository.getDayFazitsFlow(),
-      historyRepository.getWeekFazitsFlow(),
-      _internalState
-  ) { entries, dayFazits, weekFazits, internal ->
-      // Transformationslogik
-  }.stateIn(
-      scope = viewModelScope,
-      started = SharingStarted.WhileSubscribed(5_000),
-      initialValue = HistoryUiState()
-  )
-  ```
 
 ---
 
@@ -150,8 +126,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 ## 4. Empfohlene Roadmap & Nächste Schritte
 
 ### Phase 1: Architektur-Refactoring & Entkopplung (Mittelfristig)
-1. **Reaktive State-Pipelines:** `startObserving()` durch deklarative `stateIn`-Pipelines ersetzen.
-2. **Dispatcher Injection:** `CoroutineDispatchers` für saubere Testbarkeit injizierbar machen.
+1. **Dispatcher Injection:** `CoroutineDispatchers` für saubere Testbarkeit injizierbar machen.
 
 ### Phase 2: Qualitäts- & Test-Offensive (Langfristig)
 1. **Compose-Tests & Screenshot-Testing:** Integration von `androidx.compose.ui.test` und Roborazzi für Snapshot-Tests.
