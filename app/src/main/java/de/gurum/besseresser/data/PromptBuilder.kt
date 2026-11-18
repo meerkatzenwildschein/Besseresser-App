@@ -17,10 +17,10 @@ object PromptBuilder {
             appendLine(promptBundle.noteHeader)
         }
         appendLine("")
-        // JSON-Schlüssel (bewertung/ziel/ampel/begruendung/zusatz/erkannt) sind bewusst
+        // JSON-Schlüssel (bewertung/ziel/ampel/reason/zusatz/recognizedMeal) sind bewusst
         // fest verdrahtet – der Parser kennt diese Namen; nur die Anweisungssprache variiert.
         appendLine(promptBundle.formatIntro)
-        appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","begruendung":"<short reason>"}],"zusatz":"<one-sentence overall impression>","erkannt":"<one short sentence: food with estimated quantities, e.g. '100 g pasta with sauce, one apple'>"}""")
+        appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","reason":"<short reason>"}],"zusatz":"<one-sentence overall impression>","recognizedMeal":"<one short sentence: food with estimated quantities, e.g. '100 g pasta with sauce, one apple'>"}""")
         appendLine(promptBundle.ampelMeaning)
         appendLine(promptBundle.exactlyOne)
         if (promptBundle.recognized.isNotBlank()) appendLine(promptBundle.recognized)
@@ -34,7 +34,7 @@ object PromptBuilder {
     fun createDayFazitPrompt(
         goals: List<String>,
         promptContext: String?,
-        mealLines: List<String>,
+        mealDescriptions: List<String>,
         prompts: FazitPromptBundle
     ): String = buildString {
         appendLine(prompts.promptIntro)
@@ -44,7 +44,7 @@ object PromptBuilder {
             appendLine(it)
         }
         appendLine("")
-        mealLines.forEach { appendLine(it) }
+        mealDescriptions.forEach { appendLine(it) }
         appendLine("")
         appendLine(prompts.promptRules)
         if (prompts.promptHonesty.isNotBlank()) appendLine(prompts.promptHonesty)
@@ -68,7 +68,7 @@ object PromptBuilder {
         appendLine(textOnlyContext)
         appendLine("")
         appendLine(promptBundle.formatIntro)
-        appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","begruendung":"<short reason>"}],"zusatz":"<one-sentence overall impression>","erkannt":"<one short sentence: what the description says the meal was, with quantities>"}""")
+        appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","reason":"<short reason>"}],"zusatz":"<one-sentence overall impression>","recognizedMeal":"<one short sentence: what the description says the meal was, with quantities>"}""")
         appendLine(promptBundle.ampelMeaning)
         appendLine(promptBundle.exactlyOne)
         if (promptBundle.honesty.isNotBlank()) appendLine(promptBundle.honesty)

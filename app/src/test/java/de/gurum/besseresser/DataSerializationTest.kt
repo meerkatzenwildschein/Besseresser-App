@@ -64,14 +64,14 @@ class DataSerializationTest {
     fun testGoalResultSerialization() {
         val result = GoalResult(
             goal = "2l Wasser trinken",
-            ampel = TrafficLight.GREEN,
-            begruendung = "Genug Wasser getrunken."
+            rating = TrafficLight.GREEN,
+            reason = "Genug Wasser getrunken."
         )
 
         val json = AppJson.encodeToString(result)
         assertTrue(json.contains("\"ziel\":\"2l Wasser trinken\""))
         assertTrue(json.contains("\"ampel\":\"gruen\""))
-        assertTrue(json.contains("\"begruendung\":\"Genug Wasser getrunken.\""))
+        assertTrue(json.contains("\"reason\":\"Genug Wasser getrunken.\""))
 
         val decoded = AppJson.decodeFromString<GoalResult>(json)
         assertEquals(result, decoded)
@@ -80,11 +80,11 @@ class DataSerializationTest {
     @Test
     fun testGoalResultDeserializationTolerant() {
         // KI returns english or alternate words in ampel field
-        val json = """{"ziel":"Gemüse","ampel":"green","begruendung":"Viel Salat gegessen"}"""
+        val json = """{"ziel":"Gemüse","ampel":"green","reason":"Viel Salat gegessen"}"""
         val decoded = AppJson.decodeFromString<GoalResult>(json)
         assertEquals("Gemüse", decoded.goal)
-        assertEquals(TrafficLight.GREEN, decoded.ampel)
-        assertEquals("Viel Salat gegessen", decoded.begruendung)
+        assertEquals(TrafficLight.GREEN, decoded.rating)
+        assertEquals("Viel Salat gegessen", decoded.reason)
     }
 
     @Test
@@ -101,7 +101,7 @@ class DataSerializationTest {
             ),
             summary = "Gesamteindruck gut",
             note = "Mittagessen",
-            erkannt = "Pasta mit Tomatensoße",
+            recognizedMeal = "Pasta mit Tomatensoße",
             backdated = false
         )
 
@@ -114,7 +114,7 @@ class DataSerializationTest {
         assertTrue(json.contains("\"foto\":\"123456789.jpg\""))
         assertTrue(json.contains("\"zusatz\":\"Gesamteindruck gut\""))
         assertTrue(json.contains("\"anmerkung\":\"Mittagessen\""))
-        assertTrue(json.contains("\"erkannt\":\"Pasta mit Tomatensoße\""))
+        assertTrue(json.contains("\"recognizedMeal\":\"Pasta mit Tomatensoße\""))
 
         val decoded = AppJson.decodeFromString<HistoryEntry>(json)
         assertEquals(entry, decoded)
@@ -139,7 +139,7 @@ class DataSerializationTest {
     fun testDayFazitSerialization() {
         val fazit = DayFazit(
             dayKey = "20261106",
-            ampel = TrafficLight.GREEN,
+            rating = TrafficLight.GREEN,
             text = "Ein sehr gesunder Tag!",
             entryIds = listOf(101L, 102L),
             createdAt = 1730900000000L,
@@ -163,7 +163,7 @@ class DataSerializationTest {
         val sampleEval = Evaluation(
             goalResults = listOf(GoalResult("Weniger Zucker", TrafficLight.GREEN, "Kein Zuckerzusatz")),
             summary = "Top Frühstück",
-            erkannt = "Müsli mit Beeren"
+            recognizedMeal = "Müsli mit Beeren"
         )
         val notes = listOf(
             RecentNote("Müsli mit Beeren", starred = true, evaluation = sampleEval),
@@ -190,7 +190,7 @@ class DataSerializationTest {
                 GoalResult("Ziel 2", TrafficLight.YELLOW, "Mittel $name")
             ),
             summary = "Fazit $name",
-            erkannt = "Erkannt $name"
+            recognizedMeal = "recognizedMeal $name"
         )
 
         var list = emptyList<RecentNote>()
@@ -202,13 +202,13 @@ class DataSerializationTest {
         assertEquals(5, list.size)
         assertFalse(list.any { it.text == "Essen 1" })
         val serialized = AppJson.encodeToString(list)
-        assertFalse(serialized.contains("Erkannt Essen 1"))
-        assertTrue(serialized.contains("Erkannt Essen 6"))
+        assertFalse(serialized.contains("recognizedMeal Essen 1"))
+        assertTrue(serialized.contains("recognizedMeal Essen 6"))
 
         // Pushing an existing note without passing evaluation preserves its cached evaluation
         list = RecentNotesLogic.pushNote(list, "Essen 2")
         assertEquals("Essen 2", list.first().text)
-        assertEquals("Erkannt Essen 2", list.first().evaluation?.erkannt)
+        assertEquals("recognizedMeal Essen 2", list.first().evaluation?.recognizedMeal)
 
         // Exact match returns cached evaluation when goals match
         val matched = RecentNotesLogic.findMatchingEvaluation(list, "  Essen 2  ", goals)
@@ -222,10 +222,10 @@ class DataSerializationTest {
         assertEquals(null, RecentNotesLogic.findMatchingEvaluation(list, "Essen 2", listOf("Ziel 1", "Neues Ziel")))
         assertEquals(null, RecentNotesLogic.findMatchingEvaluation(list, "Essen 2", listOf("Ziel 1")))
 
-        // Updating evaluation in-place (e.g. after erkannt correction) keeps order and updates evaluation
-        val correctedEval = makeEval("Essen 2").copy(erkannt = "Korrigiertes Essen 2")
+        // Updating evaluation in-place (e.g. after recognizedMeal correction) keeps order and updates evaluation
+        val correctedEval = makeEval("Essen 2").copy(recognizedMeal = "Korrigiertes Essen 2")
         list = RecentNotesLogic.updateEvaluationInList(list, "Essen 2", correctedEval)
-        assertEquals("Korrigiertes Essen 2", RecentNotesLogic.findMatchingEvaluation(list, "Essen 2", goals)?.erkannt)
+        assertEquals("Korrigiertes Essen 2", RecentNotesLogic.findMatchingEvaluation(list, "Essen 2", goals)?.recognizedMeal)
     }
 
     @Test
@@ -314,7 +314,7 @@ class DataSerializationTest {
                         ),
                         summary = "Gesundes Frühstück",
                         note = "Haferflocken mit Beeren",
-                        erkannt = "250 g Haferflocken mit Beeren",
+                        recognizedMeal = "250 g Haferflocken mit Beeren",
                         backdated = false
                     ),
                     photoBase64 = encodedPhoto
@@ -323,7 +323,7 @@ class DataSerializationTest {
             dayFazits = listOf(
                 DayFazit(
                     dayKey = "20261106",
-                    ampel = TrafficLight.GREEN,
+                    rating = TrafficLight.GREEN,
                     text = "Sehr guter Tag",
                     entryIds = listOf(1001L),
                     createdAt = 1730895000000L,
@@ -333,7 +333,7 @@ class DataSerializationTest {
             weekFazits = listOf(
                 DayFazit(
                     dayKey = "20261102",
-                    ampel = TrafficLight.YELLOW,
+                    rating = TrafficLight.YELLOW,
                     text = "Solide Woche",
                     entryIds = listOf(1001L),
                     createdAt = 1730896000000L,

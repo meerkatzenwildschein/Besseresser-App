@@ -279,7 +279,7 @@ class BackupManager(
             existingEntries.filter { existing ->
                 existing.id != rawEntry.id &&
                         existing.dateMillis == rawEntry.dateMillis &&
-                        existing.erkannt == rawEntry.erkannt &&
+                        existing.recognizedMeal == rawEntry.recognizedMeal &&
                         existing.note == rawEntry.note
             }.forEach { duplicate ->
                 historyRepository.delete(duplicate)

@@ -114,18 +114,18 @@ private val DuplicateCopyIcon: ImageVector by lazy {
 
 /** Baut den Teilen-Text aus erkanntem Essen (🍽️) und allgemeiner Bewertung (🧠) zusammen. */
 internal fun buildShareText(
-    erkannt: String,
+    recognizedMeal: String,
     summary: String,
     formatDetected: (String) -> String = { "🍽️ $it" },
     formatSummary: (String) -> String = { "🧠 $it" }
 ): String = buildList {
-    if (erkannt.isNotBlank()) add(formatDetected(erkannt.trim()))
+    if (recognizedMeal.isNotBlank()) add(formatDetected(recognizedMeal.trim()))
     if (summary.isNotBlank()) add(formatSummary(summary.trim()))
 }.joinToString("\n\n")
 
 private fun shareHistoryEntry(ctx: Context, photoFile: java.io.File?, entry: HistoryEntry) {
     val shareText = buildShareText(
-        erkannt = entry.erkannt,
+        recognizedMeal = entry.recognizedMeal,
         summary = entry.summary,
         formatDetected = { ctx.getString(R.string.detected_prefix, it) },
         formatSummary = { ctx.getString(R.string.summary_prefix, it) }
@@ -183,7 +183,7 @@ fun HistoryDetailScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     var showDuplicateDatePicker by remember { mutableStateOf(false) }
     var duplicateTargetDate by remember { mutableStateOf<LocalDate?>(null) }
-    var showErkanntEdit by remember { mutableStateOf(false) }
+    var showRecognizedEdit by remember { mutableStateOf(false) }
     val photoFile = remember(entry.id, entry.photoFile) {
         viewModel.photoFile()
     }
@@ -273,7 +273,7 @@ fun HistoryDetailScreen(
         }
 
         if (detailState.reEvalBusy) {
-            // Re-Bewertung durch KI läuft (nach erkannt-Korrektur)
+            // Re-Bewertung durch KI läuft (nach recognizedMeal-Korrektur)
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
@@ -300,15 +300,15 @@ fun HistoryDetailScreen(
             }
         }
 
-        val canShare = photoFile != null || entry.erkannt.isNotBlank() || entry.summary.isNotBlank()
-        if (entry.summary.isNotBlank() || entry.erkannt.isNotBlank() || entry.note.isNotBlank()) {
+        val canShare = photoFile != null || entry.recognizedMeal.isNotBlank() || entry.summary.isNotBlank()
+        if (entry.summary.isNotBlank() || entry.recognizedMeal.isNotBlank() || entry.note.isNotBlank()) {
             // Gleicher antipbarer Block wie in der Auswertung: 🧠 sichtbar, 🍽️/📝 einklappbar,
-            // 🍽️ mit Pencil → erkannt userkorrigierbar, unten rechts Teilen-Button
+            // 🍽️ mit Pencil → recognizedMeal userkorrigierbar, unten rechts Teilen-Button
             CollapsibleSummaryBlock(
                 summary = entry.summary,
-                erkannt = entry.erkannt,
+                recognizedMeal = entry.recognizedMeal,
                 note = entry.note,
-                onEditErkannt = { if (entry.erkannt.isNotBlank()) showErkanntEdit = true },
+                onEditRecognizedMeal = { if (entry.recognizedMeal.isNotBlank()) showRecognizedEdit = true },
                 onShare = if (canShare) ({ shareHistoryEntry(ctx, viewModel.photoFile(), entry) }) else null
             )
         }
@@ -348,13 +348,13 @@ fun HistoryDetailScreen(
         }
     }
 
-    if (showErkanntEdit) {
-        ErkanntEditDialog(
-            initialText = entry.erkannt,
+    if (showRecognizedEdit) {
+        RecognizedMealEditDialog(
+            initialText = entry.recognizedMeal,
             onOk = { newText ->
                 val trimmed = newText.trim()
                 viewModel.updateErkannt(trimmed)
-                showErkanntEdit = false
+                showRecognizedEdit = false
                 if (trimmed.isNotBlank() && !detailState.reEvalBusy) {
                     val photoBundle = PromptBundle(
                         intro = ctx.getString(R.string.prompt_eval_intro),
@@ -386,7 +386,7 @@ fun HistoryDetailScreen(
                     )
                 }
             },
-            onDismiss = { showErkanntEdit = false }
+            onDismiss = { showRecognizedEdit = false }
         )
     }
 

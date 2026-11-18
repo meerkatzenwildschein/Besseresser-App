@@ -170,7 +170,7 @@ class FakeHistoryRepository : HistoryRepository {
             goalResults = ev.goalResults,
             summary = ev.summary,
             note = note,
-            erkannt = ev.erkannt,
+            recognizedMeal = ev.recognizedMeal,
             backdated = backdated,
             sortOrder = id
         )
@@ -180,7 +180,7 @@ class FakeHistoryRepository : HistoryRepository {
 
     override suspend fun updateErkannt(id: Long, newText: String) {
         entriesFlow.update { list ->
-            list.map { if (it.id == id) it.copy(erkannt = newText) else it }
+            list.map { if (it.id == id) it.copy(recognizedMeal = newText) else it }
         }
     }
 
@@ -292,7 +292,7 @@ class FakeHistoryRepository : HistoryRepository {
 class FakeApiService(
     var analyzeResult: Result<Evaluation> = Result.success(
         Evaluation(
-            erkannt = "Apfel und Nüsse",
+            recognizedMeal = "Apfel und Nüsse",
             goalResults = listOf(GoalResult("Z1", TrafficLight.GREEN, "Gut")),
             summary = "Super Mahlzeit"
         )
@@ -328,7 +328,7 @@ class FakeApiService(
         settings: Settings,
         goals: List<String>,
         promptContext: String?,
-        mealLines: List<String>,
+        mealDescriptions: List<String>,
         prompts: FazitPromptBundle
     ): Result<DayFazitResult> = dayFazitResult
 
@@ -411,9 +411,9 @@ class RepositoriesAndFakesTest {
         repo.ensureMigrated()
         assertTrue(repo.migrationChecked)
 
-        val ev = Evaluation(goalResults = listOf(GoalResult("Z1", TrafficLight.GREEN, "Frisch")), summary = "Toll", erkannt = "Salat")
+        val ev = Evaluation(goalResults = listOf(GoalResult("Z1", TrafficLight.GREEN, "Frisch")), summary = "Toll", recognizedMeal = "Salat")
         val entry = repo.add(null, ev, note = "Mittagessen")
-        assertEquals("Salat", entry.erkannt)
+        assertEquals("Salat", entry.recognizedMeal)
         assertEquals("Mittagessen", entry.note)
 
         repo.updateErkannt(entry.id, "Bunter Salat")
@@ -440,7 +440,7 @@ class RepositoriesAndFakesTest {
         vm.setNote("Leckerer Snack")
         assertEquals("Leckerer Snack", vm.uiState.value.note)
 
-        val ev = Evaluation(goalResults = listOf(GoalResult("Ziel", TrafficLight.GREEN, "Top")), summary = "Sehr gut", erkannt = "Apfel")
+        val ev = Evaluation(goalResults = listOf(GoalResult("Ziel", TrafficLight.GREEN, "Top")), summary = "Sehr gut", recognizedMeal = "Apfel")
         api.analyzeResult = Result.success(ev)
 
         vm.saveToHistory()
@@ -537,14 +537,14 @@ class RepositoriesAndFakesTest {
             entriesOfDay = listOf(entry),
             settings = Settings("", "", "", emptyList()),
             promptContext = null,
-            mealLines = listOf("12:00 · Suppe"),
+            mealDescriptions = listOf("12:00 · Suppe"),
             prompts = FazitPromptBundle("Intro", "Rules", "de", "Ehrlich")
         )
         advanceUntilIdle()
 
         val savedDayFazit = histRepo.loadDayFazit("20261106")
         assertNotNull(savedDayFazit)
-        assertEquals(TrafficLight.GREEN, savedDayFazit?.ampel)
+        assertEquals(TrafficLight.GREEN, savedDayFazit?.rating)
 
         // Backdated meal capture flow
         val targetDay = LocalDate.of(2026, 11, 5)
@@ -558,7 +558,7 @@ class RepositoriesAndFakesTest {
         val backdatedEval = Evaluation(
             goalResults = listOf(GoalResult("Z", TrafficLight.GREEN, "Proteinreich")),
             summary = "Top Snack",
-            erkannt = "150 g Skyr mit Beeren"
+            recognizedMeal = "150 g Skyr mit Beeren"
         )
         vm.saveBackdatedEntry(ev = backdatedEval, photoUriIn = null) { pickedBackdated = it }
         advanceUntilIdle()
@@ -569,7 +569,7 @@ class RepositoriesAndFakesTest {
         assertFalse(backdatedEntry.backdated)
         val expectedMillis = targetDay.atTime(14, 20).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
         assertEquals(expectedMillis, backdatedEntry.dateMillis)
-        assertEquals("150 g Skyr mit Beeren", backdatedEntry.erkannt)
+        assertEquals("150 g Skyr mit Beeren", backdatedEntry.recognizedMeal)
         assertFalse(vm.uiState.value.showAddText)
         assertEquals("", vm.uiState.value.addNote)
         assertNull(vm.uiState.value.addTargetDay)
@@ -593,7 +593,7 @@ class RepositoriesAndFakesTest {
         assertTrue(usedCache)
         assertNotNull(reusedEntry)
         assertEquals("Top Snack", reusedEntry?.summary)
-        assertEquals("150 g Skyr mit Beeren", reusedEntry?.erkannt)
+        assertEquals("150 g Skyr mit Beeren", reusedEntry?.recognizedMeal)
 
         // When goals changed, trySaveCachedBackdated returns false (forces new AI evaluation)
         vm.setAddTargetDay(day2)
@@ -615,7 +615,7 @@ class RepositoriesAndFakesTest {
         val cachedEv = Evaluation(
             goalResults = listOf(GoalResult("Ziel 1", TrafficLight.GREEN, "Sehr gut")),
             summary = "Gesundes Frühstück",
-            erkannt = "Haferflocken mit Obst"
+            recognizedMeal = "Haferflocken mit Obst"
         )
         setRepo.pushRecentNote("Haferflocken", cachedEv)
 
@@ -626,13 +626,13 @@ class RepositoriesAndFakesTest {
         assertFalse(vm.uiState.value.isBusy)
         assertEquals(cachedEv, vm.uiState.value.evaluation)
 
-        // Editing "erkannt" also updates the cached evaluation on the RecentNote entry
+        // Editing "recognizedMeal" also updates the cached evaluation on the RecentNote entry
         vm.updateErkannt(newText = "Haferflocken mit Beeren und Nüssen")
-        assertEquals("Haferflocken mit Beeren und Nüssen", vm.uiState.value.evaluation?.erkannt)
+        assertEquals("Haferflocken mit Beeren und Nüssen", vm.uiState.value.evaluation?.recognizedMeal)
         advanceUntilIdle()
         assertEquals(
             "Haferflocken mit Beeren und Nüssen",
-            setRepo.findCachedEvaluation("Haferflocken", listOf("Ziel 1"))?.erkannt
+            setRepo.findCachedEvaluation("Haferflocken", listOf("Ziel 1"))?.recognizedMeal
         )
 
         // Modified note text -> does not match cached entry -> returns false
@@ -696,9 +696,9 @@ class RepositoriesAndFakesTest {
             imagePreprocessor = FakeImagePreprocessor()
         )
 
-        val e1 = histRepo.add(null, Evaluation(erkannt = "Mahlzeit 1"), dateOverride = 1000L)
-        val e2 = histRepo.add(null, Evaluation(erkannt = "Mahlzeit 2"), dateOverride = 2000L)
-        val e3 = histRepo.add(null, Evaluation(erkannt = "Mahlzeit 3"), dateOverride = 3000L)
+        val e1 = histRepo.add(null, Evaluation(recognizedMeal = "Mahlzeit 1"), dateOverride = 1000L)
+        val e2 = histRepo.add(null, Evaluation(recognizedMeal = "Mahlzeit 2"), dateOverride = 2000L)
+        val e3 = histRepo.add(null, Evaluation(recognizedMeal = "Mahlzeit 3"), dateOverride = 3000L)
         advanceUntilIdle()
         assertEquals(3, vm.uiState.value.entries.size)
 
@@ -737,8 +737,8 @@ class RepositoriesAndFakesTest {
         val thisWeek = today.atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
         val tenWeeksAgo = today.minusWeeks(10).atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-        val recent = repo.add(null, Evaluation(erkannt = "Heute"), dateOverride = thisWeek)
-        val old = repo.add(null, Evaluation(erkannt = "Vor 10 Wochen"), dateOverride = tenWeeksAgo)
+        val recent = repo.add(null, Evaluation(recognizedMeal = "Heute"), dateOverride = thisWeek)
+        val old = repo.add(null, Evaluation(recognizedMeal = "Vor 10 Wochen"), dateOverride = tenWeeksAgo)
         repo.saveDayFazit(DayFazit(dayKeyOf(thisWeek), TrafficLight.GREEN, "Heute ok", listOf(recent.id), 1L, "fp1"))
         repo.saveDayFazit(DayFazit(dayKeyOf(tenWeeksAgo), TrafficLight.RED, "Alt schlecht", listOf(old.id), 1L, "fp2"))
         repo.saveWeekFazit(DayFazit(weekKeyOf(thisWeek), TrafficLight.GREEN, "Woche ok", listOf(recent.id), 1L, "fp3"))
@@ -777,20 +777,20 @@ class RepositoriesAndFakesTest {
         val m3 = day.atTime(19, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 
         // Descending order initially: Abendessen (m3), Mittagessen (m2), Frühstück (m1)
-        histRepo.add(null, Evaluation(erkannt = "Abendessen"), dateOverride = m3)
-        histRepo.add(null, Evaluation(erkannt = "Mittagessen"), dateOverride = m2)
-        histRepo.add(null, Evaluation(erkannt = "Frühstück"), dateOverride = m1)
+        histRepo.add(null, Evaluation(recognizedMeal = "Abendessen"), dateOverride = m3)
+        histRepo.add(null, Evaluation(recognizedMeal = "Mittagessen"), dateOverride = m2)
+        histRepo.add(null, Evaluation(recognizedMeal = "Frühstück"), dateOverride = m1)
         advanceUntilIdle()
 
-        assertEquals("Abendessen", vm.uiState.value.entries[0].erkannt)
-        assertEquals("Mittagessen", vm.uiState.value.entries[1].erkannt)
-        assertEquals("Frühstück", vm.uiState.value.entries[2].erkannt)
+        assertEquals("Abendessen", vm.uiState.value.entries[0].recognizedMeal)
+        assertEquals("Mittagessen", vm.uiState.value.entries[1].recognizedMeal)
+        assertEquals("Frühstück", vm.uiState.value.entries[2].recognizedMeal)
 
         // Save a DayFazit for this day before reordering
         val initialDayEntries = vm.uiState.value.entries
         val dayFazit = DayFazit(
             dayKey = dayKeyOf(day),
-            ampel = TrafficLight.GREEN,
+            rating = TrafficLight.GREEN,
             text = "Ausgewogener Tag",
             entryIds = initialDayEntries.map { it.id },
             fingerprint = dayFingerprint(initialDayEntries)
@@ -804,9 +804,9 @@ class RepositoriesAndFakesTest {
         advanceUntilIdle()
 
         val reordered = vm.uiState.value.entries
-        assertEquals("Frühstück", reordered[0].erkannt)
-        assertEquals("Abendessen", reordered[1].erkannt)
-        assertEquals("Mittagessen", reordered[2].erkannt)
+        assertEquals("Frühstück", reordered[0].recognizedMeal)
+        assertEquals("Abendessen", reordered[1].recognizedMeal)
+        assertEquals("Mittagessen", reordered[2].recognizedMeal)
         // Sort orders must be strictly descending, while original capture times (dateMillis) stay untouched!
         assertTrue(reordered[0].sortOrder > reordered[1].sortOrder)
         assertTrue(reordered[1].sortOrder > reordered[2].sortOrder)
@@ -817,19 +817,19 @@ class RepositoriesAndFakesTest {
         // Test moving a normal entry above a backdated (23:59) entry: normal entry keeps its time!
         histRepo.add(
             null,
-            Evaluation(erkannt = "Später Snack"),
+            Evaluation(recognizedMeal = "Später Snack"),
             dateOverride = day.atTime(23, 59).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),
             backdated = true
         )
         advanceUntilIdle()
-        assertEquals("Später Snack", vm.uiState.value.entries[0].erkannt)
+        assertEquals("Später Snack", vm.uiState.value.entries[0].recognizedMeal)
         assertTrue(vm.uiState.value.entries[0].backdated)
 
         // Move Mittagessen (index 3) to top (index 0, above backdated 23:59 entry)
         vm.moveEntryWithinDay(day = day, fromIndex = 3, toIndex = 0)
         advanceUntilIdle()
         val afterBackdatedMove = vm.uiState.value.entries
-        assertEquals("Mittagessen", afterBackdatedMove[0].erkannt)
+        assertEquals("Mittagessen", afterBackdatedMove[0].recognizedMeal)
         assertFalse(afterBackdatedMove[0].backdated)
         // Mittagessen MUST still have its original 12:00 timestamp (m2), NOT 23:59!
         assertEquals(m2, afterBackdatedMove[0].dateMillis)
@@ -877,7 +877,7 @@ class RepositoriesAndFakesTest {
 
         val pastDay = LocalDate.now().minusDays(1)
         val pastDayMillis = pastDay.atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val entry = histRepo.add(null, Evaluation(erkannt = "Salat"), dateOverride = pastDayMillis)
+        val entry = histRepo.add(null, Evaluation(recognizedMeal = "Salat"), dateOverride = pastDayMillis)
         advanceUntilIdle()
 
         DayFazitSession.attempted.clear()
@@ -886,14 +886,14 @@ class RepositoriesAndFakesTest {
             promptContext = null,
             dayPrompts = FazitPromptBundle("Intro", "Rules", "de", "Ehrlich"),
             weekPromptsProvider = { FazitPromptBundle("WeekIntro", "Rules", "de", "Ehrlich") },
-            dayMealLinesProvider = { list -> list.map { it.erkannt } },
-            weekMealLinesProvider = { list -> list.map { it.erkannt } }
+            daymealDescriptionsProvider = { list -> list.map { it.recognizedMeal } },
+            weekmealDescriptionsProvider = { list -> list.map { it.recognizedMeal } }
         )
         advanceTimeBy(1300)
         advanceUntilIdle()
 
         val savedFazit = histRepo.loadDayFazit(dayKeyOf(pastDay))
         assertNotNull(savedFazit)
-        assertEquals(TrafficLight.GREEN, savedFazit?.ampel)
+        assertEquals(TrafficLight.GREEN, savedFazit?.rating)
     }
 }

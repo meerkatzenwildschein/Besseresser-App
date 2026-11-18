@@ -23,7 +23,7 @@ import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.Settings
 
 /** ViewModel für die Detailansicht eines Verlaufseintrags: hält den Eintrag reaktiv
- *  synchron und kapselt Re-Evaluation, erkannt-Korrektur, Löschen und Duplizieren. */
+ *  synchron und kapselt Re-Evaluation, recognizedMeal-Korrektur, Löschen und Duplizieren. */
 class HistoryDetailViewModel(
     private val entryId: Long,
     val historyRepository: HistoryRepository,
@@ -60,7 +60,7 @@ class HistoryDetailViewModel(
     fun thumbnail(target: Int = 1280): android.graphics.Bitmap? =
         _uiState.value.entry?.let { historyRepository.decodeThumbnail(it, target) }
 
-    /** erkannt-Text korrigieren (persistiert; Fazit wird über Fingerprint veraltet). */
+    /** recognizedMeal-Text korrigieren (persistiert; Fazit wird über Fingerprint veraltet). */
     fun updateErkannt(newText: String) {
         val entry = _uiState.value.entry ?: return
         val trimmed = newText.trim()
@@ -72,14 +72,14 @@ class HistoryDetailViewModel(
                     Evaluation(
                         goalResults = entry.goalResults,
                         summary = entry.summary,
-                        erkannt = trimmed
+                        recognizedMeal = trimmed
                     )
                 )
             }
         }
     }
 
-    /** Re-Bewertung nach erkannt-Korrektur: Mit Foto wenn vorhanden, sonst text-only.
+    /** Re-Bewertung nach recognizedMeal-Korrektur: Mit Foto wenn vorhanden, sonst text-only.
      *  Prompts werden von der UI geliefert. Ziele + Gesamteindruck werden 1:1 ersetzt. */
     fun reEvaluate(
         correctedText: String,
@@ -113,7 +113,7 @@ class HistoryDetailViewModel(
                 if (entry.note.isNotBlank()) {
                     settingsRepository.updateRecentNoteEvaluation(
                         entry.note,
-                        Evaluation(goalResults = ev.goalResults, summary = ev.summary, erkannt = entry.erkannt)
+                        Evaluation(goalResults = ev.goalResults, summary = ev.summary, recognizedMeal = entry.recognizedMeal)
                     )
                 }
                 historyRepository.deleteDayFazitForEntry(entry)

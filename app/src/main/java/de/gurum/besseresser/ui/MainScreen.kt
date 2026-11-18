@@ -155,7 +155,7 @@ fun MainScreen(
                 onOpenHistory = onOpenHistory,
                 onEditSettings = onEditSettings,
                 onOpenConfig = onOpenConfig,
-                onEditErkannt = { viewModel.setShowErkanntEdit(true) },
+                onEditRecognizedMeal = { viewModel.setshowRecognizedEdit(true) },
                 onTakePhoto = {
                     if (!uiState.isBusy) {
                         viewModel.reset()
@@ -188,13 +188,13 @@ fun MainScreen(
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
 
-            if (uiState.showErkanntEdit && uiState.evaluation != null) {
-                ErkanntEditDialog(
-                    initialText = uiState.evaluation?.erkannt.orEmpty(),
+            if (uiState.showRecognizedEdit && uiState.evaluation != null) {
+                RecognizedMealEditDialog(
+                    initialText = uiState.evaluation?.recognizedMeal.orEmpty(),
                     onOk = { newText ->
                         viewModel.updateErkannt(newText)
                     },
-                    onDismiss = { viewModel.setShowErkanntEdit(false) }
+                    onDismiss = { viewModel.setshowRecognizedEdit(false) }
                 )
             }
         }

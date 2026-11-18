@@ -158,7 +158,7 @@ class UserFlowsTest {
             advanceUntilIdle()
             assertEquals(0, vm.uiState.value.entries.size)
 
-            val eval = Evaluation(erkannt = "Lachs", goalResults = listOf(GoalResult("Ziel 1", TrafficLight.GREEN, "")))
+            val eval = Evaluation(recognizedMeal = "Lachs", goalResults = listOf(GoalResult("Ziel 1", TrafficLight.GREEN, "")))
             histRepo.add(null, eval, note = "Mittagessen", dateOverride = 1_000_000L)
             histRepo.add(null, eval, note = "Abendessen", dateOverride = 2_000_000L)
             advanceUntilIdle()
@@ -170,7 +170,7 @@ class UserFlowsTest {
     fun `history list - pending delete is undoable within delay`() =
         runTest(testDispatcher) {
             val histRepo = FakeHistoryRepository()
-            val eval = Evaluation(erkannt = "Toast")
+            val eval = Evaluation(recognizedMeal = "Toast")
             val entry = histRepo.add(null, eval, note = "Frühstück", dateOverride = 5_000L)
 
             val vm = HistoryViewModel(
@@ -195,7 +195,7 @@ class UserFlowsTest {
     fun `history detail - loads correct entry by id`() = runTest(testDispatcher) {
         val histRepo = FakeHistoryRepository()
         val eval = Evaluation(
-            erkannt = "Pizza",
+            recognizedMeal = "Pizza",
             goalResults = listOf(GoalResult("Ziel 1", TrafficLight.RED, "Zu viel Fett"))
         )
         val entry = histRepo.add(null, eval, note = "Mittagessen", dateOverride = 42_000L)
@@ -212,7 +212,7 @@ class UserFlowsTest {
 
         assertNotNull(vm.uiState.value.entry)
         assertEquals(entry.id, vm.uiState.value.entry!!.id)
-        assertEquals("Pizza", vm.uiState.value.entry!!.erkannt)
+        assertEquals("Pizza", vm.uiState.value.entry!!.recognizedMeal)
         assertTrue(vm.uiState.value.loaded)
     }
 
@@ -236,7 +236,7 @@ class UserFlowsTest {
     @Test
     fun `history detail - updateErkannt persists new text`() = runTest(testDispatcher) {
         val histRepo = FakeHistoryRepository()
-        val eval = Evaluation(erkannt = "Burger")
+        val eval = Evaluation(recognizedMeal = "Burger")
         val entry = histRepo.add(null, eval, note = "Abend", dateOverride = 7_000L)
 
         val vm = HistoryDetailViewModel(
@@ -248,11 +248,11 @@ class UserFlowsTest {
             dispatchers = testDispatchers
         )
         advanceUntilIdle()
-        assertEquals("Burger", vm.uiState.value.entry!!.erkannt)
+        assertEquals("Burger", vm.uiState.value.entry!!.recognizedMeal)
 
         vm.updateErkannt("Veggie-Burger")
         advanceUntilIdle()
 
-        assertEquals("Veggie-Burger", histRepo.getAll().first { it.id == entry.id }.erkannt)
+        assertEquals("Veggie-Burger", histRepo.getAll().first { it.id == entry.id }.recognizedMeal)
     }
 }

@@ -406,7 +406,7 @@ class HistoryViewModel(
         entriesOfDay: List<HistoryEntry>,
         settings: Settings,
         promptContext: String?,
-        mealLines: List<String>,
+        mealDescriptions: List<String>,
         prompts: FazitPromptBundle
     ) {
         val key = dayKeyOf(day)
@@ -422,13 +422,13 @@ class HistoryViewModel(
                 settings = settings,
                 goals = settings.goals,
                 promptContext = promptContext,
-                mealLines = mealLines,
+                mealDescriptions = mealDescriptions,
                 prompts = prompts
             )
             result.onSuccess { res ->
                 val fazit = DayFazit(
                     dayKey = key,
-                    ampel = res.ampel,
+                    rating = res.rating,
                     text = res.text,
                     entryIds = entriesOfDay.map { it.id },
                     createdAt = System.currentTimeMillis(),
@@ -446,7 +446,7 @@ class HistoryViewModel(
         settings: Settings,
         promptContext: String?,
         weekKey: String,
-        mealLines: List<String>? = null,
+        mealDescriptions: List<String>? = null,
         prompts: FazitPromptBundle? = null
     ) {
         val wk = weekKey
@@ -460,19 +460,19 @@ class HistoryViewModel(
             )
         }
         val wkEntries = _uiState.value.entries.filter { weekKeyOf(it.dateMillis) == wk }
-        val lines = mealLines ?: wkEntries.map { it.erkannt }
+        val lines = mealDescriptions ?: wkEntries.map { it.recognizedMeal }
         val promptBundle = prompts ?: FazitPromptBundle("", "", "", "")
         viewModelScope.launch {
             val result = apiService.dayFazit(
                 settings = settings,
                 goals = settings.goals,
                 promptContext = promptContext,
-                mealLines = lines,
+                mealDescriptions = lines,
                 prompts = promptBundle
             )
             result.onSuccess { res ->
                 val wf = DayFazit(
-                    wk, res.ampel, res.text, wkEntries.map { it.id },
+                    wk, res.rating, res.text, wkEntries.map { it.id },
                     System.currentTimeMillis(), dayFingerprint(wkEntries)
                 )
                 historyRepository.saveWeekFazit(wf)
@@ -513,8 +513,8 @@ class HistoryViewModel(
         promptContext: String?,
         dayPrompts: FazitPromptBundle,
         weekPromptsProvider: (calendarWeek: Int) -> FazitPromptBundle,
-        dayMealLinesProvider: (List<HistoryEntry>) -> List<String>,
-        weekMealLinesProvider: (List<HistoryEntry>) -> List<String>
+        daymealDescriptionsProvider: (List<HistoryEntry>) -> List<String>,
+        weekmealDescriptionsProvider: (List<HistoryEntry>) -> List<String>
     ) {
         autoFazitJob?.cancel()
         autoFazitJob = viewModelScope.launch {
@@ -533,7 +533,7 @@ class HistoryViewModel(
                 settings = settings,
                 promptContext = promptContext,
                 dayPrompts = dayPrompts,
-                dayMealLinesProvider = dayMealLinesProvider
+                daymealDescriptionsProvider = daymealDescriptionsProvider
             )
 
             checkAutoWeekFazits(
@@ -543,7 +543,7 @@ class HistoryViewModel(
                 settings = settings,
                 promptContext = promptContext,
                 weekPromptsProvider = weekPromptsProvider,
-                weekMealLinesProvider = weekMealLinesProvider
+                weekmealDescriptionsProvider = weekmealDescriptionsProvider
             )
         }
     }
@@ -555,7 +555,7 @@ class HistoryViewModel(
         settings: Settings,
         promptContext: String?,
         dayPrompts: FazitPromptBundle,
-        dayMealLinesProvider: (List<HistoryEntry>) -> List<String>
+        daymealDescriptionsProvider: (List<HistoryEntry>) -> List<String>
     ) {
         val fazitMap = _uiState.value.fazitMap
         val loadingFazits = _uiState.value.loadingFazits
@@ -574,7 +574,7 @@ class HistoryViewModel(
                         entriesOfDay = group.entries,
                         settings = settings,
                         promptContext = promptContext,
-                        mealLines = dayMealLinesProvider(group.entries),
+                        mealDescriptions = daymealDescriptionsProvider(group.entries),
                         prompts = dayPrompts
                     )
                 }
@@ -584,7 +584,7 @@ class HistoryViewModel(
                     entriesOfDay = group.entries,
                     settings = settings,
                     promptContext = promptContext,
-                    mealLines = dayMealLinesProvider(group.entries),
+                    mealDescriptions = daymealDescriptionsProvider(group.entries),
                     prompts = dayPrompts
                 )
             }
@@ -598,7 +598,7 @@ class HistoryViewModel(
         settings: Settings,
         promptContext: String?,
         weekPromptsProvider: (calendarWeek: Int) -> FazitPromptBundle,
-        weekMealLinesProvider: (List<HistoryEntry>) -> List<String>
+        weekmealDescriptionsProvider: (List<HistoryEntry>) -> List<String>
     ) {
         val weekFazitMap = _uiState.value.weekFazitMap
         val loadingWeeks = _uiState.value.loadingWeeks
@@ -611,7 +611,7 @@ class HistoryViewModel(
                 settings = settings,
                 promptContext = promptContext,
                 weekKey = dueWk,
-                mealLines = weekMealLinesProvider(wkEntries),
+                mealDescriptions = weekmealDescriptionsProvider(wkEntries),
                 prompts = weekPromptsProvider(calendarWeekOfKey(dueWk))
             )
         }

@@ -50,7 +50,7 @@ class ApiClientTest {
     @Test
     fun testDayFazitResult() {
         val res = DayFazitResult(TrafficLight.GREEN, "Gute Mahlzeiten heute!")
-        assertEquals(TrafficLight.GREEN, res.ampel)
+        assertEquals(TrafficLight.GREEN, res.rating)
         assertEquals("Gute Mahlzeiten heute!", res.text)
     }
 
@@ -76,7 +76,7 @@ class ApiClientTest {
             ampelMeaning = "gruen=gut",
             exactlyOne = "Genau eine Ampel",
             responseLanguage = "Sprache: Deutsch",
-            recognized = "Erkannt:",
+            recognized = "recognizedMeal:",
             honesty = "Ehrlich",
             noteHeader = "Notiz:"
         )
@@ -91,7 +91,7 @@ class ApiClientTest {
     @Test
     fun testPromptBuilderCreateDayFazitPrompt() {
         val goals = listOf("Blutdruck senken", "Weniger Zucker")
-        val mealLines = listOf("08:00 · Haferflocken", "12:30 · Gemüse-Curry")
+        val mealDescriptions = listOf("08:00 · Haferflocken", "12:30 · Gemüse-Curry")
         val bundle = FazitPromptBundle(
             promptIntro = "Bewerte den Tag:",
             promptRules = "Kleine Snacks fair gewichten.",
@@ -101,7 +101,7 @@ class ApiClientTest {
         val promptWithCtx = PromptBuilder.createDayFazitPrompt(
             goals = goals,
             promptContext = "Nutzerprofil: 35 Jahre · 75 kg",
-            mealLines = mealLines,
+            mealDescriptions = mealDescriptions,
             prompts = bundle
         )
         assertTrue(promptWithCtx.contains("1. Blutdruck senken"))
@@ -116,7 +116,7 @@ class ApiClientTest {
         val promptWithoutCtx = PromptBuilder.createDayFazitPrompt(
             goals = goals,
             promptContext = null,
-            mealLines = mealLines,
+            mealDescriptions = mealDescriptions,
             prompts = bundle
         )
         assertFalse(promptWithoutCtx.contains("Nutzerprofil"))
@@ -265,24 +265,24 @@ class ApiClientTest {
         val rawStandard = """
             {
               "bewertung": [
-                {"ziel": "Blutdruck senken", "ampel": "gruen", "begruendung": "Wenig Salz"},
-                {"ziel": "Gesuender ernaehren", "ampel": "gelb", "begruendung": "Viel Fett"},
-                {"ziel": "Weniger Zucker", "ampel": "rot", "begruendung": "Süßes Dessert"}
+                {"ziel": "Blutdruck senken", "ampel": "gruen", "reason": "Wenig Salz"},
+                {"ziel": "Gesuender ernaehren", "ampel": "gelb", "reason": "Viel Fett"},
+                {"ziel": "Weniger Zucker", "ampel": "rot", "reason": "Süßes Dessert"}
               ],
               "zusatz": "Insgesamt solide.",
-              "erkannt": "Auf dem Foto ist zu sehen: 250 g Gemüsepfanne"
+              "recognizedMeal": "Auf dem Foto ist zu sehen: 250 g Gemüsepfanne"
             }
         """.trimIndent()
 
         val ev = ApiClient.parseEvaluation(rawStandard, goals)
         assertEquals(3, ev.goalResults.size)
-        assertEquals(TrafficLight.GREEN, ev.goalResults[0].ampel)
+        assertEquals(TrafficLight.GREEN, ev.goalResults[0].rating)
         // Matched despite umlaut difference ("Gesünder ernähren" vs "Gesuender ernaehren")
-        assertEquals(TrafficLight.YELLOW, ev.goalResults[1].ampel)
-        assertEquals("Viel Fett", ev.goalResults[1].begruendung)
-        assertEquals(TrafficLight.RED, ev.goalResults[2].ampel)
+        assertEquals(TrafficLight.YELLOW, ev.goalResults[1].rating)
+        assertEquals("Viel Fett", ev.goalResults[1].reason)
+        assertEquals(TrafficLight.RED, ev.goalResults[2].rating)
         assertEquals("Insgesamt solide.", ev.summary)
-        assertEquals("250 g Gemüsepfanne", ev.erkannt)
+        assertEquals("250 g Gemüsepfanne", ev.recognizedMeal)
 
         // English alias schema + positional fallback when goal names don't match
         val rawAliases = """
@@ -299,12 +299,12 @@ class ApiClientTest {
 
         val evAlias = ApiClient.parseEvaluation(rawAliases, goals)
         assertEquals(3, evAlias.goalResults.size)
-        assertEquals(TrafficLight.GREEN, evAlias.goalResults[0].ampel)
-        assertEquals("Low sodium", evAlias.goalResults[0].begruendung)
-        assertEquals(TrafficLight.YELLOW, evAlias.goalResults[1].ampel)
-        assertEquals(TrafficLight.RED, evAlias.goalResults[2].ampel)
+        assertEquals(TrafficLight.GREEN, evAlias.goalResults[0].rating)
+        assertEquals("Low sodium", evAlias.goalResults[0].reason)
+        assertEquals(TrafficLight.YELLOW, evAlias.goalResults[1].rating)
+        assertEquals(TrafficLight.RED, evAlias.goalResults[2].rating)
         assertEquals("Balanced meal", evAlias.summary)
-        assertEquals("100 g salad", evAlias.erkannt)
+        assertEquals("100 g salad", evAlias.recognizedMeal)
     }
 
     @Test

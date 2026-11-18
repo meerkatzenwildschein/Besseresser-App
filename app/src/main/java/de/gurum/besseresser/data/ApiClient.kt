@@ -74,7 +74,7 @@ data class SplitGoalsRequest(
 
 /** Ergebnis eines Tages- oder Wochenfazits von der KI. */
 data class DayFazitResult(
-    val ampel: TrafficLight,
+    val rating: TrafficLight,
     val text: String
 )
 
@@ -103,7 +103,7 @@ interface BesseresserApiService {
         settings: Settings,
         goals: List<String>,
         promptContext: String?,
-        mealLines: List<String>,
+        mealDescriptions: List<String>,
         prompts: FazitPromptBundle
     ): Result<DayFazitResult>
 
@@ -133,7 +133,7 @@ class ApiClient(
 
         private val AMP_KEYS = listOf("ampel", "ampelfarbe", "farbe", "color", "status", "rating", "trafficlight")
         private val ZIEL_KEYS = listOf("ziel", "goal", "zielname", "name", "thema", "title")
-        private val BEG_KEYS = listOf("begruendung", "reason", "erklaerung", "beschreibung", "kommentar", "text", "note")
+        private val BEG_KEYS = listOf("reason", "reason", "erklaerung", "beschreibung", "kommentar", "text", "note")
         private val RESULT_ARRAY_KEYS = listOf("bewertung", "bewertungen", "results", "ampeln", "ratings", "ziele", "goals")
 
         private val ERKANNT_INTRO_PATTERNS = listOf(
@@ -216,8 +216,8 @@ class ApiClient(
                     list.add(
                         GoalResult(
                             goal = goal,
-                            ampel = TrafficLight.fromString(pick(m, AMP_KEYS)),
-                            begruendung = pick(m, BEG_KEYS)
+                            rating = TrafficLight.fromString(pick(m, AMP_KEYS)),
+                            reason = pick(m, BEG_KEYS)
                         )
                     )
                 } else {
@@ -225,10 +225,10 @@ class ApiClient(
                 }
             }
             val summary = pickString(obj, listOf("zusatz", "summary"))
-            val erkannt = stripErkanntIntro(
-                pickString(obj, listOf("erkannt", "detected", "food", "meal"))
+            val recognizedMeal = stripErkanntIntro(
+                pickString(obj, listOf("recognizedMeal", "detected", "food", "meal"))
             )
-            return Evaluation(list, summary, erkannt)
+            return Evaluation(list, summary, recognizedMeal)
         }
 
         internal fun stripErkanntIntro(raw: String): String {
@@ -406,10 +406,10 @@ class ApiClient(
         settings: Settings,
         goals: List<String>,
         promptContext: String?,
-        mealLines: List<String>,
+        mealDescriptions: List<String>,
         prompts: FazitPromptBundle
     ): Result<DayFazitResult> = withContext(dispatchers.io) {
-        val prompt = PromptBuilder.createDayFazitPrompt(goals, promptContext, mealLines, prompts)
+        val prompt = PromptBuilder.createDayFazitPrompt(goals, promptContext, mealDescriptions, prompts)
         val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
         val messages = buildJsonArray {
             add(buildJsonObject {
@@ -442,10 +442,10 @@ class ApiClient(
             }
 
             val obj = OpenAiChatClient.tolerantJson(rawContent)
-            val ampel = TrafficLight.fromString(pickString(obj, listOf("ampel", "rating", "status", "farbe")))
+            val rating = TrafficLight.fromString(pickString(obj, listOf("ampel", "rating", "status", "farbe")))
             val fazitText = pickString(obj, listOf("text", "fazit", "summary"))
             check(fazitText.isNotBlank()) { "KI-Antwort ohne Fazit-Text (Roh: ${rawContent.take(200)})" }
-            DayFazitResult(ampel, fazitText.trim())
+            DayFazitResult(rating, fazitText.trim())
         }
     }
 

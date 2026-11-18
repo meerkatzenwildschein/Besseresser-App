@@ -170,18 +170,18 @@ fun ErrorBanner(message: String) {
  * Zusammenfassungs-Block: 🧠 Gesamteindruck immer sichtbar; 🍽️ „Erkannt" und 📝 Anmerkung
  * eingeklappt hinter einem Toggle (der ganze Block antippbar = großes Touch-Ziel), Chevron
  * rotiert mit, animateContentSize animiert das Auf-/ Zuklappen. Nutzt Auswertung UND
- * Historie-Detail – bewusst identisch verhalten. Pencil an der 🍽️-Zeile (wenn onEditErkannt
- * gesetzt) öffnet den ErkanntEditDialog – der erkannt-Text ist userkorrigierbar.
+ * Historie-Detail – bewusst identisch verhalten. Pencil an der 🍽️-Zeile (wenn onEditRecognizedMeal
+ * gesetzt) öffnet den RecognizedMealEditDialog – der recognizedMeal-Text ist userkorrigierbar.
  */
 @Composable
 fun CollapsibleSummaryBlock(
     summary: String,
-    erkannt: String,
+    recognizedMeal: String,
     note: String,
-    onEditErkannt: (() -> Unit)? = null,
+    onEditRecognizedMeal: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null
 ) {
-    val extraCount = listOf(erkannt.isNotBlank(), note.isNotBlank()).count { it }
+    val extraCount = listOf(recognizedMeal.isNotBlank(), note.isNotBlank()).count { it }
     var expanded by remember { mutableStateOf(false) }
     val chevron by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
 
@@ -213,7 +213,7 @@ fun CollapsibleSummaryBlock(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                 }
-                SummaryDetailsContent(erkannt = erkannt, note = note, onEditErkannt = onEditErkannt)
+                SummaryDetailsContent(recognizedMeal = recognizedMeal, note = note, onEditRecognizedMeal = onEditRecognizedMeal)
             }
             if (extraCount > 0 || onShare != null) {
                 Spacer(Modifier.height(8.dp))
@@ -230,13 +230,13 @@ fun CollapsibleSummaryBlock(
 
 @Composable
 private fun SummaryDetailsContent(
-    erkannt: String,
+    recognizedMeal: String,
     note: String,
-    onEditErkannt: (() -> Unit)?
+    onEditRecognizedMeal: (() -> Unit)?
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (erkannt.isNotBlank()) {
-            ErkanntDetailCard(erkannt = erkannt, onEditErkannt = onEditErkannt)
+        if (recognizedMeal.isNotBlank()) {
+            RecognizedMealDetailCard(recognizedMeal = recognizedMeal, onEditRecognizedMeal = onEditRecognizedMeal)
         }
         if (note.isNotBlank()) {
             Surface(
@@ -256,9 +256,9 @@ private fun SummaryDetailsContent(
 }
 
 @Composable
-private fun ErkanntDetailCard(
-    erkannt: String,
-    onEditErkannt: (() -> Unit)?
+private fun RecognizedMealDetailCard(
+    recognizedMeal: String,
+    onEditRecognizedMeal: (() -> Unit)?
 ) {
     Surface(
         shape = RoundedCornerShape(10.dp),
@@ -270,12 +270,12 @@ private fun ErkanntDetailCard(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
         ) {
             Text(
-                stringResource(R.string.detected_prefix, erkannt),
+                stringResource(R.string.detected_prefix, recognizedMeal),
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
-                modifier = if (onEditErkannt != null) Modifier.weight(1f) else Modifier
+                modifier = if (onEditRecognizedMeal != null) Modifier.weight(1f) else Modifier
             )
-            if (onEditErkannt != null) {
+            if (onEditRecognizedMeal != null) {
                 Spacer(Modifier.width(6.dp))
                 Surface(
                     shape = CircleShape,
@@ -283,7 +283,7 @@ private fun ErkanntDetailCard(
                     modifier = Modifier.size(30.dp)
                 ) {
                     IconButton(
-                        onClick = onEditErkannt,
+                        onClick = onEditRecognizedMeal,
                         modifier = Modifier.size(30.dp)
                     ) {
                         Icon(
@@ -372,9 +372,9 @@ private fun SummaryFooterRow(
     }
 }
 
-/** Dialog zum direkten Korrigieren des erkannt-Essens-Textes. */
+/** Dialog zum direkten Korrigieren des recognizedMeal-Essens-Textes. */
 @Composable
-fun ErkanntEditDialog(initialText: String, onOk: (String) -> Unit, onDismiss: () -> Unit) {
+fun RecognizedMealEditDialog(initialText: String, onOk: (String) -> Unit, onDismiss: () -> Unit) {
     var text by remember { mutableStateOf(initialText) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -460,8 +460,8 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
 
 @Composable
 fun GoalRow(goal: String, res: GoalResult?) {
-    val isRated = res != null && res.ampel != TrafficLight.UNKNOWN
-    val color = res?.ampel?.color() ?: TrafficLight.UNKNOWN.color()
+    val isRated = res != null && res.rating != TrafficLight.UNKNOWN
+    val color = res?.rating?.color() ?: TrafficLight.UNKNOWN.color()
     val containerColor = MaterialTheme.colorScheme.surfaceVariant
     val borderStroke = if (isRated) {
         BorderStroke(1.dp, color.copy(alpha = 0.4f))
@@ -516,7 +516,7 @@ fun GoalRow(goal: String, res: GoalResult?) {
                             border = BorderStroke(1.dp, color.copy(alpha = 0.4f))
                         ) {
                             Text(
-                                text = res.ampel.label(),
+                                text = res.rating.label(),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isRated) color else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -526,16 +526,16 @@ fun GoalRow(goal: String, res: GoalResult?) {
                     }
                 }
                 Spacer(Modifier.height(4.dp))
-                if (res != null && res.begruendung.isNotBlank()) {
+                if (res != null && res.reason.isNotBlank()) {
                     Text(
-                        res.begruendung,
+                        res.reason,
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else if (res != null) {
                     Text(
-                        res.ampel.label(),
+                        res.rating.label(),
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

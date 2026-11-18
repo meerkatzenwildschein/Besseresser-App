@@ -390,15 +390,15 @@ fun HistoryItem(
                                     modifier = Modifier
                                         .size(7.dp)
                                         .clip(CircleShape)
-                                        .background(gr.ampel.color())
+                                        .background(gr.rating.color())
                                 )
                             }
                         }
                     }
                 }
-                if (entry.erkannt.isNotBlank()) {
+                if (entry.recognizedMeal.isNotBlank()) {
                     Text(
-                        stringResource(R.string.detected_prefix, entry.erkannt),
+                        stringResource(R.string.detected_prefix, entry.recognizedMeal),
                         fontSize = 12.5.sp,
                         lineHeight = 17.sp,
                         maxLines = 2,
@@ -695,9 +695,9 @@ fun PendingDeleteHistoryItem(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error
                     )
-                    if (entry.erkannt.isNotBlank()) {
+                    if (entry.recognizedMeal.isNotBlank()) {
                         Text(
-                            entry.erkannt,
+                            entry.recognizedMeal,
                             fontSize = 12.5.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
