@@ -1,19 +1,29 @@
 package de.gurum.besseresser
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import de.gurum.besseresser.model.DayFazit
 import de.gurum.besseresser.model.Evaluation
 import de.gurum.besseresser.model.Gender
 import de.gurum.besseresser.model.GoalResult
 import de.gurum.besseresser.model.HistoryEntry
+import de.gurum.besseresser.ui.AppStateViewModel
+import de.gurum.besseresser.ui.ConfigViewModel
+import de.gurum.besseresser.ui.HistoryDetailViewModel
 import de.gurum.besseresser.ui.HistoryViewModel
 import de.gurum.besseresser.ui.MainViewModel
 import de.gurum.besseresser.ui.ProfileViewModel
+import de.gurum.besseresser.ui.RecentNotesViewModel
 import de.gurum.besseresser.data.RoomConverters
 import de.gurum.besseresser.ui.SetupViewModel
 import de.gurum.besseresser.data.BackupService
@@ -21,6 +31,9 @@ import de.gurum.besseresser.data.BackupSummary
 import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.data.toEntity
 import de.gurum.besseresser.data.toWeekEntity
+import de.gurum.besseresser.model.AppLanguage
+import de.gurum.besseresser.model.AppThemeMode
+import de.gurum.besseresser.model.RecentNote
 import de.gurum.besseresser.model.TrafficLight
 import de.gurum.besseresser.model.Profile
 import de.gurum.besseresser.model.Settings
@@ -28,6 +41,17 @@ import de.gurum.besseresser.model.Settings
 class RoomDatabaseAndViewModelTest {
 
     private val converters = RoomConverters()
+    private val testDispatcher = StandardTestDispatcher()
+
+    @Before
+    fun setUp() {
+        Dispatchers.setMain(testDispatcher)
+    }
+
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
 
     @Test
     fun testRoomGoalResultConverters() {
@@ -225,5 +249,81 @@ class RoomDatabaseAndViewModelTest {
         viewModel.setGoals("Neues Ziel")
         assertEquals("Neues Ziel", viewModel.uiState.value.goals)
         assertTrue(viewModel.uiState.value.goalsDirty)
+    }
+
+    @Test
+    fun testHistoryDetailViewModelUiStateTransitions() {
+        val historyRepo = FakeHistoryRepository()
+        val settingsRepo = FakeSettingsRepository()
+        val apiService = FakeApiService()
+        val imagePreprocessor = FakeImagePreprocessor()
+
+        val viewModel = HistoryDetailViewModel(
+            entryId = 100L,
+            historyRepository = historyRepo,
+            settingsRepository = settingsRepo,
+            apiService = apiService,
+            imagePreprocessor = imagePreprocessor
+        )
+
+        val state = viewModel.uiState.value
+        assertNull(state.entry)
+        assertFalse(state.reEvalBusy)
+        assertNull(state.error)
+
+        viewModel.clearError()
+        assertNull(viewModel.uiState.value.error)
+    }
+
+    @Test
+    fun testConfigViewModelUiStateTransitions() {
+        val backupService = FakeBackupService()
+        val historyRepo = FakeHistoryRepository()
+        val viewModel = ConfigViewModel(backupService, historyRepo)
+
+        val state = viewModel.uiState.value
+        assertFalse(state.busy)
+        assertNull(state.importSummary)
+        assertNull(state.exportSummary)
+        assertFalse(state.cleared)
+        assertNull(state.error)
+
+        viewModel.clearHistory()
+        for (i in 0 until 50) {
+            testDispatcher.scheduler.advanceUntilIdle()
+            if (viewModel.uiState.value.cleared) break
+            Thread.sleep(20)
+        }
+        assertTrue(viewModel.uiState.value.cleared)
+    }
+
+    @Test
+    fun testRecentNotesViewModelUiStateTransitions() {
+        val note = RecentNote("Salat", starred = false)
+        val settingsRepo = FakeSettingsRepository(initialRecentNotes = listOf(note))
+        val viewModel = RecentNotesViewModel(settingsRepo)
+
+        testDispatcher.scheduler.advanceUntilIdle()
+        viewModel.toggleStar(note)
+        val updated = viewModel.notes.value.firstOrNull { it.text == "Salat" }
+        assertNotNull(updated)
+        assertTrue(updated!!.starred)
+    }
+
+    @Test
+    fun testAppStateViewModelUiStateTransitions() {
+        val settingsRepo = FakeSettingsRepository()
+        val profileRepo = FakeProfileRepository()
+        val uiPrefsRepo = FakeUiPrefsRepository()
+        val historyRepo = FakeHistoryRepository()
+
+        val viewModel = AppStateViewModel(settingsRepo, profileRepo, uiPrefsRepo, historyRepo)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val state = viewModel.uiState.value
+        assertTrue(state.loaded)
+
+        viewModel.setThemeMode(AppThemeMode.DARK)
+        viewModel.setLanguage(AppLanguage.EN)
+        testDispatcher.scheduler.advanceUntilIdle()
     }
 }

@@ -9,9 +9,11 @@ hin zu einer sauberen MVVM-Schichtenarchitektur. Status: **abgeschlossen**.
 
 **Ziel:** Direkt-Instanziierung und Context-Fallbacks durch Koin ersetzen.
 
-- Koin 4.0.4 (`koin-android`, `koin-androidx-compose`) eingeführt; `BesseresserApp` startet den Container, `di/AppModule.kt` registriert DB, Repositories, ApiService, ViewModels.
-- Handgeschriebener `RepositoryProvider` entfernt; ViewModels erhalten ihre Abhängigkeiten per Konstruktor (kein `ctx`-Fallback mehr).
-- Ungenutzte Parameter entfernt (`SetupViewModel.settingsRepository`, `MainViewModel.saveToHistory(settings)`).
+- Koin 4.0.4 (`koin-android`, `koin-androidx-compose`, `koin-test`) eingeführt; `BesseresserApp` startet den Container, `di/AppModule.kt` registriert DB, DAOs, Repositories, ApiService, ImagePreprocessor und ViewModels.
+- Handgeschriebener `RepositoryProvider` entfernt; ViewModels und Repositories erhalten ihre Abhängigkeiten per Konstruktor-Injection (kein `Context`-Fallback oder statischer Aufruf mehr).
+- DAOs (`HistoryDao`, `DayFazitDao`, `WeekFazitDao`) in Koin registriert und direkt in `DefaultHistoryRepository` injiziert.
+- `ApiClient` implementiert `BesseresserApiService` als injizierbare Klasse; UI-Aufrufe (`ModelListScreen`) delegieren über ViewModels statt statischer Direktaufrufe.
+- Koin-Modulkonfigurationen und ViewModel-Auflösungen via `koin-test` automatisiert abgesichert.
 
 ## Phase 2 – Persistenzschicht entflechten ✅
 

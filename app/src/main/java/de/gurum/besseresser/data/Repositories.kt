@@ -293,9 +293,10 @@ class DefaultUiPrefsRepository(private val dataStore: DataStore<Preferences>) : 
 // ----------------------------------------------------------------- Verlauf (Room + PhotoStorage)
 
 class DefaultHistoryRepository(
-    private val context: Context,
-    private val db: AppDatabase,
-    private val photoStorage: PhotoStorage
+    private val photoStorage: PhotoStorage,
+    private val historyDao: HistoryDao,
+    private val dayFazitDao: DayFazitDao,
+    private val weekFazitDao: WeekFazitDao
 ) : HistoryRepository {
 
     @Volatile
@@ -317,21 +318,21 @@ class DefaultHistoryRepository(
                 runCatching {
                     val entry = AppJson.decodeFromString<HistoryEntry>(f.readText())
                     val e = if (entry.id == 0L) entry.copy(id = f.nameWithoutExtension.toLongOrNull() ?: 0L) else entry
-                    db.historyDao().insert(e.toEntity())
+                    historyDao.insert(e.toEntity())
                     f.delete()
                 }
             }
             d.listFiles { f -> f.name.startsWith("day_") && f.extension == "json" }?.forEach { f ->
                 runCatching {
                     val fazit = AppJson.decodeFromString<DayFazit>(f.readText())
-                    db.dayFazitDao().insert(fazit.toEntity())
+                    dayFazitDao.insert(fazit.toEntity())
                     f.delete()
                 }
             }
             d.listFiles { f -> f.name.startsWith("week_") && f.extension == "json" }?.forEach { f ->
                 runCatching {
                     val fazit = AppJson.decodeFromString<DayFazit>(f.readText())
-                    db.weekFazitDao().insert(fazit.toWeekEntity())
+                    weekFazitDao.insert(fazit.toWeekEntity())
                     f.delete()
                 }
             }
@@ -339,16 +340,16 @@ class DefaultHistoryRepository(
     }
 
     override fun getAllFlow(): Flow<List<HistoryEntry>> =
-        db.historyDao().getAllFlow().map { list -> list.map { it.toDomain() } }
+        historyDao.getAllFlow().map { list -> list.map { it.toDomain() } }
 
     override fun getDayFazitsFlow(): Flow<Map<String, DayFazit>> =
-        db.dayFazitDao().getAllFlow().map { list -> list.map { it.toDomain() }.associateBy { it.dayKey } }
+        dayFazitDao.getAllFlow().map { list -> list.map { it.toDomain() }.associateBy { it.dayKey } }
 
     override fun getWeekFazitsFlow(): Flow<Map<String, DayFazit>> =
-        db.weekFazitDao().getAllFlow().map { list -> list.map { it.toDomain() }.associateBy { it.dayKey } }
+        weekFazitDao.getAllFlow().map { list -> list.map { it.toDomain() }.associateBy { it.dayKey } }
 
     override suspend fun getAll(): List<HistoryEntry> =
-        db.historyDao().getAll().map { it.toDomain() }
+        historyDao.getAll().map { it.toDomain() }
 
     /** Speichert Bewertung + verkleinertes Foto (typisch < 100 KB). Foto-Verarbeitung darf scheitern (dann ohne Thumbnail).
      *  photoUri = null → Eintrag OHNE Foto (Nacherfassung „ohne Foto“).
@@ -372,7 +373,7 @@ class DefaultHistoryRepository(
             note = note, erkannt = ev.erkannt, backdated = backdated,
             sortOrder = date
         )
-        val dao = db.historyDao()
+        val dao = historyDao
         val targetDay = Instant.ofEpochMilli(date).atZone(ZoneId.systemDefault()).toLocalDate()
         val existingSameDay = dao.getAll().map { it.toDomain() }.filter {
             Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate() == targetDay
@@ -385,7 +386,7 @@ class DefaultHistoryRepository(
     /** Eintrag inkl. Foto loeschen. Löscht Tages-/Wochenfazit des Tages gleich mit. */
     override suspend fun delete(entry: HistoryEntry) {
         photoStorage.deletePhoto(entry.photoFile)
-        db.historyDao().deleteById(entry.id)
+        historyDao.deleteById(entry.id)
         deleteDayFazitForEntry(entry)
         deleteWeekFazitForEntry(entry)
     }
@@ -393,12 +394,12 @@ class DefaultHistoryRepository(
     /** erkannt-Text eines gespeicherten Eintrags userkorrigieren (in Room DB aktualisieren).
      *  Das Tagesfazit bleibt in der DB, wird aber über den Fingerprint als veraltet erkannt. */
     override suspend fun updateErkannt(id: Long, newText: String) {
-        db.historyDao().updateErkannt(id, newText.trim())
+        historyDao.updateErkannt(id, newText.trim())
     }
 
     /** Ziele + Gesamteindruck eines Eintrags neu schreiben (KI-Re-Bewertung nach Korrektur). */
     override suspend fun updateEvaluation(id: Long, goalResults: List<GoalResult>, summary: String) {
-        db.historyDao().updateEvaluation(id, goalResults, summary)
+        historyDao.updateEvaluation(id, goalResults, summary)
     }
 
     /** Aktualisiert die Zeitstempel der übergebenen Einträge (für Umsortierung innerhalb eines Tages).
@@ -406,14 +407,14 @@ class DefaultHistoryRepository(
     override suspend fun reorderEntries(reordered: List<HistoryEntry>) {
         if (reordered.isEmpty()) return
         ensureMigrated()
-        db.historyDao().insertAll(reordered.map { it.toEntity() })
+        historyDao.insertAll(reordered.map { it.toEntity() })
     }
 
     /** Speichert/überschreibt mehrere Verlaufseinträge (z. B. beim Backup-Import). */
     override suspend fun saveAll(entries: List<HistoryEntry>) {
         if (entries.isEmpty()) return
         ensureMigrated()
-        db.historyDao().insertAll(entries.map { it.toEntity() })
+        historyDao.insertAll(entries.map { it.toEntity() })
     }
 
     /** Dupliziert einen bestehenden Eintrag komplett (inkl. Foto, Ziele, Texte, Notiz) ohne erneute KI-Bewertung
@@ -438,7 +439,7 @@ class DefaultHistoryRepository(
             newId = id,
             newPhotoFile = copiedPhotoName
         )
-        val dao = db.historyDao()
+        val dao = historyDao
         val existingSameDay = dao.getAll().map { it.toDomain() }.filter {
             Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate() == targetDay
         }
@@ -455,9 +456,9 @@ class DefaultHistoryRepository(
     override suspend fun clearAll() {
         ensureMigrated()
         photoStorage.deleteAll()
-        db.historyDao().deleteAll()
-        db.dayFazitDao().deleteAll()
-        db.weekFazitDao().deleteAll()
+        historyDao.deleteAll()
+        dayFazitDao.deleteAll()
+        weekFazitDao.deleteAll()
         DayFazitSession.attempted.clear()
         DayFazitSession.attemptedWeekly.clear()
     }
@@ -472,20 +473,20 @@ class DefaultHistoryRepository(
         val cutoffDayKey = dayKeyOf(cutoffMillis)
 
         // 1. Einträge vor dem Stichtag inkl. Foto-Dateien löschen
-        val stale = db.historyDao().getAll().map { it.toDomain() }
+        val stale = historyDao.getAll().map { it.toDomain() }
             .filter { it.dateMillis < cutoffMillis }
         stale.forEach { entry ->
             photoStorage.deletePhoto(entry.photoFile)
-            db.historyDao().deleteById(entry.id)
+            historyDao.deleteById(entry.id)
         }
 
         // 2. Tages-/Wochenfazits vor dem Stichtag löschen (inkl. verwaister)
-        db.dayFazitDao().getAll().map { it.dayKey }
+        dayFazitDao.getAll().map { it.dayKey }
             .filter { it < cutoffDayKey }
-            .forEach { db.dayFazitDao().delete(it) }
-        db.weekFazitDao().getAll().map { it.weekKey }
+            .forEach { dayFazitDao.delete(it) }
+        weekFazitDao.getAll().map { it.weekKey }
             .filter { it < cutoffWeekKey }
-            .forEach { db.weekFazitDao().delete(it) }
+            .forEach { weekFazitDao.delete(it) }
 
         // 3. Session-Guard aufräumen (damit Fazits neuer Tage nicht irrtümlich „versucht" bleiben)
         DayFazitSession.attempted.removeAll { it < cutoffDayKey }
@@ -496,59 +497,59 @@ class DefaultHistoryRepository(
 
     override suspend fun saveDayFazit(fazit: DayFazit) {
         ensureMigrated()
-        db.dayFazitDao().insert(fazit.toEntity())
+        dayFazitDao.insert(fazit.toEntity())
     }
 
     override suspend fun loadDayFazit(dayKey: String): DayFazit? {
         ensureMigrated()
-        return db.dayFazitDao().getByKey(dayKey)?.toDomain()
+        return dayFazitDao.getByKey(dayKey)?.toDomain()
     }
 
     override suspend fun loadAllDayFazits(): List<DayFazit> {
         ensureMigrated()
-        return db.dayFazitDao().getAll().map { it.toDomain() }
+        return dayFazitDao.getAll().map { it.toDomain() }
     }
 
     override suspend fun saveAllDayFazits(fazits: List<DayFazit>) {
         if (fazits.isEmpty()) return
         ensureMigrated()
-        db.dayFazitDao().insertAll(fazits.map { it.toEntity() })
+        dayFazitDao.insertAll(fazits.map { it.toEntity() })
     }
 
     /** Fazit eines Tags löschen (z. B. weil ein Eintrag des Tages gelöscht wurde). */
     override suspend fun deleteDayFazitForEntry(entry: HistoryEntry) {
-        db.dayFazitDao().delete(dayKeyOf(entry.dateMillis))
+        dayFazitDao.delete(dayKeyOf(entry.dateMillis))
     }
 
     override suspend fun saveWeekFazit(fazit: DayFazit) {
         ensureMigrated()
-        db.weekFazitDao().insert(fazit.toWeekEntity())
+        weekFazitDao.insert(fazit.toWeekEntity())
     }
 
     override suspend fun loadWeekFazit(weekKey: String): DayFazit? {
         ensureMigrated()
-        return db.weekFazitDao().getByKey(weekKey)?.toDomain()
+        return weekFazitDao.getByKey(weekKey)?.toDomain()
     }
 
     override suspend fun loadAllWeekFazits(): List<DayFazit> {
         ensureMigrated()
-        return db.weekFazitDao().getAll().map { it.toDomain() }
+        return weekFazitDao.getAll().map { it.toDomain() }
     }
 
     override suspend fun saveAllWeekFazits(fazits: List<DayFazit>) {
         if (fazits.isEmpty()) return
         ensureMigrated()
-        db.weekFazitDao().insertAll(fazits.map { it.toWeekEntity() })
+        weekFazitDao.insertAll(fazits.map { it.toWeekEntity() })
     }
 
     /** Wochen-Fazit löschen (Akzeptiert Keys mit oder ohne „week_"-Präfix). */
     override suspend fun deleteWeekFazit(weekKey: String) {
-        db.weekFazitDao().delete(weekKey.removePrefix("week_"))
+        weekFazitDao.delete(weekKey.removePrefix("week_"))
     }
 
     /** Wochen-Fazit löschen (nachträglicher Eintrag in derselben Woche). */
     override suspend fun deleteWeekFazitForEntry(entry: HistoryEntry) {
-        db.weekFazitDao().delete(weekKeyOf(entry.dateMillis))
+        weekFazitDao.delete(weekKeyOf(entry.dateMillis))
     }
 
     override fun photoFileOf(entry: HistoryEntry): File? =
