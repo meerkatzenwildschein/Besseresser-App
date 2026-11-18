@@ -8,7 +8,6 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import de.gurum.besseresser.data.SettingsRepository
 
 // ----------------------------------------------------------------- Profil
 
