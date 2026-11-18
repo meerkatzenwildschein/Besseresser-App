@@ -1,6 +1,7 @@
 package de.gurum.besseresser.ui
 import android.app.Activity
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -48,7 +49,29 @@ import org.koin.core.parameter.parametersOf
 import de.gurum.besseresser.model.AppLanguage
 import de.gurum.besseresser.model.AppThemeMode
 
-/** Erzeugt einen ContextWrapper mit der gewählten App-Sprache, behält aber den Basis-Activity-Context bei. */
+/**
+ * Applies the chosen app language:
+ * - API 33+: delegates to the OS via LocaleManager so the system language picker reflects
+ *   the in-app choice and the Activity is recreated by the OS.
+ * - API < 33: falls back to a Configuration-based ContextWrapper (Compose reads
+ *   LocalContext / LocalConfiguration to pick up the change without an Activity restart).
+ */
+fun Context.applyLocale(language: AppLanguage) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val activity = this as? Activity ?: return
+        activity.getSystemService(android.app.LocaleManager::class.java)
+            ?.applicationLocales = android.os.LocaleList.forLanguageTags(language.rawValue)
+    } else {
+        // Legacy path: update Compose LocalContext / LocalConfiguration below.
+        java.util.Locale.setDefault(language.locale)
+    }
+}
+
+/**
+ * Returns a locale-aware Context for Compose's LocalContext / LocalConfiguration on API < 33.
+ * On API 33+ the OS handles locale propagation; we still wrap so that string resources inside
+ * the composition use the correct locale even before the Activity restarts.
+ */
 fun Context.withAppLanguage(language: AppLanguage): Context {
     val targetLocale = language.locale
     java.util.Locale.setDefault(targetLocale)
@@ -159,7 +182,12 @@ fun BesseresserAppContent() {
     val appStateViewModel: AppStateViewModel = koinViewModel()
     val appState by appStateViewModel.uiState.collectAsStateWithLifecycle()
 
+    // On API 33+ apply the locale via LocaleManager (OS recreates the Activity).
+    // On API < 33 wrap the context so Compose picks up the right string resources immediately.
     val localizedCtx = remember(baseCtx, appState.language) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            baseCtx.applyLocale(appState.language)
+        }
         baseCtx.withAppLanguage(appState.language)
     }
     val localizedConfig = remember(localizedCtx) {
