@@ -520,9 +520,7 @@ fun ModelListScreen(
     apiKey: String,
     onPick: (String) -> Unit,
     onBack: () -> Unit,
-    onFetchModels: suspend (String, String) -> Result<ApiClient.ModelsResult> = { u, k ->
-        ApiClient().fetchModels(baseUrl = u, apiKey = k)
-    }
+    onFetchModels: suspend (String, String) -> Result<ApiClient.ModelsResult>
 ) {
     var loading by remember { mutableStateOf(true) }
     var models by remember { mutableStateOf(ApiClient.ModelsResult(emptyList(), emptyList())) }
