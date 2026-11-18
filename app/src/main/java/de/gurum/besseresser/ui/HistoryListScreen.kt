@@ -51,7 +51,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -68,6 +67,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -120,7 +120,7 @@ fun HistoryListContent(
     onDeleteEntry: (HistoryEntry) -> Unit,
     onUndoDeleteEntry: (HistoryEntry) -> Unit = {},
     onMoveEntryWithinDay: (LocalDate, Int, Int) -> Unit = { _, _, _ -> },
-    onDecodeThumbnail: (HistoryEntry) -> android.graphics.Bitmap? = { null }
+    onPhotoFile: (HistoryEntry) -> java.io.File? = { null }
 ) {
     TopBarRow(
         title = stringResource(R.string.history_title),
@@ -223,7 +223,7 @@ fun HistoryListContent(
                         PendingDeleteHistoryItem(
                             entry = entry,
                             onUndo = { onUndoDeleteEntry(entry) },
-                            onDecodeThumbnail = onDecodeThumbnail
+                            onPhotoFile = onPhotoFile
                         )
                     } else {
                         ReorderableDayMealBox(
@@ -240,7 +240,7 @@ fun HistoryListContent(
                                     entry = entry,
                                     onClick = { onPick(entry) },
                                     isLifted = isDragging,
-                                    onDecodeThumbnail = onDecodeThumbnail
+                                    onPhotoFile = onPhotoFile
                                 )
                             }
                         }
@@ -299,7 +299,7 @@ fun HistoryItem(
     entry: HistoryEntry,
     onClick: () -> Unit,
     isLifted: Boolean = false,
-    onDecodeThumbnail: (HistoryEntry) -> android.graphics.Bitmap? = { null }
+    onPhotoFile: (HistoryEntry) -> java.io.File? = { null }
 ) {
     val scale by animateFloatAsState(
         targetValue = if (isLifted) 1.025f else 1f,
@@ -331,12 +331,10 @@ fun HistoryItem(
             modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val thumb = remember(entry.id) {
-                onDecodeThumbnail(entry)
-            }
-            if (thumb != null) {
-                Image(
-                    bitmap = thumb.asImageBitmap(),
+            val photoFile = onPhotoFile(entry)
+            if (photoFile != null) {
+                AsyncImage(
+                    model = photoFile,
                     contentDescription = stringResource(R.string.photo_of_meal),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -631,7 +629,7 @@ private fun ShortSwipeToDeleteBox(
 fun PendingDeleteHistoryItem(
     entry: HistoryEntry,
     onUndo: () -> Unit,
-    onDecodeThumbnail: (HistoryEntry) -> android.graphics.Bitmap? = { null }
+    onPhotoFile: (HistoryEntry) -> java.io.File? = { null }
 ) {
     val progress = remember(entry.id) { Animatable(1f) }
     LaunchedEffect(entry.id) {
@@ -657,13 +655,11 @@ fun PendingDeleteHistoryItem(
                     .padding(horizontal = 12.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val thumb = remember(entry.id) {
-                    onDecodeThumbnail(entry)
-                }
+                val photoFile = onPhotoFile(entry)
                 Box(modifier = Modifier.alpha(0.32f)) {
-                    if (thumb != null) {
-                        Image(
-                            bitmap = thumb.asImageBitmap(),
+                    if (photoFile != null) {
+                        AsyncImage(
+                            model = photoFile,
                             contentDescription = stringResource(R.string.photo_of_meal),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier

@@ -1,6 +1,5 @@
 package de.gurum.besseresser.ui
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -56,7 +55,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -67,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import org.koin.androidx.compose.koinViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -272,28 +271,19 @@ private fun MainReviewScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
             photoUri?.let { uri ->
-                val bmp = remember(uri) {
-                    try {
-                        ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
-                if (bmp != null) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Image(
-                            bitmap = bmp.asImageBitmap(),
-                            contentDescription = stringResource(R.string.photo_of_meal),
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(290.dp)
-                        )
-                    }
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    AsyncImage(
+                        model = uri,
+                        contentDescription = stringResource(R.string.photo_of_meal),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(290.dp)
+                    )
                 }
             }
             if (error != null) {
@@ -416,28 +406,19 @@ private fun MainReportView(
             MainHeroCard(onTakePhoto = onTakePhoto)
         } else {
             photoUri?.let { uri ->
-                val bmp = remember(uri) {
-                    try {
-                        ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
-                if (bmp != null) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(230.dp)
-                    ) {
-                        Image(
-                            bitmap = bmp.asImageBitmap(),
-                            contentDescription = stringResource(R.string.photo_of_meal),
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(230.dp)
+                ) {
+                    AsyncImage(
+                        model = uri,
+                        contentDescription = stringResource(R.string.photo_of_meal),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
         }
