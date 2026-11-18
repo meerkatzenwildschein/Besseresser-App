@@ -37,7 +37,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 | ~~**P2 (Mittel)**~~ | ~~Architektur~~ | ~~Imperative `startObserving()`-Initialisierung~~ | ~~Fehleranfälliger manueller Kick aus der UI~~ | ✅ |
 | ~~**P2 (Mittel)**~~ | ~~Compose~~ | ~~`remember`-basierte Foto-Dateierstellung~~ | ~~Veralteter Dateiname bei Wiederaufnahme~~ | ✅ |
 | ~~**P2 (Mittel)**~~ | ~~Datenhaltung~~ | ~~Verwaiste Foto-Dateien (Dangling Files)~~ | ~~Speicherleck nach Abstürzen oder Migrationsfehlern~~ | ✅ |
-| **P2 (Mittel)** | Lifecycle / System | Manueller Locale ContextWrapper | Umgeht Android 13+ Per-App-Language-APIs | offen |
+| ~~**P2 (Mittel)**~~ | ~~Lifecycle / System~~ | ~~Manueller Locale ContextWrapper~~ | ~~Umgeht Android 13+ Per-App-Language-APIs~~ | ✅ |
 | ~~**P2 (Mittel)**~~ | ~~Testing & DI~~ | ~~Harte `Dispatchers.IO`-Referenzen & fehlende Dispatcher-Injection~~ | ~~Erschwerte deterministische Unit- & Coroutine-Tests~~ | ✅ |
 | **P3 (Niedrig)** | Code-Qualität | Denglish-Bezeichner & String-basierte Magic Keys | Wartungsaufwand, Fehleranfälligkeit bei Refactorings | offen |
 
@@ -109,12 +109,13 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ---
 
-#### Finding 3.5.1: Manuelle Locale-Hacks statt Android 13+ App-Sprachen API
+#### ✅ Finding 3.5.1: ~~Manuelle Locale-Hacks statt Android 13+ App-Sprachen API~~
 - **Betroffene Dateien:** `MainActivity.kt` (`withAppLanguage`)
 - **Problem:**
-  Die App manipuliert `ConfigurationContext` und `Locale.setDefault(...)` manuell im `CompositionLocalProvider`, obwohl `locales_config.xml` bereits vorhanden ist.
-- **Empfohlene Best Practice:**
-  Migration auf `AppCompatDelegate.setApplicationLocales()` bzw. `android.app.LocaleManager` (ab Android 13, API 33). Dies wird vom Betriebssystem nativ unterstützt und integriert sich in die Systemeinstellungen von Android.
+  Die App manipulierte `ConfigurationContext` und `Locale.setDefault(...)` manuell auf allen API-Levels.
+- **Umgesetzt:** Neue Funktion `applyLocale()` wählt den richtigen Pfad je nach API-Level:
+  - **API 33+**: `LocaleManager.setApplicationLocales()` — der OS übernimmt den Sprachenwechsel, spiegelt ihn in den Systemeinstellungen wider und startet die Activity neu.
+  - **API < 26–32**: bisheriger `ContextWrapper`-Fallback bleibt erhalten, da `LocaleManager` dort nicht verfügbar ist. `withAppLanguage()` sorgt weiterhin dafür, dass Compose-Strings sofort die richtige Sprache nutzen.
 
 ---
 
