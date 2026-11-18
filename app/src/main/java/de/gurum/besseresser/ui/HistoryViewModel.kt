@@ -71,7 +71,9 @@ class HistoryViewModel(
     fun startObserving() {
         if (dbObserving) return
         dbObserving = true
-        historyRepository.ensureMigrated()
+        viewModelScope.launch {
+            historyRepository.ensureMigrated()
+        }
 
         observeEntries(historyRepository)
         observeDayFazits(historyRepository)

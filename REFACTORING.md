@@ -5,16 +5,6 @@ hin zu einer sauberen MVVM-Schichtenarchitektur. Status: **abgeschlossen**.
 
 ---
 
-## Phase 2 – Persistenzschicht entflechten ✅
-
-**Ziel:** Store-Objekte auflösen, `runBlocking` beseitigen, Foto-Ablage kapseln.
-
-- `Store`/`ProfileStore`/`RecentNotesStore`/`HistoryStore`/`DayFazitStore`/`WeekFazitStore` in die Repository-Implementierungen (`data/Repositories.kt`) überführt.
-- Reine Logik in `RecentNotesLogic`, `HistoryEntryLogic`, `BackupLogic` extrahiert (direkt testbar).
-- `BackupStore` → injizierbarer `BackupManager` (+ `BackupService`-Interface).
-- `runBlocking` entfernt; Repositories sind suspend/Flow (Room-DAOs direkt).
-- `PhotoStorage` als eigene Komponente für die Foto-Dateiablage.
-
 ## Phase 3 – DataStore + AppStateViewModel ✅
 
 **Ziel:** SharedPreferences ablösen, Settings/Profil/Theme/Sprache reaktiv machen.
