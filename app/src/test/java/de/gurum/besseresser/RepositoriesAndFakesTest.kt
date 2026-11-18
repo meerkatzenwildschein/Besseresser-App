@@ -274,7 +274,6 @@ class FakeHistoryRepository : HistoryRepository {
         if (weeks <= 0) return 0
         val cutoffMillis = de.gurum.besseresser.model.retentionCutoffMillis(weeks)
         val cutoffWeekKey = weekKeyOf(cutoffMillis)
-        val cutoffDayKey = dayKeyOf(cutoffMillis)
         val stale = entriesFlow.value.filter { it.dateMillis < cutoffMillis }
         val staleDayKeys = stale.map { dayKeyOf(it.dateMillis) }.toSet()
         entriesFlow.update { list -> list.filter { it.dateMillis >= cutoffMillis } }
@@ -552,11 +551,13 @@ class RepositoriesAndFakesTest {
         vm.saveBackdatedEntry(ev = backdatedEval, photoUriIn = null) { pickedBackdated = it }
         advanceUntilIdle()
 
-        assertNotNull(pickedBackdated)
-        assertFalse(pickedBackdated!!.backdated)
+        val backdated = pickedBackdated
+        assertNotNull(backdated)
+        val backdatedEntry = checkNotNull(backdated)
+        assertFalse(backdatedEntry.backdated)
         val expectedMillis = targetDay.atTime(14, 20).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-        assertEquals(expectedMillis, pickedBackdated!!.dateMillis)
-        assertEquals("150 g Skyr mit Beeren", pickedBackdated!!.erkannt)
+        assertEquals(expectedMillis, backdatedEntry.dateMillis)
+        assertEquals("150 g Skyr mit Beeren", backdatedEntry.erkannt)
         assertFalse(vm.uiState.value.showAddText)
         assertEquals("", vm.uiState.value.addNote)
         assertNull(vm.uiState.value.addTargetDay)
@@ -723,7 +724,6 @@ class RepositoriesAndFakesTest {
         val repo = FakeHistoryRepository()
         val today = java.time.LocalDate.now()
         val thisWeek = today.atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val twoWeeksAgo = today.minusWeeks(2).atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
         val tenWeeksAgo = today.minusWeeks(10).atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 
         val recent = repo.add(null, Evaluation(erkannt = "Heute"), dateOverride = thisWeek)
@@ -767,9 +767,9 @@ class RepositoriesAndFakesTest {
         val m3 = day.atTime(19, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 
         // Descending order initially: Abendessen (m3), Mittagessen (m2), Frühstück (m1)
-        val eAbend = histRepo.add(null, Evaluation(erkannt = "Abendessen"), dateOverride = m3)
-        val eMittag = histRepo.add(null, Evaluation(erkannt = "Mittagessen"), dateOverride = m2)
-        val eFrueh = histRepo.add(null, Evaluation(erkannt = "Frühstück"), dateOverride = m1)
+        histRepo.add(null, Evaluation(erkannt = "Abendessen"), dateOverride = m3)
+        histRepo.add(null, Evaluation(erkannt = "Mittagessen"), dateOverride = m2)
+        histRepo.add(null, Evaluation(erkannt = "Frühstück"), dateOverride = m1)
         advanceUntilIdle()
 
         assertEquals("Abendessen", vm.uiState.value.entries[0].erkannt)
@@ -805,7 +805,7 @@ class RepositoriesAndFakesTest {
         assertEquals(m2, reordered[2].dateMillis)
 
         // Test moving a normal entry above a backdated (23:59) entry: normal entry keeps its time!
-        val eBackdated = histRepo.add(
+        histRepo.add(
             null,
             Evaluation(erkannt = "Später Snack"),
             dateOverride = day.atTime(23, 59).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),

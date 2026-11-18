@@ -181,7 +181,6 @@ fun CollapsibleSummaryBlock(
     onEditErkannt: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null
 ) {
-    val ctx = LocalContext.current
     val extraCount = listOf(erkannt.isNotBlank(), note.isNotBlank()).count { it }
     var expanded by remember { mutableStateOf(false) }
     val chevron by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
@@ -214,126 +213,159 @@ fun CollapsibleSummaryBlock(
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
                     )
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (erkannt.isNotBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    stringResource(R.string.detected_prefix, erkannt),
-                                    fontSize = 13.sp,
-                                    lineHeight = 18.sp,
-                                    modifier = if (onEditErkannt != null) Modifier.weight(1f) else Modifier
-                                )
-                                if (onEditErkannt != null) {
-                                    Spacer(Modifier.width(6.dp))
-                                    Surface(
-                                        shape = CircleShape,
-                                        color = MaterialTheme.colorScheme.primaryContainer,
-                                        modifier = Modifier.size(30.dp)
-                                    ) {
-                                        IconButton(
-                                            onClick = { onEditErkannt.invoke() },
-                                            modifier = Modifier.size(30.dp)
-                                        ) {
-                                            Icon(
-                                                Icons.Filled.Create,
-                                                contentDescription = stringResource(R.string.erkannt_edit_desc),
-                                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                                modifier = Modifier.size(15.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (note.isNotBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                stringResource(R.string.history_note_prefix, note),
-                                fontSize = 13.sp,
-                                lineHeight = 18.sp,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-                            )
-                        }
-                    }
-                }
+                SummaryDetailsContent(erkannt = erkannt, note = note, onEditErkannt = onEditErkannt)
             }
             if (extraCount > 0 || onShare != null) {
                 Spacer(Modifier.height(8.dp))
+                SummaryFooterRow(
+                    expanded = expanded,
+                    extraCount = extraCount,
+                    chevronRotation = chevron,
+                    onShare = onShare
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryDetailsContent(
+    erkannt: String,
+    note: String,
+    onEditErkannt: (() -> Unit)?
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (erkannt.isNotBlank()) {
+            ErkanntDetailCard(erkannt = erkannt, onEditErkannt = onEditErkannt)
+        }
+        if (note.isNotBlank()) {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    stringResource(R.string.history_note_prefix, note),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ErkanntDetailCard(
+    erkannt: String,
+    onEditErkannt: (() -> Unit)?
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            Text(
+                stringResource(R.string.detected_prefix, erkannt),
+                fontSize = 13.sp,
+                lineHeight = 18.sp,
+                modifier = if (onEditErkannt != null) Modifier.weight(1f) else Modifier
+            )
+            if (onEditErkannt != null) {
+                Spacer(Modifier.width(6.dp))
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(30.dp)
+                ) {
+                    IconButton(
+                        onClick = onEditErkannt,
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Create,
+                            contentDescription = stringResource(R.string.erkannt_edit_desc),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryFooterRow(
+    expanded: Boolean,
+    extraCount: Int,
+    chevronRotation: Float,
+    onShare: (() -> Unit)?
+) {
+    val ctx = LocalContext.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        if (extraCount > 0) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = if (expanded)
+                        stringResource(R.string.details_toggle_less)
+                    else ctx.resources.getQuantityString(R.plurals.details_toggle_more, extraCount, extraCount),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .size(16.dp)
+                        .rotate(chevronRotation)
+                )
+            }
+        } else {
+            Spacer(Modifier.width(1.dp))
+        }
+
+        if (onShare != null) {
+            Surface(
+                onClick = onShare,
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
-                    if (extraCount > 0) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.55f))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = if (expanded)
-                                    stringResource(R.string.details_toggle_less)
-                                else ctx.resources.getQuantityString(R.plurals.details_toggle_more, extraCount, extraCount),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(Modifier.width(2.dp))
-                            Icon(
-                                Icons.Filled.KeyboardArrowDown,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .size(16.dp)
-                                    .rotate(chevron)
-                            )
-                        }
-                    } else {
-                        Spacer(Modifier.width(1.dp))
-                    }
-
-                    if (onShare != null) {
-                        Surface(
-                            onClick = onShare,
-                            shape = RoundedCornerShape(50),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            ) {
-                                Icon(
-                                    Icons.Filled.Share,
-                                    contentDescription = stringResource(R.string.history_entry_share),
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(Modifier.width(5.dp))
-                                Text(
-                                    text = stringResource(R.string.share_button_label),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
-                    }
+                    Icon(
+                        Icons.Filled.Share,
+                        contentDescription = stringResource(R.string.history_entry_share),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text = stringResource(R.string.share_button_label),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 }
             }
         }

@@ -307,9 +307,8 @@ class RoomDatabaseAndViewModelTest {
 
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.toggleStar(note)
-        val updated = viewModel.notes.value.firstOrNull { it.text == "Salat" }
-        assertNotNull(updated)
-        assertTrue(updated!!.starred)
+        val updated = checkNotNull(viewModel.notes.value.firstOrNull { it.text == "Salat" })
+        assertTrue(updated.starred)
     }
 
     @Test

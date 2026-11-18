@@ -359,7 +359,7 @@ class ApiClientTest {
         var calls2 = 0
         val res2 = ApiClient.runWithOneRetry { isRetry ->
             calls2++
-            if (!isRetry) throw IllegalStateException("First attempt failed")
+            check(isRetry) { "First attempt failed" }
             "Recovered on retry"
         }
         assertTrue(res2.isSuccess)
