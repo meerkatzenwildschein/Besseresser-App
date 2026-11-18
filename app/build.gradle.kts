@@ -26,7 +26,7 @@ val buildTime: String = run {
         .format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"))
 }
 
-val appVersion = "1.6.0"
+val appVersion = "1.7.0"
 
 // Optional release signing: the keystore lives outside the repo (in
 // <repo>/../AndroidKeys/) and is never committed. Without the file, release
@@ -60,7 +60,7 @@ android {
         applicationId = "de.gurum.besseresser"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
+        versionCode = 8
         versionName = appVersion
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
         buildConfigField("String", "APP_VERSION", "\"$appVersion\"")

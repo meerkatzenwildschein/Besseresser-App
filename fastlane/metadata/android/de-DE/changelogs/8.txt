@@ -1,0 +1,9 @@
+Code-Qualität und Architektur-Verbesserungen (Refactoring):
+- PhotoCaptureManager eingeführt: Kamera-Dateien werden bei jeder Aufnahme neu erstellt, veraltete Dateinamen werden vermieden
+- MainScreen.kt in fokussierte Composables aufgeteilt (MainReviewScreen, MainReportView, MainTopBar, MainCtaBar)
+- Verlauf-ViewModel startet Flows im init-Block statt manuell aus der UI
+- Injizierbare AppDispatchers für deterministisches Coroutine-Testing eingeführt
+- Verwaiste Foto-Dateien werden beim App-Start automatisch bereinigt
+- Sprachwechsel nutzt auf Android 13+ den nativen LocaleManager des Betriebssystems
+- Alle deutschen Code-Bezeichner auf Englisch umbenannt (recognizedMeal, rating, reason usw.)
+- ViewModel-Tests für Setup, Nacherfassung und Verlauf-Detailansicht hinzugefügt
