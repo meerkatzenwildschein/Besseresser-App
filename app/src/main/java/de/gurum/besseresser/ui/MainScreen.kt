@@ -221,10 +221,12 @@ private class MainSwipeState(
 ) {
     private var acc = 0f
     private var hintShown = false
+    private var triggered = false  // prevent multiple navigations in one drag gesture
 
     fun reset() {
         acc = 0f
         hintShown = false
+        triggered = false
     }
 
     fun onDrag(dragAmount: Float) {
@@ -232,6 +234,7 @@ private class MainSwipeState(
             acc = 0f
             return
         }
+        if (triggered) return  // already navigated this gesture, ignore further movement
         acc += dragAmount
         if (acc > -160f) return
 
@@ -239,6 +242,7 @@ private class MainSwipeState(
         if (isBlocked) {
             handleBlocked()
         } else {
+            triggered = true
             onOpenHistory()
         }
     }
