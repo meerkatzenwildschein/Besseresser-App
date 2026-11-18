@@ -18,9 +18,6 @@ hin zu einer sauberen MVVM-Schichtenarchitektur. Status: **abgeschlossen**.
 
 ## Offene Punkte & Lint-Findings
 
-### 2. Mittlerer Nutzen (Benutzererfahrung & Plattform-Konformität)
-- **App-Bundle Sprachpaket-Splitting (`AppBundleLocaleChanges`)**: In `app/build.gradle.kts` `bundle { language { enableSplit = false } }` konfigurieren, damit beim dynamischen In-App-Sprachwechsel keine Strings im App Bundle fehlen.
-
 ### 3. Gezielte Dependency-Updates (Wägung von Stabilität vs. Aktualität)
 - **AndroidX & Lifecycle-Bibliotheken schrittweise und testgetrieben aktualisieren**:
   - `androidx.core:core-ktx`: `1.15.0` → `1.19.1`

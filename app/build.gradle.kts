@@ -103,6 +103,11 @@ android {
             "**/libsurface_util_jni.so"
         )
     }
+    bundle {
+        language {
+            enableSplit = false
+        }
+    }
 }
 
 dependencies {
