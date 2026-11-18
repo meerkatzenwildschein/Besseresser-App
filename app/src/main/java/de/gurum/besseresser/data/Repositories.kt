@@ -81,7 +81,7 @@ val Context.appDataStore: DataStore<Preferences> by preferencesDataStore(
 )
 
 interface HistoryRepository {
-    fun ensureMigrated()
+    suspend fun ensureMigrated()
     fun getAllFlow(): Flow<List<HistoryEntry>>
     fun getDayFazitsFlow(): Flow<Map<String, DayFazit>>
     fun getWeekFazitsFlow(): Flow<Map<String, DayFazit>>
@@ -303,15 +303,15 @@ class DefaultHistoryRepository(
     private var migrationChecked = false
 
     /** Einmalige Migration historischer JSON-Dateien (filesDir/history) nach Room. */
-    override fun ensureMigrated() {
+    override suspend fun ensureMigrated() {
         if (migrationChecked) return
-        synchronized(this) {
-            if (migrationChecked) return
-            migrationChecked = true
-        }
-        val d = photoStorage.dir()
+        withContext(Dispatchers.IO) {
+            synchronized(this@DefaultHistoryRepository) {
+                if (migrationChecked) return@withContext
+                migrationChecked = true
+            }
+            val d = photoStorage.dir()
 
-        kotlinx.coroutines.runBlocking {
             d.listFiles { f ->
                 f.extension == "json" && !f.name.startsWith("day_") && !f.name.startsWith("week_")
             }?.forEach { f ->

@@ -143,7 +143,7 @@ class FakeHistoryRepository : HistoryRepository {
 
     var migrationChecked = false
 
-    override fun ensureMigrated() {
+    override suspend fun ensureMigrated() {
         migrationChecked = true
     }
 
