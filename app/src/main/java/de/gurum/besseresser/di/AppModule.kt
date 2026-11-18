@@ -33,16 +33,20 @@ import org.koin.dsl.module
 val appModule = module {
 
     single { AppDatabase.getInstance(androidContext()) }
+    single { get<AppDatabase>().historyDao() }
+    single { get<AppDatabase>().dayFazitDao() }
+    single { get<AppDatabase>().weekFazitDao() }
+
     single { androidContext().appDataStore }
     single { PhotoStorage(androidContext()) }
     single<ImagePreprocessor> { AndroidImagePreprocessor(androidContext()) }
 
-    single<BesseresserApiService> { ApiClient }
+    single<BesseresserApiService> { ApiClient() }
 
     single<SettingsRepository> { DefaultSettingsRepository(get()) }
     single<ProfileRepository> { DefaultProfileRepository(get()) }
     single<UiPrefsRepository> { DefaultUiPrefsRepository(get()) }
-    single<HistoryRepository> { DefaultHistoryRepository(androidContext(), get(), get()) }
+    single<HistoryRepository> { DefaultHistoryRepository(get(), get(), get(), get()) }
 
     single<BackupService> { BackupManager(androidContext(), get(), get(), get(), get(), get()) }
 

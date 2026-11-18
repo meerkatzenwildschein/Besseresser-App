@@ -33,6 +33,9 @@ import de.gurum.besseresser.data.BackupSummary
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.DayFazitResult
 import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.UiPrefsRepository
+import de.gurum.besseresser.model.AppLanguage
+import de.gurum.besseresser.model.AppThemeMode
 import de.gurum.besseresser.model.dayFingerprint
 import de.gurum.besseresser.model.dayKeyOf
 import de.gurum.besseresser.model.Evaluation
@@ -108,6 +111,28 @@ class FakeProfileRepository(
     override suspend fun currentProfile(): Profile = profileFlow.value
     override suspend fun save(profile: Profile) {
         profileFlow.value = profile
+    }
+}
+
+class FakeUiPrefsRepository(
+    initialTheme: AppThemeMode = AppThemeMode.SYSTEM,
+    initialLanguage: AppLanguage = AppLanguage.DE
+) : UiPrefsRepository {
+    private val themeFlow = MutableStateFlow(initialTheme)
+    private val languageFlow = MutableStateFlow(initialLanguage)
+
+    override val themeMode: Flow<AppThemeMode> = themeFlow.asStateFlow()
+    override val language: Flow<AppLanguage> = languageFlow.asStateFlow()
+
+    override suspend fun currentThemeMode(): AppThemeMode = themeFlow.value
+    override suspend fun currentLanguage(): AppLanguage = languageFlow.value
+
+    override suspend fun saveThemeMode(mode: AppThemeMode) {
+        themeFlow.value = mode
+    }
+
+    override suspend fun saveLanguage(language: AppLanguage) {
+        languageFlow.value = language
     }
 }
 

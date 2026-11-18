@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import de.gurum.besseresser.R
+import de.gurum.besseresser.data.ApiClient
 import de.gurum.besseresser.data.ApiException
 import de.gurum.besseresser.data.BackupService
 import de.gurum.besseresser.data.BackupSummary
@@ -147,4 +148,7 @@ class SetupViewModel(
             }
         }
     }
+
+    suspend fun fetchModels(baseUrl: String, apiKey: String): Result<ApiClient.ModelsResult> =
+        apiService.fetchModels(baseUrl, apiKey)
 }

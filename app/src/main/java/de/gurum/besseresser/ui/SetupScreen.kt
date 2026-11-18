@@ -137,7 +137,8 @@ fun SetupScreen(
                 viewModel.setModel(it)
                 viewModel.setShowModels(false)
             },
-            onBack = { viewModel.setShowModels(false) }
+            onBack = { viewModel.setShowModels(false) },
+            onFetchModels = { u, k -> viewModel.fetchModels(u, k) }
         )
         return
     }
@@ -514,16 +515,21 @@ fun SetupScreen(
  * in Monospace und kopierbar.
  */
 @Composable
-fun ModelListScreen(url: String, apiKey: String, onPick: (String) -> Unit, onBack: () -> Unit) {
+fun ModelListScreen(
+    url: String,
+    apiKey: String,
+    onPick: (String) -> Unit,
+    onBack: () -> Unit,
+    onFetchModels: suspend (String, String) -> Result<ApiClient.ModelsResult> = { u, k ->
+        ApiClient().fetchModels(baseUrl = u, apiKey = k)
+    }
+) {
     var loading by remember { mutableStateOf(true) }
     var models by remember { mutableStateOf(ApiClient.ModelsResult(emptyList(), emptyList())) }
     var debugReport by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        val result = ApiClient.fetchModels(
-            baseUrl = url,
-            apiKey = apiKey
-        )
+        val result = onFetchModels(url, apiKey)
         result.onSuccess {
             models = it
             loading = false
