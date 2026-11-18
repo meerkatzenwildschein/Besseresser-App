@@ -113,9 +113,11 @@ fun SetupScreen(
         viewModel.importBackup(uri, defaultGoals) { res ->
             importingBackup = false
             res.onSuccess { (updatedSettings, summary) ->
+                val mealsStr = ctx.resources.getQuantityString(R.plurals.backup_meals_count, summary.entriesCount, summary.entriesCount)
+                val photosStr = ctx.resources.getQuantityString(R.plurals.backup_photos_count, summary.photosCount, summary.photosCount)
                 Toast.makeText(
                     ctx,
-                    ctx.getString(R.string.config_import_success, summary.entriesCount, summary.photosCount),
+                    ctx.getString(R.string.config_import_success, mealsStr, photosStr),
                     Toast.LENGTH_LONG
                 ).show()
                 onBackupImported?.invoke(updatedSettings)

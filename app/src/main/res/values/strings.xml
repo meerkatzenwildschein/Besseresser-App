@@ -83,7 +83,10 @@
     <string name="profile_date_clear">Clear date</string>
     <string name="profile_usage_hint">These details are sent to the AI with the day assessment (day summary).</string>
     <string name="profile_ctx_header">User profile: %1$s</string>
-    <string name="profile_ctx_age">%1$d years</string>
+    <plurals name="profile_ctx_age">
+        <item quantity="one">%1$d year</item>
+        <item quantity="other">%1$d years</item>
+    </plurals>
     <string name="profile_ctx_weight">%1$s kg</string>
     <string name="profile_ctx_height">%1$d cm</string>
     <string name="profile_ctx_notes">Notes: %1$s</string>
@@ -157,7 +160,10 @@
     <!-- History -->
     <string name="history_title">History</string>
     <string name="history_empty">No ratings yet.\nPhotograph your first meal!</string>
-    <string name="history_list_hint">%1$d ratings – swipe left to delete · long-press to reorder</string>
+    <plurals name="history_list_hint">
+        <item quantity="one">%1$d rating – swipe left to delete · long-press to reorder</item>
+        <item quantity="other">%1$d ratings – swipe left to delete · long-press to reorder</item>
+    </plurals>
     <string name="history_no_goals">No goals captured</string>
     <string name="history_swipe_blocked_overlay">A capture is in progress - please finish or cancel it first.</string>
     <string name="score_caption">Traffic-light average</string>
@@ -213,8 +219,16 @@
     <string name="config_backup_desc">Exports or imports all app data (settings including API key, goals, profile, favorite notes, and all meals with Base64-encoded photos, daily and weekly summaries) as a JSON file in your \"Downloads\" folder. Existing or duplicate entries are overwritten on import.</string>
     <string name="config_export_button">Export data (to Downloads)</string>
     <string name="config_import_button">Import data (from file)</string>
-    <string name="config_export_success">Backup saved to Downloads/%1$s (%2$d meals, %3$d photos).</string>
-    <string name="config_import_success">Backup imported successfully (%1$d meals, %2$d photos, settings &amp; profile restored).</string>
+    <plurals name="backup_meals_count">
+        <item quantity="one">%1$d meal</item>
+        <item quantity="other">%1$d meals</item>
+    </plurals>
+    <plurals name="backup_photos_count">
+        <item quantity="one">%1$d photo</item>
+        <item quantity="other">%1$d photos</item>
+    </plurals>
+    <string name="config_export_success">Backup saved to Downloads/%1$s (%2$s, %3$s).</string>
+    <string name="config_import_success">Backup imported successfully (%1$s, %2$s, settings &amp; profile restored).</string>
     <string name="config_import_failed">Import failed.</string>
     <string name="config_section_history_clear">Reset History Data</string>
     <string name="config_clear_history_desc">Permanently deletes all saved meals, photos, and daily/weekly summaries from this device. Settings, API key, goals, profile, and favorite notes are kept.</string>

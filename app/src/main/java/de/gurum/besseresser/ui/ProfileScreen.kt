@@ -64,7 +64,7 @@ private val BIRTH_DISPLAY_FORMAT = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 /** Kontextzeile für KI-Prompts (Tagesfazit) – null, wenn das Profil komplett leer ist. */
 fun profileContextLine(ctx: Context, profile: Profile): String? {
     val parts = mutableListOf<String>()
-    profile.ageYears?.let { parts.add(ctx.getString(R.string.profile_ctx_age, it)) }
+    profile.ageYears?.let { parts.add(ctx.resources.getQuantityString(R.plurals.profile_ctx_age, it, it)) }
     profile.weightKg?.let {
         val shown = if (abs(it % 1.0) < 0.001) "${it.toInt()}"
                     else String.format(Locale.US, "%.1f", it)

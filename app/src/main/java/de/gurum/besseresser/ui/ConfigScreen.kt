@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -155,6 +156,8 @@ fun ConfigScreen(
         }
 
         state.exportSummary?.let { summary ->
+            val mealsStr = pluralStringResource(R.plurals.backup_meals_count, summary.entriesCount, summary.entriesCount)
+            val photosStr = pluralStringResource(R.plurals.backup_photos_count, summary.photosCount, summary.photosCount)
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer,
                 shape = RoundedCornerShape(14.dp),
@@ -175,7 +178,7 @@ fun ConfigScreen(
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        stringResource(R.string.config_export_success, summary.fileName, summary.entriesCount, summary.photosCount),
+                        stringResource(R.string.config_export_success, summary.fileName, mealsStr, photosStr),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
@@ -186,6 +189,8 @@ fun ConfigScreen(
         }
 
         state.importSummary?.let { summary ->
+            val mealsStr = pluralStringResource(R.plurals.backup_meals_count, summary.entriesCount, summary.entriesCount)
+            val photosStr = pluralStringResource(R.plurals.backup_photos_count, summary.photosCount, summary.photosCount)
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer,
                 shape = RoundedCornerShape(14.dp),
@@ -206,7 +211,7 @@ fun ConfigScreen(
                     )
                     Spacer(Modifier.width(10.dp))
                     Text(
-                        stringResource(R.string.config_import_success, summary.entriesCount, summary.photosCount),
+                        stringResource(R.string.config_import_success, mealsStr, photosStr),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         fontSize = 13.sp,
                         lineHeight = 18.sp,

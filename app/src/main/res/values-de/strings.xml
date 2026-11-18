@@ -83,7 +83,10 @@
     <string name="profile_date_clear">Datum löschen</string>
     <string name="profile_usage_hint">Diese Angaben werden bei der Tagesauswertung (Tagesfazit) an die KI gesendet.</string>
     <string name="profile_ctx_header">Nutzerprofil: %1$s</string>
-    <string name="profile_ctx_age">%1$d Jahre</string>
+    <plurals name="profile_ctx_age">
+        <item quantity="one">%1$d Jahr</item>
+        <item quantity="other">%1$d Jahre</item>
+    </plurals>
     <string name="profile_ctx_weight">%1$s kg</string>
     <string name="profile_ctx_height">%1$d cm</string>
     <string name="profile_ctx_notes">Anmerkungen: %1$s</string>
@@ -157,7 +160,10 @@
     <!-- History -->
     <string name="history_title">Verlauf</string>
     <string name="history_empty">Noch keine Bewertungen.\nFotografiere dein erstes Essen!</string>
-    <string name="history_list_hint">%1$d Bewertungen – nach links wischen zum Löschen · gedrückt halten zum Verschieben</string>
+    <plurals name="history_list_hint">
+        <item quantity="one">%1$d Bewertung – nach links wischen zum Löschen · gedrückt halten zum Verschieben</item>
+        <item quantity="other">%1$d Bewertungen – nach links wischen zum Löschen · gedrückt halten zum Verschieben</item>
+    </plurals>
     <string name="history_no_goals">Keine Ziele erfasst</string>
     <string name="history_swipe_blocked_overlay">Eine Erfassung läuft - bitte zuerst abschließen oder abbrechen.</string>
     <string name="score_caption">Ampelschnitt</string>
@@ -213,8 +219,16 @@
     <string name="config_backup_desc">Exportiert bzw. importiert alle App-Daten (Einstellungen inkl. API-Key, Ziele, Profil, Notiz-Favoriten sowie alle Mahlzeiten mit Base64-codierten Fotos, Tages- und Wochenfazits) als JSON-Datei im Ordner „Downloads“. Vorhandene oder doppelte Einträge werden beim Import überschrieben.</string>
     <string name="config_export_button">Daten exportieren (nach Downloads)</string>
     <string name="config_import_button">Daten importieren (aus Datei)</string>
-    <string name="config_export_success">Backup gespeichert unter Downloads/%1$s (%2$d Mahlzeiten, %3$d Fotos).</string>
-    <string name="config_import_success">Backup erfolgreich importiert (%1$d Mahlzeiten, %2$d Fotos, Einstellungen &amp; Profil wiederhergestellt).</string>
+    <plurals name="backup_meals_count">
+        <item quantity="one">%1$d Mahlzeit</item>
+        <item quantity="other">%1$d Mahlzeiten</item>
+    </plurals>
+    <plurals name="backup_photos_count">
+        <item quantity="one">%1$d Foto</item>
+        <item quantity="other">%1$d Fotos</item>
+    </plurals>
+    <string name="config_export_success">Backup gespeichert unter Downloads/%1$s (%2$s, %3$s).</string>
+    <string name="config_import_success">Backup erfolgreich importiert (%1$s, %2$s, Einstellungen &amp; Profil wiederhergestellt).</string>
     <string name="config_import_failed">Import fehlgeschlagen.</string>
     <string name="config_section_history_clear">Verlaufsdaten zurücksetzen</string>
     <string name="config_clear_history_desc">Löscht alle gespeicherten Mahlzeiten, Fotos sowie Tages- und Wochenfazits unwiderruflich von diesem Gerät. Einstellungen, API-Key, Ziele, Profil und Notiz-Favoriten bleiben erhalten.</string>
