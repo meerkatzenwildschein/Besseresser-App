@@ -31,7 +31,6 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 | Priorität | Bereich | Finding | Auswirkung |
 |---|---|---|---|
-| **P1 (Hoch)** | Compose | Monolithische Composables (z. B. `MainScreen.kt` > 900 Zeilen) | Mangelnde Wiederverwendbarkeit, unnötige Recompositions |
 | **P2 (Mittel)** | Lifecycle / System | Manueller Locale ContextWrapper | Umgeht Android 13+ Per-App-Language-APIs |
 | **P2 (Mittel)** | Testing & DI | Harte `Dispatchers.IO`-Referenzen & fehlende Dispatcher-Injection | Erschwerte deterministische Unit- & Coroutine-Tests |
 | **P3 (Niedrig)** | Code-Qualität | Denglish-Bezeichner & String-basierte Magic Keys | Wartungsaufwand, Fehleranfälligkeit bei Refactorings |
@@ -56,19 +55,6 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
   Wird ein Foto aufgenommen und verworfen oder ein zweites Foto gemacht, verweist `photoFile` immer noch auf denselben Zeitstempel-Dateinamen.
 - **Empfohlene Best Practice:**
   Dateierstellung und Temp-File-Management sollten in eine dedizierte Helper-Klasse (`FileManager` / `PhotoCaptureManager`) ausgelagert werden, die erst bei tatsächlichem Auslösen des Kamera-Events eine neue Datei anlegt.
-
----
-
-#### Finding 3.1.2: Monolithische Screen-Dateien und fehlende Dekomposition
-- **Betroffene Dateien:** `MainScreen.kt` (930 Zeilen), `HistoryScreen.kt` (276 Zeilen)
-- **Problem:**
-  `MainScreen.kt` bündelt Kamera-Aufnahme, Review-Screen, Auswertungsansicht, Edit-Dialoge, Dropdown-Menüs und Floating Buttons in einer einzigen Datei. Sub-Composables erhalten bis zu 15–20 Callback- und State-Parameter.
-- **Empfohlene Best Practice:**
-  Aufteilung in kohärente, wiederverwendbare Teil-Composables in separate Dateien:
-  - `ui/main/MainScreen.kt` (Root-Container & Event-Verteilung)
-  - `ui/main/MainReviewView.kt`
-  - `ui/main/MainEvaluationView.kt`
-  - `ui/main/MainCtaBar.kt`
 
 ---
 
@@ -164,9 +150,8 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 ## 4. Empfohlene Roadmap & Nächste Schritte
 
 ### Phase 1: Architektur-Refactoring & Entkopplung (Mittelfristig)
-1. **Decomposition:** `MainScreen.kt` in fokussierte Sub-Composables zerlegen.
-2. **Reaktive State-Pipelines:** `startObserving()` durch deklarative `stateIn`-Pipelines ersetzen.
-3. **Dispatcher Injection:** `CoroutineDispatchers` für saubere Testbarkeit injizierbar machen.
+1. **Reaktive State-Pipelines:** `startObserving()` durch deklarative `stateIn`-Pipelines ersetzen.
+2. **Dispatcher Injection:** `CoroutineDispatchers` für saubere Testbarkeit injizierbar machen.
 
 ### Phase 2: Qualitäts- & Test-Offensive (Langfristig)
 1. **Compose-Tests & Screenshot-Testing:** Integration von `androidx.compose.ui.test` und Roborazzi für Snapshot-Tests.
