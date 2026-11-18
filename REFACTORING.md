@@ -25,7 +25,6 @@ Dieses Dokument fasst die Ergebnisse des umfassenden Code-Reviews der **Besseres
 Die Besseresser-App verfügt über eine moderne technische Basis (Kotlin 2.0+, Jetpack Compose, Material 3, Type-Safe Navigation Compose, Room, DataStore, Koin). Die bestehende Unit-Test-Abdeckung für Serialisierung, Repositories und Fingerprint-Berechnungen ist solide.
 
 Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von etablierten Android Best Practices auf:
-- **Performance / UI-Jank:** Synchrone Bilddecodierung hochauflösender Fotos auf dem Main-Thread innerhalb von Composables (`remember { BitmapFactory.decodeStream(...) }`) ohne Downsampling oder Image-Loader (wie Coil).
 - **Architektur & Separation of Concerns:** Direkte Übergabe von `android.content.Context` an ViewModels und UI-gesteuerte Business-Logik (z. B. Triggerung von KI-Fazits aus `LaunchedEffect`).
 - **Threading:** Verwendung von blockierendem `runBlocking` auf dem Main-Thread während des Activity-Starts (`attachBaseContext`).
 - **Sicherheit:** `cleartextTrafficPermitted="true"` global im gesamten Netzwerk-Manifest aktiv und API-Keys unverschlüsselt im Standard-DataStore.
@@ -37,7 +36,6 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 | Priorität | Bereich | Finding | Auswirkung |
 |---|---|---|---|
-| **P0 (Kritisch)** | Performance / Memory | Main-Thread Bitmap Decoding & fehlende Downsampling-Strategie | UI-Ruckler (Jank), Frame-Drops, `OutOfMemoryError` (OOM) |
 | **P0 (Kritisch)** | Threading | `runBlocking` in `MainActivity.attachBaseContext` | Längere Startzeiten, Risiko von Application Not Responding (ANR) |
 | **P0 (Kritisch)** | Sicherheit | Globales `cleartextTrafficPermitted="true"` & Klartext-API-Keys | Sicherheitsrisiko für sensible Nutzerdaten & API-Zugänge |
 | **P1 (Hoch)** | Architektur | `Context` in ViewModels & UI-getriebene Side-Effects | Speicherlecks, schlechte Testbarkeit, instabile State-Machines |
@@ -53,37 +51,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ### 3.1 UI & Jetpack Compose
 
-#### Finding 3.1.1: Synchrones Decodieren von Bitmaps auf dem Main-Thread
-- **Betroffene Dateien:** `MainScreen.kt` (Z. 275, Z. 419), `CameraScreen.kt` (Z. 309), `ManualEntryDialog.kt` (Z. 371)
-- **Problem:**
-  Bitmaps werden direkt während der Composition bzw. im Main-Thread synchron über `BitmapFactory.decodeStream(ctx.contentResolver.openInputStream(uri))` oder `BitmapFactory.decodeFile(...)` geladen:
-  ```kotlin
-  // Anti-Pattern: Blockiert UI-Thread und lädt volle Sensorauflösung (z.B. 48 MP) in den RAM
-  val bmp = remember(uri) {
-      try {
-          ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
-      } catch (e: Exception) { null }
-  }
-  ```
-- **Risiko:** Starkes Ruckeln beim Öffnen von Reviews/Dialogen, UI-Blockaden und `OutOfMemoryError` (OOM) auf Geräten mit begrenztem Arbeitsspeicher.
-- **Empfohlene Best Practice:**
-  1. Integration von **Coil** (`io.coil-kt:coil-compose`): Coil lädt Bilder asynchron im Hintergrund, nutzt Memory- und Disk-Caches und passt die Bitmap-Größe automatisch an die Containergröße (`AsyncImage`) an.
-  ```kotlin
-  // Best Practice mit Coil
-  AsyncImage(
-      model = ImageRequest.Builder(LocalContext.current)
-          .data(photoUri)
-          .crossfade(true)
-          .build(),
-      contentDescription = stringResource(R.string.food_photo_desc),
-      modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)),
-      contentScale = ContentScale.Crop
-  )
-  ```
-
----
-
-#### Finding 3.1.2: State & File-Erzeugung in `remember` ohne Re-Evaluation
+#### Finding 3.1.1: State & File-Erzeugung in `remember` ohne Re-Evaluation
 - **Betroffene Dateien:** `MainScreen.kt` (Z. 101–109), `HistoryScreen.kt` (Z. 61–67)
 - **Problem:**
   Dateiobjekte und FileProvider-URIs werden in `remember { ... }` ohne Dependencies erzeugt und führen I/O (`mkdirs()`) während der Initial-Composition aus:
@@ -100,7 +68,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ---
 
-#### Finding 3.1.3: Monolithische Screen-Dateien und fehlende Dekomposition
+#### Finding 3.1.2: Monolithische Screen-Dateien und fehlende Dekomposition
 - **Betroffene Dateien:** `MainScreen.kt` (930 Zeilen), `HistoryScreen.kt` (276 Zeilen)
 - **Problem:**
   `MainScreen.kt` bündelt Kamera-Aufnahme, Review-Screen, Auswertungsansicht, Edit-Dialoge, Dropdown-Menüs und Floating Buttons in einer einzigen Datei. Sub-Composables erhalten bis zu 15–20 Callback- und State-Parameter.
@@ -318,10 +286,9 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 ## 4. Empfohlene Roadmap & Nächste Schritte
 
 ### Phase 1: Stabilität, Performance & Sicherheit (Sofortmaßnahmen)
-1. **Bildverarbeitung optimieren:** Coil einbinden und synchrone `BitmapFactory`-Aufrufe aus Composables eliminieren.
-2. **Sicherheitslücke schließen:** `cleartextTrafficPermitted="false"` in `network_security_config.xml` umstellen.
-3. **Room-Sicherheit:** `fallbackToDestructiveMigration()` entfernen und Migrationsstrategie etablieren.
-4. **Main-Thread Entlastung:** `runBlocking` in `attachBaseContext` durch native Locale-APIs ersetzen.
+1. **Sicherheitslücke schließen:** `cleartextTrafficPermitted="false"` in `network_security_config.xml` umstellen.
+2. **Room-Sicherheit:** `fallbackToDestructiveMigration()` entfernen und Migrationsstrategie etablieren.
+3. **Main-Thread Entlastung:** `runBlocking` in `attachBaseContext` durch native Locale-APIs ersetzen.
 
 ### Phase 2: Architektur-Refactoring & Entkopplung (Mittelfristig)
 1. **Clean ViewModels:** Alle `Context`-Parameter aus ViewModels (`ProfileViewModel`, `SetupViewModel`) entfernen und auf `UiText` / Resource-IDs umstellen.

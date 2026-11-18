@@ -49,7 +49,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.layout.ContentScale
@@ -58,6 +57,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.LocalTime
@@ -184,8 +184,8 @@ fun HistoryDetailScreen(
     var showDuplicateDatePicker by remember { mutableStateOf(false) }
     var duplicateTargetDate by remember { mutableStateOf<LocalDate?>(null) }
     var showErkanntEdit by remember { mutableStateOf(false) }
-    val thumb = remember(entry.id, entry.photoFile) {
-        viewModel.thumbnail(target = 1280)
+    val photoFile = remember(entry.id, entry.photoFile) {
+        viewModel.photoFile()
     }
 
     // Fehler aus der Re-Evaluation als Toast anzeigen
@@ -255,14 +255,14 @@ fun HistoryDetailScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
 
-        if (thumb != null) {
+        if (photoFile != null) {
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Image(
-                    bitmap = thumb.asImageBitmap(),
+                AsyncImage(
+                    model = photoFile,
                     contentDescription = stringResource(R.string.photo_of_meal),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -300,7 +300,7 @@ fun HistoryDetailScreen(
             }
         }
 
-        val canShare = thumb != null || entry.erkannt.isNotBlank() || entry.summary.isNotBlank()
+        val canShare = photoFile != null || entry.erkannt.isNotBlank() || entry.summary.isNotBlank()
         if (entry.summary.isNotBlank() || entry.erkannt.isNotBlank() || entry.note.isNotBlank()) {
             // Gleicher antipbarer Block wie in der Auswertung: 🧠 sichtbar, 🍽️/📝 einklappbar,
             // 🍽️ mit Pencil → erkannt userkorrigierbar, unten rechts Teilen-Button

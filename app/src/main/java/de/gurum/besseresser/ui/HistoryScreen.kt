@@ -162,7 +162,7 @@ fun HistoryScreen(
                 onMoveEntryWithinDay = { day, fromIdx, toIdx ->
                     viewModel.moveEntryWithinDay(day, fromIdx, toIdx)
                 },
-                onDecodeThumbnail = { viewModel.decodeThumbnail(it) }
+                onPhotoFile = { viewModel.photoFileOf(it) }
             )
         }
 

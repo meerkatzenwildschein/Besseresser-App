@@ -449,13 +449,11 @@ class HistoryViewModel(
     fun generateWeekFazit(
         settings: Settings,
         promptContext: String?,
-        weekKey: String? = null,
+        weekKey: String,
         mealLines: List<String>? = null,
         prompts: FazitPromptBundle? = null
     ) {
         val wk = weekKey
-            ?: latestDueWeekKey(_uiState.value.entries)
-            ?: weekKeyOf(System.currentTimeMillis())
         if (wk in _uiState.value.loadingWeeks) return
         _uiState.update {
             it.copy(
@@ -502,6 +500,9 @@ class HistoryViewModel(
             }
         }
     }
+    fun photoFileOf(entry: HistoryEntry): java.io.File? =
+        historyRepository.photoFileOf(entry)
+
     fun decodeThumbnail(entry: HistoryEntry, target: Int = 128): android.graphics.Bitmap? =
         historyRepository.decodeThumbnail(entry, target)
 }

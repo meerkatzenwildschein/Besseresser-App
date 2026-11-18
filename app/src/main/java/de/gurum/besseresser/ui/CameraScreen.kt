@@ -51,7 +51,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -62,6 +61,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import coil.compose.AsyncImage
 import java.io.File
 import de.gurum.besseresser.R
 
@@ -306,22 +306,17 @@ fun CameraCaptureScreen(
                             .fillMaxWidth()
                             .weight(1f)
                     ) {
-                        val bmp = remember(outputFile) {
-                            try { BitmapFactory.decodeFile(outputFile.absolutePath) } catch (e: Exception) { null }
-                        }
-                        if (bmp != null) {
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            AsyncImage(
+                                model = outputFile,
+                                contentDescription = stringResource(R.string.photo_of_meal),
+                                contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
-                            ) {
-                                Image(
-                                    bitmap = bmp.asImageBitmap(),
-                                    contentDescription = stringResource(R.string.photo_of_meal),
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
+                            )
                         }
                     }
 

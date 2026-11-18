@@ -1,5 +1,4 @@
 package de.gurum.besseresser.ui
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -46,7 +45,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -54,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.LocalDate
@@ -367,27 +366,19 @@ fun AddMealReviewScreen(
                     .padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-            val reviewCtx = LocalContext.current
-            val bmp = remember(photoUri) {
-                try {
-                    reviewCtx.contentResolver.openInputStream(photoUri)?.use { BitmapFactory.decodeStream(it) }
-                } catch (e: Exception) { null }
-            }
-            if (bmp != null) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Image(
-                        bitmap = bmp.asImageBitmap(),
-                        contentDescription = stringResource(R.string.photo_of_meal),
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(280.dp)
-                    )
-                }
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                AsyncImage(
+                    model = photoUri,
+                    contentDescription = stringResource(R.string.photo_of_meal),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp)
+                )
             }
             if (busy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             OutlinedTextField(

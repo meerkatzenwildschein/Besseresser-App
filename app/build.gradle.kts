@@ -50,6 +50,7 @@ val navigationVersion = "2.8.8"
 val exifVersion = "1.3.7"
 val junitVersion = "4.13.2"
 val coroutinesVersion = "1.9.0"
+val coilVersion = "2.7.0"
 
 android {
     namespace = "de.gurum.besseresser"
@@ -137,6 +138,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:$datastoreVersion")
     implementation("androidx.navigation:navigation-compose:$navigationVersion")
     implementation("androidx.exifinterface:exifinterface:$exifVersion")
+    implementation("io.coil-kt:coil-compose:$coilVersion")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:$junitVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
