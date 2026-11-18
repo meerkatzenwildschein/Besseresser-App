@@ -237,23 +237,23 @@ class ApiClientTest {
     fun testStripErkanntIntroPatterns() {
         assertEquals(
             "200 g Spaghetti Bolognese",
-            ApiClient.stripErkanntIntro("Auf dem Foto ist zu sehen: 200 g Spaghetti Bolognese")
+            ApiClient.stripRecognizedMealIntro("Auf dem Foto ist zu sehen: 200 g Spaghetti Bolognese")
         )
         assertEquals(
             "Ein bunter Salat mit Hähnchen",
-            ApiClient.stripErkanntIntro("Zu sehen sind ein bunter Salat mit Hähnchen")
+            ApiClient.stripRecognizedMealIntro("Zu sehen sind ein bunter Salat mit Hähnchen")
         )
         assertEquals(
             "150 g Lachsfilet mit Reis",
-            ApiClient.stripErkanntIntro("Das Bild zeigt 150 g Lachsfilet mit Reis")
+            ApiClient.stripRecognizedMealIntro("Das Bild zeigt 150 g Lachsfilet mit Reis")
         )
         assertEquals(
             "One bowl of oatmeal with berries",
-            ApiClient.stripErkanntIntro("The photo shows: one bowl of oatmeal with berries")
+            ApiClient.stripRecognizedMealIntro("The photo shows: one bowl of oatmeal with berries")
         )
         assertEquals(
             "Two slices of wholegrain bread",
-            ApiClient.stripErkanntIntro("In the image i can see two slices of wholegrain bread")
+            ApiClient.stripRecognizedMealIntro("In the image i can see two slices of wholegrain bread")
         )
     }
 

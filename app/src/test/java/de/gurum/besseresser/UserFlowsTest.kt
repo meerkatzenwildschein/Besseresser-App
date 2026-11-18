@@ -234,7 +234,7 @@ class UserFlowsTest {
     }
 
     @Test
-    fun `history detail - updateErkannt persists new text`() = runTest(testDispatcher) {
+    fun `history detail - updateRecognizedMeal persists new text`() = runTest(testDispatcher) {
         val histRepo = FakeHistoryRepository()
         val eval = Evaluation(recognizedMeal = "Burger")
         val entry = histRepo.add(null, eval, note = "Abend", dateOverride = 7_000L)
@@ -250,7 +250,7 @@ class UserFlowsTest {
         advanceUntilIdle()
         assertEquals("Burger", vm.uiState.value.entry!!.recognizedMeal)
 
-        vm.updateErkannt("Veggie-Burger")
+        vm.updateRecognizedMeal("Veggie-Burger")
         advanceUntilIdle()
 
         assertEquals("Veggie-Burger", histRepo.getAll().first { it.id == entry.id }.recognizedMeal)

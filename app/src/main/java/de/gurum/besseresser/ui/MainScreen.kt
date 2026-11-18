@@ -192,7 +192,7 @@ fun MainScreen(
                 RecognizedMealEditDialog(
                     initialText = uiState.evaluation?.recognizedMeal.orEmpty(),
                     onOk = { newText ->
-                        viewModel.updateErkannt(newText)
+                        viewModel.updateRecognizedMeal(newText)
                     },
                     onDismiss = { viewModel.setshowRecognizedEdit(false) }
                 )

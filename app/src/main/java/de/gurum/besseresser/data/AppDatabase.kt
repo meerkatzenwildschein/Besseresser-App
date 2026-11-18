@@ -177,7 +177,7 @@ interface HistoryDao {
     suspend fun deleteAll()
 
     @Query("UPDATE history_entries SET recognizedMeal = :recognizedMeal WHERE id = :id")
-    suspend fun updateErkannt(id: Long, recognizedMeal: String)
+    suspend fun updateRecognizedMeal(id: Long, recognizedMeal: String)
 
     @Query("UPDATE history_entries SET goalResults = :goalResults, summary = :summary WHERE id = :id")
     suspend fun updateEvaluation(id: Long, goalResults: List<GoalResult>, summary: String)

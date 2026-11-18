@@ -178,7 +178,7 @@ class FakeHistoryRepository : HistoryRepository {
         return entry
     }
 
-    override suspend fun updateErkannt(id: Long, newText: String) {
+    override suspend fun updateRecognizedMeal(id: Long, newText: String) {
         entriesFlow.update { list ->
             list.map { if (it.id == id) it.copy(recognizedMeal = newText) else it }
         }
@@ -416,7 +416,7 @@ class RepositoriesAndFakesTest {
         assertEquals("Salat", entry.recognizedMeal)
         assertEquals("Mittagessen", entry.note)
 
-        repo.updateErkannt(entry.id, "Bunter Salat")
+        repo.updateRecognizedMeal(entry.id, "Bunter Salat")
         val entryDayKey = dayKeyOf(entry.dateMillis)
         val fazit = DayFazit(entryDayKey, TrafficLight.GREEN, "Klasse", listOf(entry.id), 1000L, "fp")
         repo.saveDayFazit(fazit)
@@ -627,7 +627,7 @@ class RepositoriesAndFakesTest {
         assertEquals(cachedEv, vm.uiState.value.evaluation)
 
         // Editing "recognizedMeal" also updates the cached evaluation on the RecentNote entry
-        vm.updateErkannt(newText = "Haferflocken mit Beeren und Nüssen")
+        vm.updateRecognizedMeal(newText = "Haferflocken mit Beeren und Nüssen")
         assertEquals("Haferflocken mit Beeren und Nüssen", vm.uiState.value.evaluation?.recognizedMeal)
         advanceUntilIdle()
         assertEquals(

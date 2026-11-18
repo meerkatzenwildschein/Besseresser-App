@@ -163,7 +163,7 @@ class MainViewModel(
         }
     }
 
-    fun updateErkannt(newText: String) {
+    fun updateRecognizedMeal(newText: String) {
         val trimmed = newText.trim()
         val entryId = _uiState.value.savedEntryId
         val currentNote = _uiState.value.note.trim()
@@ -180,7 +180,7 @@ class MainViewModel(
         }
         if (entryId != null) {
             viewModelScope.launch {
-                historyRepository.updateErkannt(entryId, trimmed)
+                historyRepository.updateRecognizedMeal(entryId, trimmed)
             }
         }
     }

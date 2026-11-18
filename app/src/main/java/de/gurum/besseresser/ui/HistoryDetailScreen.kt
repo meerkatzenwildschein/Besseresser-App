@@ -353,7 +353,7 @@ fun HistoryDetailScreen(
             initialText = entry.recognizedMeal,
             onOk = { newText ->
                 val trimmed = newText.trim()
-                viewModel.updateErkannt(trimmed)
+                viewModel.updateRecognizedMeal(trimmed)
                 showRecognizedEdit = false
                 if (trimmed.isNotBlank() && !detailState.reEvalBusy) {
                     val photoBundle = PromptBundle(
