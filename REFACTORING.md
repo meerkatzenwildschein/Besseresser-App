@@ -12,10 +12,9 @@ Dieses Dokument fasst die Ergebnisse des umfassenden Code-Reviews der **Besseres
    - [3.2 Architektur & State Management (MVVM / Clean Architecture)](#32-architektur--state-management-mvvm--clean-architecture)
    - [3.3 Threading, Concurrency & Coroutines](#33-threading-concurrency--coroutines)
    - [3.4 Datenhaltung, Persistence & Room](#34-datenhaltung-persistence--room)
-   - [3.5 Sicherheit & Datenschutz](#35-sicherheit--datenschutz)
-   - [3.6 Android Lifecycle & Lokalisierung](#36-android-lifecycle--lokalisierung)
-   - [3.7 Dependency Injection & Testbarkeit](#37-dependency-injection--testbarkeit)
-   - [3.8 Code-Style, Naming & Lokalisierung](#38-code-style-naming--lokalisierung)
+   - [3.5 Android Lifecycle & Lokalisierung](#35-android-lifecycle--lokalisierung)
+   - [3.6 Dependency Injection & Testbarkeit](#36-dependency-injection--testbarkeit)
+   - [3.7 Code-Style, Naming & Lokalisierung](#37-code-style-naming--lokalisierung)
 4. [Empfohlene Roadmap & Nächste Schritte](#4-empfohlene-roadmap--nächste-schritte)
 
 ---
@@ -25,7 +24,6 @@ Dieses Dokument fasst die Ergebnisse des umfassenden Code-Reviews der **Besseres
 Die Besseresser-App verfügt über eine moderne technische Basis (Kotlin 2.0+, Jetpack Compose, Material 3, Type-Safe Navigation Compose, Room, DataStore, Koin). Die bestehende Unit-Test-Abdeckung für Serialisierung, Repositories und Fingerprint-Berechnungen ist solide.
 
 Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von etablierten Android Best Practices auf:
-- **Sicherheit:** `cleartextTrafficPermitted="true"` global im gesamten Netzwerk-Manifest aktiv und API-Keys unverschlüsselt im Standard-DataStore.
 - **Resilienz & Datenhaltung:** `fallbackToDestructiveMigration()` bei Room-Datenbanken aktiv (Gefahr des kompletten Datenverlusts bei Updates) und `configChanges` in `MainActivity` deaktiviert Standard-Activity-Recreations.
 
 ---
@@ -34,7 +32,6 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 | Priorität | Bereich | Finding | Auswirkung |
 |---|---|---|---|
-| **P0 (Kritisch)** | Sicherheit | Globales `cleartextTrafficPermitted="true"` & Klartext-API-Keys | Sicherheitsrisiko für sensible Nutzerdaten & API-Zugänge |
 | **P1 (Hoch)** | Persistence | `fallbackToDestructiveMigration()` in Room | Verlust aller Verlaufsdaten bei Schema-Änderungen |
 | **P1 (Hoch)** | Compose | Monolithische Composables (z. B. `MainScreen.kt` > 900 Zeilen) | Mangelnde Wiederverwendbarkeit, unnötige Recompositions |
 | **P2 (Mittel)** | Lifecycle / System | `android:configChanges` & manueller Locale ContextWrapper | Umgeht Standard-Lifecycle, ignoriert Android 13+ Per-App-Language-APIs |
@@ -148,46 +145,9 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ---
 
-### 3.5 Sicherheit & Datenschutz
+### 3.5 Android Lifecycle & Lokalisierung
 
-#### Finding 3.5.1: Global aktivierter Klartext-Netzwerkverkehr (`cleartextTrafficPermitted`)
-- **Betroffene Dateien:** `app/src/main/res/xml/network_security_config.xml` (Z. 6)
-- **Problem:**
-  ```xml
-  <base-config cleartextTrafficPermitted="true">
-      <trust-anchors>
-          <certificates src="system" />
-      </trust-anchors>
-  </base-config>
-  ```
-- **Risiko:** Die App erlaubt unverschlüsselte HTTP-Verbindungen für alle Domains. Man-in-the-Middle-Angriffe (MitM) können API-Keys und private Ernährungsfotos/Gesundheitsdaten abfangen.
-- **Empfohlene Best Practice:**
-  `cleartextTrafficPermitted="false"` als Default setzen. Falls lokale Entwicklungs-Server (z. B. lokales Ollama auf `http://192.168.x.x`) unterstützt werden müssen, sollte dies ausschließlich über explizite `<domain-config>` für lokale IP-Bereiche im Debug-Build freigeschaltet werden:
-  ```xml
-  <network-security-config>
-      <base-config cleartextTrafficPermitted="false" />
-      <!-- Nur für lokale Entwicklung / Debugging -->
-      <domain-config cleartextTrafficPermitted="true">
-          <domain includeSubdomains="true">localhost</domain>
-          <domain includeSubdomains="true">10.0.2.2</domain>
-      </domain-config>
-  </network-security-config>
-  ```
-
----
-
-#### Finding 3.5.2: Unverschlüsselte Speicherung sensibler API-Keys
-- **Betroffene Dateien:** `SettingsRepository.kt`, `UiPrefsRepository.kt`
-- **Problem:**
-  API-Keys (OpenAI, OpenRouter etc.) werden im Standard-Jetpack-Preferences-DataStore als Klartext gespeichert.
-- **Empfohlene Best Practice:**
-  Nutzung von **EncryptedSharedPreferences** oder `EncryptedDataStore` in Verbindung mit dem Android Keystore für sensible Schlüssel und Credentials.
-
----
-
-### 3.6 Android Lifecycle & Lokalisierung
-
-#### Finding 3.6.1: `android:configChanges` in `MainActivity`
+#### Finding 3.5.1: `android:configChanges` in `MainActivity`
 - **Betroffene Dateien:** `app/src/main/AndroidManifest.xml` (Z. 31)
 - **Problem:**
   ```xml
@@ -199,7 +159,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ---
 
-#### Finding 3.6.2: Manuelle Locale-Hacks statt Android 13+ App-Sprachen API
+#### Finding 3.5.2: Manuelle Locale-Hacks statt Android 13+ App-Sprachen API
 - **Betroffene Dateien:** `MainActivity.kt` (`withAppLanguage`)
 - **Problem:**
   Die App manipuliert `ConfigurationContext` und `Locale.setDefault(...)` manuell im `CompositionLocalProvider`, obwohl `locales_config.xml` bereits vorhanden ist.
@@ -208,9 +168,9 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ---
 
-### 3.7 Dependency Injection & Testbarkeit
+### 3.6 Dependency Injection & Testbarkeit
 
-#### Finding 3.7.1: Fehlende UI- & Screenshot-Tests
+#### Finding 3.6.1: Fehlende UI- & Screenshot-Tests
 - **Problem:**
   Es existieren derzeit Unit-Tests für Serialisierung, Repositories und Room, jedoch keine Compose-UI-Tests (`createComposeRule`) oder Screenshot-Regressionstests (z. B. mit Roborazzi oder Paparazzi).
 - **Empfohlene Best Practice:**
@@ -221,9 +181,9 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ---
 
-### 3.8 Code-Style, Naming & Lokalisierung
+### 3.7 Code-Style, Naming & Lokalisierung
 
-#### Finding 3.8.1: Vermischung von Deutsch und Englisch (Denglish)
+#### Finding 3.7.1: Vermischung von Deutsch und Englisch (Denglish)
 - **Betroffene Dateien:** Projektweit (z. B. `TrafficLight` vs. `erkannt`, `MainViewModel.showErkanntEdit`, `DayFazit`, `mealLines`)
 - **Empfohlene Best Practice:**
   Einheitliche Naming Convention im Code: **Englisch für allen Code** (Klassen, Variablen, Methoden, Kommentare, DB-Tabellen), Lokalisierung (Deutsch/Englisch) ausschließlich in `strings.xml`.
@@ -233,9 +193,8 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ## 4. Empfohlene Roadmap & Nächste Schritte
 
-### Phase 1: Stabilität, Performance & Sicherheit (Sofortmaßnahmen)
-1. **Sicherheitslücke schließen:** `cleartextTrafficPermitted="false"` in `network_security_config.xml` umstellen.
-2. **Room-Sicherheit:** `fallbackToDestructiveMigration()` entfernen und Migrationsstrategie etablieren.
+### Phase 1: Stabilität & Performance (Sofortmaßnahmen)
+1. **Room-Sicherheit:** `fallbackToDestructiveMigration()` entfernen und Migrationsstrategie etablieren.
 
 ### Phase 2: Architektur-Refactoring & Entkopplung (Mittelfristig)
 1. **Decomposition:** `MainScreen.kt` in fokussierte Sub-Composables zerlegen.
@@ -245,4 +204,3 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 ### Phase 3: Qualitäts- & Test-Offensive (Langfristig)
 1. **Compose-Tests & Screenshot-Testing:** Integration von `androidx.compose.ui.test` und Roborazzi für Snapshot-Tests.
 2. **Naming-Konsolidierung:** Schrittweise Vereinheitlichung auf englische Bezeichner in Datenmodellen und Repositories.
-3. **Encrypted Storage:** Umstellung der API-Key-Speicherung auf EncryptedSharedPreferences / Keystore.

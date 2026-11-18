@@ -139,7 +139,7 @@ class DefaultSettingsRepository(private val dataStore: DataStore<Preferences>) :
             .filter { it.isNotBlank() }
         return Settings(
             baseUrl = this[Keys.BASE_URL] ?: "",
-            apiKey = this[Keys.API_KEY]?.let { KeyVault.decrypt(it) } ?: "",
+            apiKey = this[Keys.API_KEY]?.let { raw -> KeyVault.decrypt(raw) ?: raw } ?: "",
             model = this[Keys.MODEL] ?: Keys.DEFAULT_MODEL,
             goals = goals,
             goalsWereSplit = this[Keys.GOALS_WERE_SPLIT] ?: false,
