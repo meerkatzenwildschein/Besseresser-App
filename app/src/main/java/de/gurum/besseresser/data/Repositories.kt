@@ -111,6 +111,9 @@ interface HistoryRepository {
     /** Löscht alle Einträge (inkl. Fotos) sowie Tages-/Wochenfazits, die älter als [weeks]
      *  volle Wochen sind. 0/negativ = nichts löschen. Liefert die Anzahl gelöschter Einträge. */
     suspend fun purgeOlderThanWeeks(weeks: Int): Int
+    /** Löscht Foto-Dateien im Speicherverzeichnis, denen kein DB-Eintrag mehr entspricht.
+     *  Schützt vor verwaisten Dateien nach Abstürzen oder fehlgeschlagenen Migrationen. */
+    suspend fun purgeOrphanedPhotos(): Int
     fun photoFileOf(entry: HistoryEntry): File?
     fun decodeThumbnail(entry: HistoryEntry, target: Int = 200): Bitmap?
 }
@@ -493,6 +496,21 @@ class DefaultHistoryRepository(
         DayFazitSession.attemptedWeekly.removeAll { it < cutoffWeekKey }
 
         return stale.size
+    }
+
+    override suspend fun purgeOrphanedPhotos(): Int {
+        ensureMigrated()
+        val knownFileNames = historyDao.getAll()
+            .map { it.photoFile }
+            .filter { it.isNotBlank() }
+            .toSet()
+        val dir = photoStorage.dir()
+        val orphans = dir.listFiles { f ->
+            f.extension.lowercase() in setOf("jpg", "jpeg", "png", "webp") &&
+                f.name !in knownFileNames
+        } ?: return 0
+        orphans.forEach { runCatching { it.delete() } }
+        return orphans.size
     }
 
     override suspend fun saveDayFazit(fazit: DayFazit) {

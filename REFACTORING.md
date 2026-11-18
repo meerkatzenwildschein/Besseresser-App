@@ -36,6 +36,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 | ~~**P2 (Mittel)**~~ | ~~Lifecycle / System~~ | ~~`android:configChanges` in `MainActivity`~~ | ~~Umgeht Standard-Lifecycle bei Rotation/Split-Screen~~ | ✅ |
 | ~~**P2 (Mittel)**~~ | ~~Architektur~~ | ~~Imperative `startObserving()`-Initialisierung~~ | ~~Fehleranfälliger manueller Kick aus der UI~~ | ✅ |
 | ~~**P2 (Mittel)**~~ | ~~Compose~~ | ~~`remember`-basierte Foto-Dateierstellung~~ | ~~Veralteter Dateiname bei Wiederaufnahme~~ | ✅ |
+| ~~**P2 (Mittel)**~~ | ~~Datenhaltung~~ | ~~Verwaiste Foto-Dateien (Dangling Files)~~ | ~~Speicherleck nach Abstürzen oder Migrationsfehlern~~ | ✅ |
 | **P2 (Mittel)** | Lifecycle / System | Manueller Locale ContextWrapper | Umgeht Android 13+ Per-App-Language-APIs | offen |
 | ~~**P2 (Mittel)**~~ | ~~Testing & DI~~ | ~~Harte `Dispatchers.IO`-Referenzen & fehlende Dispatcher-Injection~~ | ~~Erschwerte deterministische Unit- & Coroutine-Tests~~ | ✅ |
 | **P3 (Niedrig)** | Code-Qualität | Denglish-Bezeichner & String-basierte Magic Keys | Wartungsaufwand, Fehleranfälligkeit bei Refactorings | offen |
@@ -91,13 +92,11 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ---
 
-#### Finding 3.4.1: Getrennte Verwaltung von SQLite-Daten und Foto-Dateien (Dangling Files)
+#### ✅ Finding 3.4.1: ~~Getrennte Verwaltung von SQLite-Daten und Foto-Dateien (Dangling Files)~~
 - **Betroffene Dateien:** `HistoryRepository.kt`, `AppDatabase.kt`
 - **Problem:**
-  Metadaten liegen in Room, Foto-Dateien im Dateisystem (`filesDir/history`). Beim Löschen, Bereinigen (`purgeOlderThanWeeks`) oder Importieren von Backups muss das Löschen von Dateien manuell synchron gehalten werden.
-- **Empfohlene Best Practice:**
-  Transaktionssichere Bereinigung:
-  1. Room-Entity um Statusflags erweitern oder Bereinigungs-Job als periodischen `WorkManager`-Worker implementieren, der verwaiste Dateien (Dateien im Ordner ohne entsprechenden DB-Eintrag) automatisch löscht.
+  Foto-Dateien im Dateisystem konnten nach Abstürzen oder fehlgeschlagenen Migrationen ohne zugehörigen DB-Eintrag zurückbleiben.
+- **Umgesetzt:** `purgeOrphanedPhotos()` in `HistoryRepository`-Interface und `DefaultHistoryRepository` implementiert: vergleicht alle JPEG/PNG/WebP-Dateien im `history`-Verzeichnis mit den bekannten `photoFile`-Einträgen in Room und löscht Dateien ohne Eintrag. Wird beim App-Start im Hintergrund zusammen mit `purgeOlderThanWeeks()` aufgerufen (`AppStateViewModel`). `FakeHistoryRepository` in den Tests implementiert die Methode als No-Op.
 
 ---
 

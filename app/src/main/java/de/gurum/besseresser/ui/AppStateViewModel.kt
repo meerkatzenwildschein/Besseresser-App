@@ -57,6 +57,7 @@ class AppStateViewModel(
             runCatching {
                 val weeks = settingsRepository.currentSettings().retentionWeeks
                 if (weeks > 0) historyRepository.purgeOlderThanWeeks(weeks)
+                historyRepository.purgeOrphanedPhotos()
             }
         }
     }

@@ -285,6 +285,8 @@ class FakeHistoryRepository : HistoryRepository {
         DayFazitSession.attemptedWeekly.removeIf { it < cutoffWeekKey }
         return stale.size
     }
+
+    override suspend fun purgeOrphanedPhotos(): Int = 0
 }
 
 class FakeApiService(
