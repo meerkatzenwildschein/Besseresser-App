@@ -55,7 +55,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
 import java.io.File
 import java.time.LocalDate
 import java.time.LocalTime
