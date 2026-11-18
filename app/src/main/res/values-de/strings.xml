@@ -78,7 +78,6 @@
     <string name="profile_notes_label">Anmerkungen / Vorerkrankungen</string>
     <string name="profile_notes_hint">z. B. Diabetes, Medikamente, Ernährungswünsche …</string>
     <string name="profile_save">Speichern</string>
-    <string name="profile_invalid_number">Bitte nur gültige Zahlen eingeben – oder das Feld leer lassen.</string>
     <string name="profile_birth_label">Geburtsdatum</string>
     <string name="profile_ok">OK</string>
     <string name="profile_date_clear">Datum löschen</string>
@@ -118,8 +117,6 @@
     <string name="provider_note_text_only">reine Textmodelle – kein Bild-Input!</string>
     <string name="provider_note_compat">Claude über OpenAI-Schicht</string>
     <string name="model_picker_title">Modelle wählen</string>
-    <string name="models_vision_title">Bildfähige Modelle (%1$d)</string>
-    <string name="models_all_title">Modelle (%1$d)</string>
     <string name="models_loading">Lade Modelle von %1$s/models …</string>
     <string name="models_vision_summary">Bildfähige Modelle: %1$d (von %2$d insgesamt) – antippen zum Übernehmen</string>
     <string name="models_all_summary">Alle %1$d Modelle (Bildverarbeitung war nicht sicher erkennbar) – antippen zum Übernehmen</string>
@@ -147,7 +144,6 @@
     <string name="nacherfassen_label">nachträglich erfasst</string>
     <string name="nacherfassen_send">An die KI senden</string>
     <string name="nacherfassen_empty_hint">Ohne Foto ist die Beschreibung Pflicht.</string>
-    <string name="nacherfassen_block_hint">Eine Erfassung läuft – bitte zuerst abschließen (fertigstellen oder abbrechen).</string>
     <string name="reeval_progress">KI bewertet die Korrektur neu …</string>
 
     <!-- Default goals -->
@@ -162,11 +158,9 @@
     <string name="history_title">Verlauf</string>
     <string name="history_empty">Noch keine Bewertungen.\nFotografiere dein erstes Essen!</string>
     <string name="history_list_hint">%1$d Bewertungen – nach links wischen zum Löschen · gedrückt halten zum Verschieben</string>
-    <string name="history_delete_action">🗑 Löschen</string>
     <string name="history_no_goals">Keine Ziele erfasst</string>
     <string name="history_swipe_blocked_overlay">Eine Erfassung läuft - bitte zuerst abschließen oder abbrechen.</string>
     <string name="score_caption">Ampelschnitt</string>
-    <string name="weekfazit_row_label">Wochenfazit</string>
     <string name="weekfazit_row_label_kw">Wochenfazit · KW %1$d</string>
     <string name="weekfazit_chip_idle">✨ Wochenfazit ermitteln</string>
     <string name="weekfazit_chip_loading">Wochenfazit …</string>
@@ -220,7 +214,6 @@
     <string name="config_export_button">Daten exportieren (nach Downloads)</string>
     <string name="config_import_button">Daten importieren (aus Datei)</string>
     <string name="config_export_success">Backup gespeichert unter Downloads/%1$s (%2$d Mahlzeiten, %3$d Fotos).</string>
-    <string name="config_export_failed">Export fehlgeschlagen.</string>
     <string name="config_import_success">Backup erfolgreich importiert (%1$d Mahlzeiten, %2$d Fotos, Einstellungen &amp; Profil wiederhergestellt).</string>
     <string name="config_import_failed">Import fehlgeschlagen.</string>
     <string name="config_section_history_clear">Verlaufsdaten zurücksetzen</string>
@@ -229,5 +222,4 @@
     <string name="config_clear_confirm_title">Alle Verlaufsdaten löschen?</string>
     <string name="config_clear_confirm_text">Sämtliche Mahlzeiten, Fotos sowie Tages- und Wochenfazits werden unwiderruflich gelöscht. Deine Einstellungen, Ziele und dein Profil bleiben erhalten.</string>
     <string name="config_clear_success">Alle Verlaufsdaten wurden gelöscht.</string>
-    <string name="config_clear_failed">Löschen fehlgeschlagen.</string>
 </resources>

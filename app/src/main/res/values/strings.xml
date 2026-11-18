@@ -78,7 +78,6 @@
     <string name="profile_notes_label">Notes / pre-existing conditions</string>
     <string name="profile_notes_hint">e.g. diabetes, medication, dietary preferences …</string>
     <string name="profile_save">Save</string>
-    <string name="profile_invalid_number">Please enter valid numbers only – or leave the field empty.</string>
     <string name="profile_birth_label">Date of birth</string>
     <string name="profile_ok">OK</string>
     <string name="profile_date_clear">Clear date</string>
@@ -118,8 +117,6 @@
     <string name="provider_note_text_only">text-only models – no image input!</string>
     <string name="provider_note_compat">Claude via OpenAI layer</string>
     <string name="model_picker_title">Pick a model</string>
-    <string name="models_vision_title">Vision-capable models (%1$d)</string>
-    <string name="models_all_title">Models (%1$d)</string>
     <string name="models_loading">Loading models from %1$s/models …</string>
     <string name="models_vision_summary">Vision-capable models: %1$d (of %2$d total) – tap to apply</string>
     <string name="models_all_summary">All %1$d models (image capability unclear) – tap to apply</string>
@@ -147,7 +144,6 @@
     <string name="nacherfassen_label">added retroactively</string>
     <string name="nacherfassen_send">Send to AI</string>
     <string name="nacherfassen_empty_hint">The description is required without a photo.</string>
-    <string name="nacherfassen_block_hint">A capture is in progress – dispose it first (finish or cancel).</string>
     <string name="reeval_progress">AI is re-evaluating the correction …</string>
 
     <!-- Default goals -->
@@ -162,11 +158,9 @@
     <string name="history_title">History</string>
     <string name="history_empty">No ratings yet.\nPhotograph your first meal!</string>
     <string name="history_list_hint">%1$d ratings – swipe left to delete · long-press to reorder</string>
-    <string name="history_delete_action">🗑 Delete</string>
     <string name="history_no_goals">No goals captured</string>
     <string name="history_swipe_blocked_overlay">A capture is in progress - please finish or cancel it first.</string>
     <string name="score_caption">Traffic-light average</string>
-    <string name="weekfazit_row_label">Week summary</string>
     <string name="weekfazit_row_label_kw">Week summary · CW %1$d</string>
     <string name="weekfazit_chip_idle">✨ Create week summary</string>
     <string name="weekfazit_chip_loading">Week summary …</string>
@@ -220,7 +214,6 @@
     <string name="config_export_button">Export data (to Downloads)</string>
     <string name="config_import_button">Import data (from file)</string>
     <string name="config_export_success">Backup saved to Downloads/%1$s (%2$d meals, %3$d photos).</string>
-    <string name="config_export_failed">Export failed.</string>
     <string name="config_import_success">Backup imported successfully (%1$d meals, %2$d photos, settings &amp; profile restored).</string>
     <string name="config_import_failed">Import failed.</string>
     <string name="config_section_history_clear">Reset History Data</string>
@@ -229,5 +222,4 @@
     <string name="config_clear_confirm_title">Delete all history data?</string>
     <string name="config_clear_confirm_text">All meals, photos, and daily and weekly summaries will be permanently deleted. Your settings, goals, and profile will be kept.</string>
     <string name="config_clear_success">All history data has been deleted.</string>
-    <string name="config_clear_failed">Deletion failed.</string>
 </resources>

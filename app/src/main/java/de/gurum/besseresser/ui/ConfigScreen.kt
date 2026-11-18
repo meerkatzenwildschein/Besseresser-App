@@ -3,6 +3,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
+import androidx.core.net.toUri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -64,7 +65,7 @@ class OpenBackupDocumentContract : ActivityResultContracts.OpenDocument() {
     override fun createIntent(context: Context, input: Array<String>): Intent {
         val intent = super.createIntent(context, input)
         runCatching {
-            val downloadsUri = Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload")
+            val downloadsUri = "content://com.android.externalstorage.documents/document/primary%3ADownload".toUri()
             intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, downloadsUri)
         }
         return intent
