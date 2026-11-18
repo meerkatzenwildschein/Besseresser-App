@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- Standardmäßig keine automatische Cloud-Sicherung, da die App lokale Export/Import-Backups nutzt -->
+    </cloud-backup>
+    <device-transfer>
+        <!-- Standardmäßig kein automatischer Datentransfer bei Gerätewechsel -->
+    </device-transfer>
+</data-extraction-rules>
