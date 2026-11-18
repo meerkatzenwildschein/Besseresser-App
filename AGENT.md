@@ -308,6 +308,48 @@ Besseresser-App/
 
 ---
 
+## Fachliches Glossar (Deutsch ↔ Englisch)
+
+Die App verwendet durchgängig **englische Bezeichner im Code** und **deutsche bzw. englische Strings in der UI** (je nach Spracheinstellung). Dieses Glossar ordnet die zentralen fachlichen Begriffe einander zu.
+
+| Deutsch (UI / Domäne) | Englisch (Code / API) | Kontext |
+|---|---|---|
+| **Ampel** | `TrafficLight` | Bewertungs-Enum `GREEN / YELLOW / RED / UNKNOWN`; UI-Farben via `TrafficLight.color()`, Labels via `TrafficLight.label()` |
+| **Grün / Gelb / Rot / Unbekannt** | `GREEN / YELLOW / RED / UNKNOWN` | Werte des `TrafficLight`-Enums |
+| **Bewertung** (einer Mahlzeit) | `Evaluation` | Gesamtergebnis einer KI-Analyse: Liste von `GoalResult`, `summary`, `recognizedMeal` |
+| **Ziel** | `goal` (String in `GoalResult`) | Ein einzelnes Ernährungsziel des Nutzers, z. B. „Wenig Zucker" |
+| **Zielbewertung** | `GoalResult` | Bewertung eines einzelnen Ziels: `goal`, `rating` (TrafficLight), `reason` |
+| **Begründung** | `reason` | Kurze KI-Erklärung zur Zielbewertung (`GoalResult.reason`; `@SerialName("begruendung")`) |
+| **Erkannt / Erkannte Mahlzeit** | `recognizedMeal` | Was die KI auf dem Foto erkannt hat, inkl. Mengenangabe (`@SerialName("erkannt")`) |
+| **Gesamteindruck** | `summary` | Zusammenfassender Satz der KI über die gesamte Mahlzeit |
+| **Verlauf / Historie** | `History` | Liste aller gespeicherten Mahlzeiten (`HistoryEntry`); Screen: `HistoryScreen` |
+| **Verlaufseintrag** | `HistoryEntry` | Eine einzelne gespeicherte Mahlzeit mit Foto, Bewertung, Notiz und Datum |
+| **Tagesfazit** | `DayFazit` / `DailySummary` | KI-Zusammenfassung aller Mahlzeiten eines Tages; enthält `rating`, `text`, `fingerprint` |
+| **Wochenfazit** | `WeekFazit` (als `DayFazit` mit `weekKey`) | KI-Zusammenfassung einer ganzen Kalenderwoche |
+| **Fingerabdruck / Veraltetscheck** | `fingerprint` / `dayFingerprint()` | Hash aus ID + `recognizedMeal` aller Einträge eines Tages; signalisiert Veralterung eines Fazits |
+| **Nacherfassung** | `backdated` / retro capture | Nachträgliches Hinzufügen einer Mahlzeit ohne echte Aufnahme-Uhrzeit |
+| **Notiz** | `note` | Nutzer-Anmerkung zu einer Mahlzeit (Freitext, z. B. „nach dem Sport") |
+| **Zuletzt verwendete Notizen** | `RecentNotes` | MRU-Speicher für bis zu 5 Notizen + Favoriten (`RecentNote`), inkl. gecachtem KI-Ergebnis |
+| **Favorit (Notiz)** | `starred` | Dauerhaft gespeicherte Notiz mit Sternchen (`RecentNote.starred`) |
+| **Score** | `score` | Zahlenwert 0–100, berechnet aus den Ampelfarben aller Ziele einer Mahlzeit |
+| **Profil** | `Profile` | Optionale Nutzerdaten: Alter, Gewicht, Größe, Geschlecht, Freitext-Anmerkungen |
+| **Einstellungen / Setup** | `Settings` | API-URL, API-Key, Modell, Ziele, `retentionWeeks` |
+| **Ziele** | `goals` | Liste der Ernährungsziele des Nutzers (in `Settings.goals`) |
+| **Historien-Begrenzung** | `retentionWeeks` | Maximales Alter von Einträgen in Wochen; `0` = unbegrenzt |
+| **Datensicherung** | Backup | JSON-Export/Import aller App-Daten inkl. Fotos (Base64) |
+| **API-Schlüssel** | `apiKey` | AES-256-GCM-verschlüsselt im Android-Keystore (`KeyVault`) |
+| **Modell** | `model` | Name des KI-Modells (Vision-fähig), z. B. `gpt-4o-mini` |
+| **Anbieter** | Provider | Auswahl bekannter API-Anbieter im Setup (`PROVIDERS`-Liste) |
+| **Mahlzeiten-Beschreibungen** | `mealDescriptions` | Texte der erkannten Mahlzeiten, die in Fazit-Prompts einfließen (ehem. `mealLines`) |
+| **Ampelfarbe / -label** | `ampelColor()` / `ampelLabel()` | UI-Hilfsfunktionen in `AmpelUi.kt` |
+| **Bewertungs-Dialog** | `RecognizedMealEditDialog` | Dialog zum nachträglichen Korrigieren der erkannten Mahlzeit (ehem. `ErkanntEditDialog`) |
+| **Zusammenfassungsblock** | `CollapsibleSummaryBlock` | Aufklappbarer Block mit Gesamteindruck, erkannter Mahlzeit und Nutzernotiz |
+| **Konfiguration** | `Config` | Screen für Datensicherung, Verlauf löschen, Theme & Sprache (`ConfigScreen`) |
+| **Sprache** | `AppLanguage` | Enum `DE / EN`; Sprachauswahl wird ab API 33 via `LocaleManager` an das OS weitergegeben |
+| **Theme / Farbschema** | `AppThemeMode` | Enum `LIGHT / DARK / SYSTEM` |
+
+---
+
 ## Besonderheiten & Guidelines für Agenten
 
 1. **Kein `org.json` mehr verwenden:** Alle neuen Datenstrukturen und Konvertierungen müssen über `@Serializable` und `AppJson` abgewickelt werden.
