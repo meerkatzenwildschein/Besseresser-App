@@ -5,14 +5,6 @@ hin zu einer sauberen MVVM-Schichtenarchitektur. Status: **abgeschlossen**.
 
 ---
 
-## Phase 4 – Package-Struktur ✅
-
-**Ziel:** Klare Schichtentrennung (model / data / ui), Domänenmodelle compose-frei.
-
-- `model/`: reine Domänenmodelle & Logik (`Data.kt`, `Store.kt`, `HistoryStore.kt`) – kein Android-/Compose-Import.
-- `data/`: `AppDatabase`, `Repositories`, `PhotoStorage`, `BackupStore`, `KeyVault`, `ApiClient`, `OpenAiChatClient`, `ImagePreprocessor`, `PromptBuilder`.
-- `ui/`: alle Screens + ViewModels; `TrafficLight.color()/label()` als Compose-Extensions in `ui/AmpelUi.kt`; `withAppLanguage` in `MainActivity`.
-- Manifest zeigt auf `.ui.MainActivity`.
 
 ## Phase 5 – Navigation Compose + ViewModels ✅
 
