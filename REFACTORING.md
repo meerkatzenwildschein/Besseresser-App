@@ -37,7 +37,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 | ~~**P2 (Mittel)**~~ | ~~Architektur~~ | ~~Imperative `startObserving()`-Initialisierung~~ | ~~Fehleranfälliger manueller Kick aus der UI~~ | ✅ |
 | ~~**P2 (Mittel)**~~ | ~~Compose~~ | ~~`remember`-basierte Foto-Dateierstellung~~ | ~~Veralteter Dateiname bei Wiederaufnahme~~ | ✅ |
 | **P2 (Mittel)** | Lifecycle / System | Manueller Locale ContextWrapper | Umgeht Android 13+ Per-App-Language-APIs | offen |
-| **P2 (Mittel)** | Testing & DI | Harte `Dispatchers.IO`-Referenzen & fehlende Dispatcher-Injection | Erschwerte deterministische Unit- & Coroutine-Tests | offen |
+| ~~**P2 (Mittel)**~~ | ~~Testing & DI~~ | ~~Harte `Dispatchers.IO`-Referenzen & fehlende Dispatcher-Injection~~ | ~~Erschwerte deterministische Unit- & Coroutine-Tests~~ | ✅ |
 | **P3 (Niedrig)** | Code-Qualität | Denglish-Bezeichner & String-basierte Magic Keys | Wartungsaufwand, Fehleranfälligkeit bei Refactorings | offen |
 
 ---
@@ -74,19 +74,11 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ### 3.3 Threading, Concurrency & Coroutines
 
-#### Finding 3.3.1: Harte `Dispatchers.IO`-Referenzen in Klassen
+#### ✅ Finding 3.3.1: ~~Harte `Dispatchers.IO`-Referenzen in Klassen~~
 - **Betroffene Dateien:** `HistoryRepository.kt`, `ImagePreprocessor.kt`, `BackupService.kt`, `ConfigViewModel.kt`
 - **Problem:**
-  Direkte Aufrufe von `withContext(Dispatchers.IO)` erschweren das Testen mit `StandardTestDispatcher` oder `UnconfinedTestDispatcher`.
-- **Empfohlene Best Practice:**
-  Definition eines injizierbaren `CoroutineDispatchers`-Providers oder Koin-Bindings:
-  ```kotlin
-  class CoroutineDispatchers(
-      val main: CoroutineDispatcher = Dispatchers.Main,
-      val io: CoroutineDispatcher = Dispatchers.IO,
-      val default: CoroutineDispatcher = Dispatchers.Default
-  )
-  ```
+  Direkte Aufrufe von `withContext(Dispatchers.IO)` erschwerten das Testen mit `StandardTestDispatcher` oder `UnconfinedTestDispatcher`.
+- **Umgesetzt:** `AppDispatchers`-Klasse in `data/` mit injizierbaren `main`, `io` und `default` Dispatchers. Koin-Binding als `single { AppDispatchers() }`. Alle betroffenen Klassen (`DefaultHistoryRepository`, `PhotoStorage`, `ApiClient`, `AppStateViewModel`, `ConfigViewModel`, `HistoryViewModel`, `HistoryDetailViewModel`, `MainViewModel`) erhalten `dispatchers: AppDispatchers = AppDispatchers()` als Constructor-Parameter und nutzen `dispatchers.io` statt `Dispatchers.IO`. Tests können `AppDispatchers(io = UnconfinedTestDispatcher())` übergeben.
 
 ---
 
@@ -153,7 +145,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 ## 4. Empfohlene Roadmap & Nächste Schritte
 
 ### Phase 1: Architektur-Refactoring & Entkopplung (Mittelfristig)
-1. **Dispatcher Injection:** `CoroutineDispatchers` für saubere Testbarkeit injizierbar machen.
+~~1. **Dispatcher Injection:** `CoroutineDispatchers` für saubere Testbarkeit injizierbar machen.~~ ✅
 
 ### Phase 2: Qualitäts- & Test-Offensive (Langfristig)
 1. **Compose-Tests & Screenshot-Testing:** Integration von `androidx.compose.ui.test` und Roborazzi für Snapshot-Tests.

@@ -1,7 +1,6 @@
 package de.gurum.besseresser.data
 import android.content.Context
 import android.net.Uri
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -119,7 +118,9 @@ interface BesseresserApiService {
 }
 
 /** Kommunikation mit der OpenAI-kompatiblen API: Foto-Bewertung, Modell-Liste, Ziele-Aufteilung. */
-class ApiClient : BesseresserApiService {
+class ApiClient(
+    private val dispatchers: AppDispatchers = AppDispatchers()
+) : BesseresserApiService {
     companion object {
         private const val CHAT_COMPLETIONS_PATH = "/chat/completions"
 
@@ -322,7 +323,7 @@ class ApiClient : BesseresserApiService {
         imageDataUri: String,
         settings: Settings,
         promptBundle: PromptBundle
-    ): Result<Evaluation> = withContext(Dispatchers.IO) {
+    ): Result<Evaluation> = withContext(dispatchers.io) {
         val prompt = PromptBuilder.createAnalyzePrompt(settings.goals, promptBundle)
         val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
 
@@ -407,7 +408,7 @@ class ApiClient : BesseresserApiService {
         promptContext: String?,
         mealLines: List<String>,
         prompts: FazitPromptBundle
-    ): Result<DayFazitResult> = withContext(Dispatchers.IO) {
+    ): Result<DayFazitResult> = withContext(dispatchers.io) {
         val prompt = PromptBuilder.createDayFazitPrompt(goals, promptContext, mealLines, prompts)
         val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
         val messages = buildJsonArray {
@@ -469,7 +470,7 @@ class ApiClient : BesseresserApiService {
     override suspend fun analyzeText(
         prompt: String,
         settings: Settings
-    ): Result<Evaluation> = withContext(Dispatchers.IO) {
+    ): Result<Evaluation> = withContext(dispatchers.io) {
         val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
         val messages = buildJsonArray {
             add(buildJsonObject {
@@ -509,7 +510,7 @@ class ApiClient : BesseresserApiService {
 
     override suspend fun splitGoals(
         request: SplitGoalsRequest
-    ): Result<List<String>> = withContext(Dispatchers.IO) {
+    ): Result<List<String>> = withContext(dispatchers.io) {
         val requestUrl = request.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
         val prompt = PromptBuilder.createSplitGoalsPrompt(request)
         val messages = buildJsonArray {
@@ -571,7 +572,7 @@ class ApiClient : BesseresserApiService {
     override suspend fun fetchModels(
         baseUrl: String,
         apiKey: String
-    ): Result<ModelsResult> = withContext(Dispatchers.IO) {
+    ): Result<ModelsResult> = withContext(dispatchers.io) {
         val requestUrl = baseUrl.trim().trimEnd('/') + "/models"
         var httpCode = -1
         var body = ""

@@ -3,7 +3,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import de.gurum.besseresser.model.HistoryEntry
@@ -12,7 +11,10 @@ import de.gurum.besseresser.model.HistoryEntry
  * Datei-basierte Foto-Ablage für Verlaufseinträge (ein JPEG pro Eintrag in filesDir/history).
  * Zuständig für Speichern (downgesampelt), Lesen (Thumbnails), Kopieren und Löschen.
  */
-class PhotoStorage(private val context: Context) {
+class PhotoStorage(
+    private val context: Context,
+    private val dispatchers: AppDispatchers = AppDispatchers()
+) {
 
     /** Verzeichnis aller Verlaufs-Fotos (und historischer JSON-Dateien, siehe Migration). */
     fun dir(): File = File(context.filesDir, HISTORY_DIR).apply { mkdirs() }
@@ -28,7 +30,7 @@ class PhotoStorage(private val context: Context) {
 
     /** Foto von [uri] downgesampelt (<1024px) als JPEG speichern; Qualität sinkt schrittweise,
      *  bis die Datei < 100 KB ist. Liefert den Dateinamen bei Erfolg, sonst null. */
-    suspend fun saveScaledJpeg(uri: Uri, outFileName: String): String? = withContext(Dispatchers.IO) {
+    suspend fun saveScaledJpeg(uri: Uri, outFileName: String): String? = withContext(dispatchers.io) {
         runCatching {
             val out = File(dir(), outFileName)
             writeScaledJpeg(uri, out)
@@ -37,7 +39,7 @@ class PhotoStorage(private val context: Context) {
     }
 
     /** Kopiert ein gespeichertes Foto unter einem neuen Dateinamen (z. B. beim Duplizieren). */
-    suspend fun copyPhoto(source: File, targetFileName: String): String? = withContext(Dispatchers.IO) {
+    suspend fun copyPhoto(source: File, targetFileName: String): String? = withContext(dispatchers.io) {
         runCatching {
             val targetFile = File(dir(), targetFileName)
             source.copyTo(targetFile, overwrite = true)
@@ -46,14 +48,14 @@ class PhotoStorage(private val context: Context) {
     }
 
     /** Löscht eine einzelne Foto-Datei (ignoriert leere Namen und Fehler). */
-    suspend fun deletePhoto(photoFileName: String) = withContext(Dispatchers.IO) {
+    suspend fun deletePhoto(photoFileName: String) = withContext(dispatchers.io) {
         if (photoFileName.isNotBlank()) {
             runCatching { File(dir(), photoFileName).delete() }
         }
     }
 
     /** Löscht alle Dateien im Verlaufs-Verzeichnis (Fotos wie ggf. verbliebene JSON-Altdateien). */
-    suspend fun deleteAll() = withContext(Dispatchers.IO) {
+    suspend fun deleteAll() = withContext(dispatchers.io) {
         dir().listFiles()?.forEach { runCatching { it.delete() } }
     }
 

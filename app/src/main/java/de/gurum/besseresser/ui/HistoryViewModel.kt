@@ -2,7 +2,6 @@ package de.gurum.besseresser.ui
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +13,7 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.model.calendarWeekOfKey
@@ -59,7 +59,8 @@ class HistoryViewModel(
     private val apiService: BesseresserApiService,
     private val historyRepository: HistoryRepository,
     private val settingsRepository: SettingsRepository,
-    private val imagePreprocessor: ImagePreprocessor
+    private val imagePreprocessor: ImagePreprocessor,
+    private val dispatchers: AppDispatchers = AppDispatchers()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HistoryUiState())
@@ -234,7 +235,7 @@ class HistoryViewModel(
             val result: Result<Evaluation> = when {
                 photoUri != null && promptBundle != null -> {
                     val dataUri = runCatching {
-                        withContext(Dispatchers.IO) { imagePreprocessor.prepareImageDataUri(photoUri) }
+                        withContext(dispatchers.io) { imagePreprocessor.prepareImageDataUri(photoUri) }
                     }.getOrElse { e ->
                         _uiState.update { it.copy(showAddBusyCard = false, addError = e.message) }
                         return@launch
