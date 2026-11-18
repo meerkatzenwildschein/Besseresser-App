@@ -33,7 +33,7 @@ data class HistoryEntryEntity(
     val goalResults: List<GoalResult>,
     val summary: String,
     val note: String,
-    @ColumnInfo(name = "recognizedMeal")
+    @ColumnInfo(name = "erkannt")
     val recognizedMeal: String,
     val backdated: Boolean,
     val sortOrder: Long = dateMillis
@@ -176,7 +176,7 @@ interface HistoryDao {
     @Query("DELETE FROM history_entries")
     suspend fun deleteAll()
 
-    @Query("UPDATE history_entries SET recognizedMeal = :recognizedMeal WHERE id = :id")
+    @Query("UPDATE history_entries SET erkannt = :recognizedMeal WHERE id = :id")
     suspend fun updateRecognizedMeal(id: Long, recognizedMeal: String)
 
     @Query("UPDATE history_entries SET goalResults = :goalResults, summary = :summary WHERE id = :id")

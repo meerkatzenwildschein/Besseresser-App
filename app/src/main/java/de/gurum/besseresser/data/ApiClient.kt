@@ -133,7 +133,7 @@ class ApiClient(
 
         private val AMP_KEYS = listOf("ampel", "ampelfarbe", "farbe", "color", "status", "rating", "trafficlight")
         private val ZIEL_KEYS = listOf("ziel", "goal", "zielname", "name", "thema", "title")
-        private val BEG_KEYS = listOf("reason", "reason", "erklaerung", "beschreibung", "kommentar", "text", "note")
+        private val BEG_KEYS = listOf("begruendung", "reason", "erklaerung", "beschreibung", "kommentar", "text", "note")
         private val RESULT_ARRAY_KEYS = listOf("bewertung", "bewertungen", "results", "ampeln", "ratings", "ziele", "goals")
 
         private val RECOGNIZED_MEAL_INTRO_PATTERNS = listOf(
@@ -226,7 +226,7 @@ class ApiClient(
             }
             val summary = pickString(obj, listOf("zusatz", "summary"))
             val recognizedMeal = stripRecognizedMealIntro(
-                pickString(obj, listOf("recognizedMeal", "detected", "food", "meal"))
+                pickString(obj, listOf("erkannt", "recognizedMeal", "detected", "food", "meal"))
             )
             return Evaluation(list, summary, recognizedMeal)
         }
