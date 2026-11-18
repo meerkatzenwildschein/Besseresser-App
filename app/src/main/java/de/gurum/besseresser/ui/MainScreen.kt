@@ -11,19 +11,18 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.compose.koinInject
 import org.koin.androidx.compose.koinViewModel
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import de.gurum.besseresser.R
+import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.model.Settings
 
@@ -40,23 +39,27 @@ fun MainScreen(
 ) {
     val ctx = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val captureManager: PhotoCaptureManager = koinInject()
 
-    val photoFile = remember {
-        File(ctx.cacheDir, "photos").also { it.mkdirs() }
-            .let { d ->
-                File(d, "essen_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg")
-            }
-    }
-    val photoUri: Uri = remember {
-        FileProvider.getUriForFile(ctx, "de.gurum.besseresser.fileprovider", photoFile)
+    // Capture file is created fresh each time the camera is launched (not at composition time).
+    val captureState = remember { mutableStateOf<Pair<File, Uri>?>(null) }
+    fun ensureCaptureFile(): Pair<File, Uri> {
+        val existing = captureState.value
+        if (existing != null) return existing
+        val fresh = captureManager.createCaptureFile()
+        captureState.value = fresh
+        return fresh
     }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { ok ->
-        viewModel.onSystemCameraResult(ok, photoUri)
+        val (_, uri) = captureState.value ?: return@rememberLauncherForActivityResult
+        viewModel.onSystemCameraResult(ok, uri)
         if (ok) {
             viewModel.setShowReview(true)
+        } else {
+            captureState.value = null
         }
     }
 
@@ -84,25 +87,31 @@ fun MainScreen(
             )
     ) {
         if (uiState.showCamera) {
+            val (captureFile, captureUri) = ensureCaptureFile()
             CameraCaptureScreen(
-                outputFile = photoFile,
+                outputFile = captureFile,
                 note = uiState.note,
                 onNoteChange = { viewModel.setNote(it) },
-                onCancel = { viewModel.setShowCamera(false) },
+                onCancel = {
+                    viewModel.setShowCamera(false)
+                    captureState.value = null
+                },
                 onFallbackSystemCamera = {
                     viewModel.setShowCamera(false)
-                    cameraLauncher.launch(photoUri)
+                    cameraLauncher.launch(captureUri)
                 },
                 onConfirm = {
                     viewModel.setShowCamera(false)
                     val noteTrimmed = uiState.note.trim()
                     viewModel.pushRecentNote(noteTrimmed)
-                    triggerAnalyze(noteTrimmed, photoUri)
+                    triggerAnalyze(noteTrimmed, captureUri)
+                    captureState.value = null
                 }
             )
         } else if (uiState.showReview) {
+            val captureUri = captureState.value?.second
             MainReviewScreen(
-                photoUri = uiState.photoPreviewUri ?: photoUri,
+                photoUri = uiState.photoPreviewUri ?: captureUri,
                 note = uiState.note,
                 error = uiState.error,
                 busy = uiState.isBusy,
@@ -110,16 +119,20 @@ fun MainScreen(
                 onBack = {
                     viewModel.setShowReview(false)
                     viewModel.reset()
+                    captureState.value = null
                 },
                 onRate = {
                     val trimmed = uiState.note.trim()
                     viewModel.pushRecentNote(trimmed)
-                    triggerAnalyze(trimmed, photoUri)
+                    captureUri?.let { triggerAnalyze(trimmed, it) }
+                    captureState.value = null
                 },
                 onRetake = {
                     viewModel.setShowReview(false)
                     viewModel.reset()
-                    cameraLauncher.launch(photoUri)
+                    captureState.value = null
+                    val (_, freshUri) = ensureCaptureFile()
+                    cameraLauncher.launch(freshUri)
                 }
             )
         } else {

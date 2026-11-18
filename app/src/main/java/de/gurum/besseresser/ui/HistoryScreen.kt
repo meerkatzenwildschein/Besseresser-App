@@ -13,18 +13,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import org.koin.compose.koinInject
 import org.koin.androidx.compose.koinViewModel
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import de.gurum.besseresser.R
+import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.Profile
 import de.gurum.besseresser.model.Settings
@@ -47,25 +47,31 @@ fun HistoryScreen(
     BackHandler(onBack = handleBack)
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val captureManager: PhotoCaptureManager = koinInject()
 
-    DisposableEffect(Unit) {
-        onDispose {
-            viewModel.flushPendingDeletes()
-        }
+    // Capture file is created fresh on demand, not at composition time.
+    val addCaptureState = remember { mutableStateOf<Pair<File, Uri>?>(null) }
+    fun ensureAddCaptureFile(): Pair<File, Uri> {
+        val existing = addCaptureState.value
+        if (existing != null) return existing
+        val fresh = captureManager.createCaptureFile()
+        addCaptureState.value = fresh
+        return fresh
     }
 
-    val addPhotoFile = remember {
-        File(ctx.cacheDir, "photos").also { it.mkdirs() }
-            .let { d -> File(d, "essen_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg") }
-    }
-    val addPhotoUri: Uri = remember {
-        androidx.core.content.FileProvider.getUriForFile(ctx, "de.gurum.besseresser.fileprovider", addPhotoFile)
-    }
     val addSystemCameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { ok ->
         if (ok) {
             viewModel.setShowAddReview(true)
+        } else {
+            addCaptureState.value = null
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.flushPendingDeletes()
         }
     }
     BackHandler(enabled = uiState.showAddCamera) { viewModel.setShowAddCamera(false) }
@@ -172,20 +178,28 @@ fun HistoryScreen(
             showReview = uiState.showAddReview,
             showText = uiState.showAddText,
             showBusy = uiState.showAddBusyCard,
-            addPhotoFile = addPhotoFile,
-            addPhotoUri = addPhotoUri,
+            addPhotoFile = addCaptureState.value?.first,
+            addPhotoUri = addCaptureState.value?.second,
             addNote = uiState.addNote,
             addTargetDay = uiState.addTargetDay,
             settings = settings,
             onNoteChange = { viewModel.setAddNote(it) },
-            onDismissCamera = { viewModel.setShowAddCamera(false) },
-            onDismissReview = { viewModel.setShowAddReview(false) },
+            onDismissCamera = {
+                viewModel.setShowAddCamera(false)
+                addCaptureState.value = null
+            },
+            onDismissReview = {
+                viewModel.setShowAddReview(false)
+                addCaptureState.value = null
+            },
             onDismissText = { viewModel.setShowAddText(false) },
             onFallbackSystemCamera = {
                 viewModel.setShowAddCamera(false)
-                addSystemCameraLauncher.launch(addPhotoUri)
+                val (_, uri) = ensureAddCaptureFile()
+                addSystemCameraLauncher.launch(uri)
             },
             onSubmitBackdated = { uri, promptBundle, textPrompt ->
+                addCaptureState.value = null
                 viewModel.submitBackdated(
                     photoUri = uri,
                     settings = settings,
