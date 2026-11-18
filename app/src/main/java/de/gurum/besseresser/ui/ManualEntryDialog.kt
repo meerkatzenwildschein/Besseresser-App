@@ -337,8 +337,21 @@ private fun buildAnalyzePromptBundle(ctx: android.content.Context, trimmedNote: 
 )
 
 /** Vollständiger Prompt für die reine Text-Analyse (Nacherfassen ohne Foto). */
-private fun buildAnalyzeTextPrompt(ctx: android.content.Context, goals: List<String>, description: String): String =
-    PromptBuilder.createAnalyzeTextPrompt(ctx, goals = goals, userDescription = description)
+private fun buildAnalyzeTextPrompt(ctx: android.content.Context, goals: List<String>, description: String): String {
+    val textBundle = PromptBundle(
+        intro = ctx.getString(R.string.prompt_eval_intro_textonly),
+        formatIntro = ctx.getString(R.string.prompt_eval_format),
+        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+        responseLanguage = ctx.getString(R.string.prompt_eval_language),
+        honesty = ctx.getString(R.string.prompt_honesty)
+    )
+    return PromptBuilder.createAnalyzeTextPrompt(
+        goals = goals,
+        promptBundle = textBundle,
+        textOnlyContext = ctx.getString(R.string.prompt_textonly_context, description.trim())
+    )
+}
 
 /** Nachtrage-Zweig MIT Foto (Systemkamera-Fallback): Foto prüfen + Anmerkung → bewerten.
  *  Kein Abschluss-/Speichern-Screen: das Ergebnis geht direkt ins Tagesdatum.

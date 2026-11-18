@@ -98,7 +98,6 @@ fun ProfileScreen(
     onSave: (Profile) -> Unit,
     viewModel: ProfileViewModel = koinViewModel()
 ) {
-    val ctx = LocalContext.current
     BackHandler(onBack = onCancel)
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -149,8 +148,8 @@ fun ProfileScreen(
                 }
             }
 
-            uiState.error?.let { msg ->
-                ErrorBanner(msg)
+            uiState.error?.let { err ->
+                ErrorBanner(err.asString())
             }
 
             SectionCard(title = stringResource(R.string.profile_section_body)) {
@@ -269,18 +268,7 @@ fun ProfileScreen(
         ) {
             Button(
                 onClick = {
-                    val weight = uiState.weightText.trim().replace(',', '.')
-                        .takeIf { it.isNotBlank() }?.toDoubleOrNull()
-                    val height = uiState.heightText.trim().takeIf { it.isNotBlank() }?.toIntOrNull()
-
-                    val plausible =
-                        (weight == null || weight in 1.0..700.0) &&
-                        (height == null || height in 30..280)
-                    if (!plausible) {
-                        viewModel.save(ctx, onSaved = onSave)
-                    } else {
-                        onSave(Profile(uiState.birthDate, weight, height, uiState.notesText.trim(), uiState.gender))
-                    }
+                    viewModel.save(onSaved = onSave)
                 },
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier

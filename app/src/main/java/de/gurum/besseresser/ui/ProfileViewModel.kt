@@ -1,5 +1,5 @@
 package de.gurum.besseresser.ui
-import android.content.Context
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +18,7 @@ data class ProfileUiState(
     val heightText: String = "",
     val notesText: String = "",
     val gender: Gender = Gender.NONE,
-    val error: String? = null,
+    val error: UiText? = null,
     val showDatePicker: Boolean = false
 )
 
@@ -37,7 +37,8 @@ class ProfileViewModel(
                 weightText = profile.weightKg?.toString()?.removeSuffix(".0")?.replace('.', ',') ?: "",
                 heightText = profile.heightCm?.toString() ?: "",
                 notesText = profile.notes,
-                gender = profile.gender
+                gender = profile.gender,
+                error = null
             )
         }
     }
@@ -67,31 +68,18 @@ class ProfileViewModel(
     }
 
     fun save(
-        ctx: Context? = null,
-        weightErrMsg: String? = null,
-        heightErrMsg: String? = null,
         onSaved: (Profile) -> Unit = {}
     ): Boolean {
         val state = _uiState.value
         val w = if (state.weightText.isBlank()) null
         else state.weightText.replace(',', '.').toDoubleOrNull()
         if (state.weightText.isNotBlank() && (w == null || w <= 0 || w > 500)) {
-            val err = when {
-                weightErrMsg != null -> weightErrMsg
-                ctx != null -> ctx.getString(R.string.profile_err_weight)
-                else -> "Ungültiges Gewicht."
-            }
-            _uiState.update { it.copy(error = err) }
+            _uiState.update { it.copy(error = UiText.StringResource(R.string.profile_err_weight)) }
             return false
         }
         val h = if (state.heightText.isBlank()) null else state.heightText.toIntOrNull()
         if (state.heightText.isNotBlank() && (h == null || h <= 30 || h > 280)) {
-            val err = when {
-                heightErrMsg != null -> heightErrMsg
-                ctx != null -> ctx.getString(R.string.profile_err_height)
-                else -> "Ungültige Größe."
-            }
-            _uiState.update { it.copy(error = err) }
+            _uiState.update { it.copy(error = UiText.StringResource(R.string.profile_err_height)) }
             return false
         }
         _uiState.update { it.copy(error = null) }

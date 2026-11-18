@@ -76,32 +76,16 @@ fun HistoryScreen(
     BackHandler(enabled = uiState.showAddReview) { viewModel.setShowAddReview(false) }
     BackHandler(enabled = uiState.showAddText) { viewModel.setShowAddText(false) }
 
-    HistoryAutoFazitEffect(
-        entries = uiState.entries,
-        fazitMap = uiState.fazitMap,
-        loadingFazits = uiState.loadingFazits.toList(),
-        weekFazitMap = uiState.weekFazitMap,
-        loadingWeeks = uiState.loadingWeeks,
-        onGenerateFazit = { day, list ->
-            viewModel.generateFazit(
-                day = day,
-                entriesOfDay = list,
-                settings = settings,
-                promptContext = profileContextLine(ctx, profile),
-                mealLines = dayFazitMealLines(ctx, list),
-                prompts = createDayFazitPrompts(ctx)
-            )
-        },
-        onGenerateWeekFazit = { wk ->
-            viewModel.generateWeekFazit(
-                settings = settings,
-                promptContext = profileContextLine(ctx, profile),
-                weekKey = wk,
-                mealLines = weekFazitMealLines(ctx, uiState.entries.filter { weekKeyOf(it.dateMillis) == wk }),
-                prompts = createWeekFazitPrompts(ctx, calendarWeekOfKey(wk))
-            )
-        }
-    )
+    LaunchedEffect(uiState.entries, uiState.fazitMap, uiState.weekFazitMap, settings, profile) {
+        viewModel.checkAndTriggerAutoFazits(
+            settings = settings,
+            promptContext = profileContextLine(ctx, profile),
+            dayPrompts = createDayFazitPrompts(ctx),
+            weekPromptsProvider = { calWeek -> createWeekFazitPrompts(ctx, calWeek) },
+            dayMealLinesProvider = { list -> dayFazitMealLines(ctx, list) },
+            weekMealLinesProvider = { list -> weekFazitMealLines(ctx, list) }
+        )
+    }
 
     val anyOverlayOpen = uiState.showAddCamera || uiState.showAddReview || uiState.showAddText || uiState.addDialogForDay != null || uiState.showAddBusyCard
 

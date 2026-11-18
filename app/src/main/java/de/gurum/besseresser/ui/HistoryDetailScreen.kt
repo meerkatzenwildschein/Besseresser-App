@@ -356,20 +356,33 @@ fun HistoryDetailScreen(
                 viewModel.updateErkannt(trimmed)
                 showErkanntEdit = false
                 if (trimmed.isNotBlank() && !detailState.reEvalBusy) {
+                    val photoBundle = PromptBundle(
+                        intro = ctx.getString(R.string.prompt_eval_intro),
+                        formatIntro = ctx.getString(R.string.prompt_eval_format),
+                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                        recognized = ctx.getString(R.string.prompt_eval_recognized),
+                        honesty = ctx.getString(R.string.prompt_honesty),
+                        noteHeader = ctx.getString(R.string.prompt_reeval_header, trimmed)
+                    )
+                    val textBundle = PromptBundle(
+                        intro = ctx.getString(R.string.prompt_eval_intro_textonly),
+                        formatIntro = ctx.getString(R.string.prompt_eval_format),
+                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
+                        honesty = ctx.getString(R.string.prompt_honesty)
+                    )
                     viewModel.reEvaluate(
                         correctedText = trimmed,
                         settings = settings,
-                        photoPromptBundle = PromptBundle(
-                            intro = ctx.getString(R.string.prompt_eval_intro),
-                            formatIntro = ctx.getString(R.string.prompt_eval_format),
-                            ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                            exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                            responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                            recognized = ctx.getString(R.string.prompt_eval_recognized),
-                            honesty = ctx.getString(R.string.prompt_honesty),
-                            noteHeader = ctx.getString(R.string.prompt_reeval_header, trimmed)
-                        ),
-                        textPrompt = PromptBuilder.createAnalyzeTextPrompt(ctx, settings.goals, trimmed)
+                        photoPromptBundle = photoBundle,
+                        textPrompt = PromptBuilder.createAnalyzeTextPrompt(
+                            goals = settings.goals,
+                            promptBundle = textBundle,
+                            textOnlyContext = ctx.getString(R.string.prompt_textonly_context, trimmed)
+                        )
                     )
                 }
             },
