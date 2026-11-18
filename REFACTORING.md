@@ -19,7 +19,6 @@ hin zu einer sauberen MVVM-Schichtenarchitektur. Status: **abgeschlossen**.
 ## Offene Punkte & Lint-Findings
 
 ### 2. Mittlerer Nutzen (Benutzererfahrung & Plattform-Konformität)
-- **Backup-Regeln modernisieren (`DataExtractionRules`)**: `android:dataExtractionRules` via `@xml/data_extraction_rules` im `AndroidManifest.xml` für Android 12+ hinterlegen.
 - **Themed App Icon unterstützen (`MonochromeLauncherIcon`)**: `<monochrome android:drawable="..." />` in `ic_launcher.xml` für adaptive Icons auf Android 13+ ergänzen.
 - **App-Bundle Sprachpaket-Splitting (`AppBundleLocaleChanges`)**: In `app/build.gradle.kts` `bundle { language { enableSplit = false } }` konfigurieren, damit beim dynamischen In-App-Sprachwechsel keine Strings im App Bundle fehlen.
 
