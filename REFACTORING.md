@@ -5,15 +5,6 @@ hin zu einer sauberen MVVM-Schichtenarchitektur. Status: **abgeschlossen**.
 
 ---
 
-## Phase 3 – DataStore + AppStateViewModel ✅
-
-**Ziel:** SharedPreferences ablösen, Settings/Profil/Theme/Sprache reaktiv machen.
-
-- Migration von SharedPreferences auf Preferences DataStore (mit `SharedPreferencesMigration`).
-- Repositories exponieren `Flow<Settings>`/`Flow<Profile>`/`Flow<AppThemeMode>`/`Flow<AppLanguage>` + suspend-APIs.
-- Neuer `AppStateViewModel` streamt den App-Zustand in die MainActivity; manuelles State-Syncing nach Setup/Backup-Import entfällt.
-- `UiPrefsStore` entfernt; tote `MainUiState.recentNotes`-Plumbing entfernt.
-
 ## Phase 4 – Package-Struktur ✅
 
 **Ziel:** Klare Schichtentrennung (model / data / ui), Domänenmodelle compose-frei.

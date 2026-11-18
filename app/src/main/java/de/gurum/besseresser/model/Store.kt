@@ -53,7 +53,7 @@ data class RecentNote(
 )
 
 /** Reine Listen-Logik der Notiz-Schnellauswahl (komplett kontextfrei, direkt testbar).
- *  Persistenz (SharedPreferences) übernimmt das SettingsRepository. */
+ *  Persistenz (DataStore) übernimmt das SettingsRepository. */
 object RecentNotesLogic {
     internal const val MAX_UNSTARRED = 5
     internal const val MAX_TOTAL = 40
