@@ -48,10 +48,6 @@ fun HistoryScreen(
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) {
-        viewModel.startObserving()
-    }
-
     DisposableEffect(Unit) {
         onDispose {
             viewModel.flushPendingDeletes()
