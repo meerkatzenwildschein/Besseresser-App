@@ -37,7 +37,9 @@ import de.gurum.besseresser.model.RecentNote
 import de.gurum.besseresser.model.TrafficLight
 import de.gurum.besseresser.model.Profile
 import de.gurum.besseresser.model.Settings
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class RoomDatabaseAndViewModelTest {
 
     private val converters = RoomConverters()
@@ -324,6 +326,17 @@ class RoomDatabaseAndViewModelTest {
 
         viewModel.setThemeMode(AppThemeMode.DARK)
         viewModel.setLanguage(AppLanguage.EN)
+        val newSettings = Settings(baseUrl = "https://custom.api", apiKey = "sk-custom", model = "gpt-4o", goals = listOf("Goal 1"))
+        viewModel.saveSettings(newSettings)
+        val newProfile = Profile(birthDate = "1990-01-01", weightKg = 70.0, heightCm = 175, gender = Gender.MALE)
+        viewModel.saveProfile(newProfile)
+
         testDispatcher.scheduler.advanceUntilIdle()
+
+        val updatedState = viewModel.uiState.value
+        assertEquals(AppThemeMode.DARK, updatedState.themeMode)
+        assertEquals(AppLanguage.EN, updatedState.language)
+        assertEquals(newSettings, updatedState.settings)
+        assertEquals(newProfile, updatedState.profile)
     }
 }
