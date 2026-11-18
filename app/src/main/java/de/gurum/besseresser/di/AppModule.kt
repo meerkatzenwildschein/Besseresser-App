@@ -12,6 +12,7 @@ import de.gurum.besseresser.data.DefaultUiPrefsRepository
 import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.data.AndroidImagePreprocessor
 import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.PhotoStorage
 import de.gurum.besseresser.data.ProfileRepository
 import de.gurum.besseresser.data.SettingsRepository
@@ -39,6 +40,7 @@ val appModule = module {
 
     single { androidContext().appDataStore }
     single { PhotoStorage(androidContext()) }
+    single { PhotoCaptureManager(androidContext()) }
     single<ImagePreprocessor> { AndroidImagePreprocessor(androidContext()) }
 
     single<BesseresserApiService> { ApiClient() }

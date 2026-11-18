@@ -257,8 +257,8 @@ fun BackdatedOverlays(
     showReview: Boolean,
     showText: Boolean,
     showBusy: Boolean,
-    addPhotoFile: File,
-    addPhotoUri: Uri,
+    addPhotoFile: File?,
+    addPhotoUri: Uri?,
     addNote: String,
     addTargetDay: LocalDate?,
     settings: Settings,
@@ -270,7 +270,7 @@ fun BackdatedOverlays(
     onSubmitBackdated: (photoUri: Uri?, promptBundle: PromptBundle?, textPrompt: String?) -> Unit
 ) {
     val ctx = LocalContext.current
-    if (showCamera) {
+    if (showCamera && addPhotoFile != null) {
         CameraCaptureScreen(
             outputFile = addPhotoFile,
             note = addNote,
@@ -358,7 +358,7 @@ private fun buildAnalyzeTextPrompt(ctx: android.content.Context, goals: List<Str
  *  OPAKER Hintergrund, damit die Verlaufs-Liste darunter nicht durchscheint. */
 @Composable
 fun AddMealReviewScreen(
-    photoUri: Uri,
+    photoUri: Uri?,
     note: String,
     onNoteChange: (String) -> Unit,
     onBack: () -> Unit,

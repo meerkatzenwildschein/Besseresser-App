@@ -8,7 +8,6 @@ Dieses Dokument fasst die Ergebnisse des umfassenden Code-Reviews der **Besseres
 1. [Management Summary](#1-management-summary)
 2. [Prioritäten-Matrix](#2-prioritäten-matrix)
 3. [Detaillierte Findings & Best Practice Empfehlungen](#3-detaillierte-findings--best-practice-empfehlungen)
-   - [3.1 UI & Jetpack Compose](#31-ui--jetpack-compose)
    - [3.3 Threading, Concurrency & Coroutines](#33-threading-concurrency--coroutines)
    - [3.4 Datenhaltung, Persistence & Room](#34-datenhaltung-persistence--room)
    - [3.5 Android Lifecycle & Lokalisierung](#35-android-lifecycle--lokalisierung)
@@ -37,25 +36,6 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 ---
 
 ## 3. Detaillierte Findings & Best Practice Empfehlungen
-
-### 3.1 UI & Jetpack Compose
-
-#### Finding 3.1.1: State & File-Erzeugung in `remember` ohne Re-Evaluation
-- **Betroffene Dateien:** `MainScreen.kt` (Z. 101–109), `HistoryScreen.kt` (Z. 61–67)
-- **Problem:**
-  Dateiobjekte und FileProvider-URIs werden in `remember { ... }` ohne Dependencies erzeugt und führen I/O (`mkdirs()`) während der Initial-Composition aus:
-  ```kotlin
-  // Anti-Pattern
-  val photoFile = remember {
-      File(ctx.cacheDir, "photos").also { it.mkdirs() }
-          .let { d -> File(d, "essen_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg") }
-  }
-  ```
-  Wird ein Foto aufgenommen und verworfen oder ein zweites Foto gemacht, verweist `photoFile` immer noch auf denselben Zeitstempel-Dateinamen.
-- **Empfohlene Best Practice:**
-  Dateierstellung und Temp-File-Management sollten in eine dedizierte Helper-Klasse (`FileManager` / `PhotoCaptureManager`) ausgelagert werden, die erst bei tatsächlichem Auslösen des Kamera-Events eine neue Datei anlegt.
-
----
 
 ---
 
