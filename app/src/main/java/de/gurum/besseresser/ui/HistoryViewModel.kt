@@ -18,6 +18,7 @@ import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.model.calendarWeekOfKey
 import de.gurum.besseresser.model.DayFazit
+import de.gurum.besseresser.model.DayFazitSession
 import de.gurum.besseresser.model.dayFingerprint
 import de.gurum.besseresser.model.dayKeyOf
 import de.gurum.besseresser.model.Evaluation
@@ -505,4 +506,119 @@ class HistoryViewModel(
 
     fun decodeThumbnail(entry: HistoryEntry, target: Int = 128): android.graphics.Bitmap? =
         historyRepository.decodeThumbnail(entry, target)
+
+    private var autoFazitJob: Job? = null
+
+    /**
+     * Prüft und triggert fällige Tages- und Wochenfazits im Hintergrund (ViewModelScope).
+     * Entkoppelt von UI-Rendering/LaunchedEffects für maximale Stabilität und Robustheit.
+     */
+    fun checkAndTriggerAutoFazits(
+        settings: Settings,
+        promptContext: String?,
+        dayPrompts: FazitPromptBundle,
+        weekPromptsProvider: (calendarWeek: Int) -> FazitPromptBundle,
+        dayMealLinesProvider: (List<HistoryEntry>) -> List<String>,
+        weekMealLinesProvider: (List<HistoryEntry>) -> List<String>
+    ) {
+        autoFazitJob?.cancel()
+        autoFazitJob = viewModelScope.launch {
+            delay(1200) // Debounce
+            val entries = _uiState.value.entries
+            if (entries.isEmpty()) return@launch
+
+            val nowDate = LocalDate.now()
+            val nowHour = LocalTime.now().hour
+            val autoFazitTime = nowHour >= FAZIT_AUTO_HOUR
+
+            checkAutoDayFazits(
+                entries = entries,
+                nowDate = nowDate,
+                autoFazitTime = autoFazitTime,
+                settings = settings,
+                promptContext = promptContext,
+                dayPrompts = dayPrompts,
+                dayMealLinesProvider = dayMealLinesProvider
+            )
+
+            checkAutoWeekFazits(
+                entries = entries,
+                nowDate = nowDate,
+                nowHour = nowHour,
+                settings = settings,
+                promptContext = promptContext,
+                weekPromptsProvider = weekPromptsProvider,
+                weekMealLinesProvider = weekMealLinesProvider
+            )
+        }
+    }
+
+    private fun checkAutoDayFazits(
+        entries: List<HistoryEntry>,
+        nowDate: LocalDate,
+        autoFazitTime: Boolean,
+        settings: Settings,
+        promptContext: String?,
+        dayPrompts: FazitPromptBundle,
+        dayMealLinesProvider: (List<HistoryEntry>) -> List<String>
+    ) {
+        val fazitMap = _uiState.value.fazitMap
+        val loadingFazits = _uiState.value.loadingFazits
+
+        groupByDay(entries).take(2).forEach { group ->
+            val dayAutoReady = group.day.isBefore(nowDate) || autoFazitTime
+            val key = dayKeyOf(group.day)
+            if (key in loadingFazits || !dayAutoReady) return@forEach
+
+            val fazit = fazitMap[key]
+            if (fazit == null) {
+                if (key !in DayFazitSession.attempted) {
+                    DayFazitSession.attempted.add(key)
+                    generateFazit(
+                        day = group.day,
+                        entriesOfDay = group.entries,
+                        settings = settings,
+                        promptContext = promptContext,
+                        mealLines = dayMealLinesProvider(group.entries),
+                        prompts = dayPrompts
+                    )
+                }
+            } else if (isFazitOutdated(fazit, group.entries)) {
+                generateFazit(
+                    day = group.day,
+                    entriesOfDay = group.entries,
+                    settings = settings,
+                    promptContext = promptContext,
+                    mealLines = dayMealLinesProvider(group.entries),
+                    prompts = dayPrompts
+                )
+            }
+        }
+    }
+
+    private fun checkAutoWeekFazits(
+        entries: List<HistoryEntry>,
+        nowDate: LocalDate,
+        nowHour: Int,
+        settings: Settings,
+        promptContext: String?,
+        weekPromptsProvider: (calendarWeek: Int) -> FazitPromptBundle,
+        weekMealLinesProvider: (List<HistoryEntry>) -> List<String>
+    ) {
+        val weekFazitMap = _uiState.value.weekFazitMap
+        val loadingWeeks = _uiState.value.loadingWeeks
+        val dueWk = latestDueWeekKey(entries, nowDate, nowHour) ?: return
+
+        if (dueWk !in loadingWeeks && weekFazitMap[dueWk] == null && dueWk !in DayFazitSession.attemptedWeekly) {
+            DayFazitSession.attemptedWeekly.add(dueWk)
+            val wkEntries = entries.filter { weekKeyOf(it.dateMillis) == dueWk }
+            generateWeekFazit(
+                settings = settings,
+                promptContext = promptContext,
+                weekKey = dueWk,
+                mealLines = weekMealLinesProvider(wkEntries),
+                prompts = weekPromptsProvider(calendarWeekOfKey(dueWk))
+            )
+        }
+    }
 }

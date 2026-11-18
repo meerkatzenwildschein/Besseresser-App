@@ -25,7 +25,6 @@ Dieses Dokument fasst die Ergebnisse des umfassenden Code-Reviews der **Besseres
 Die Besseresser-App verfügt über eine moderne technische Basis (Kotlin 2.0+, Jetpack Compose, Material 3, Type-Safe Navigation Compose, Room, DataStore, Koin). Die bestehende Unit-Test-Abdeckung für Serialisierung, Repositories und Fingerprint-Berechnungen ist solide.
 
 Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von etablierten Android Best Practices auf:
-- **Architektur & Separation of Concerns:** Direkte Übergabe von `android.content.Context` an ViewModels und UI-gesteuerte Business-Logik (z. B. Triggerung von KI-Fazits aus `LaunchedEffect`).
 - **Threading:** Verwendung von blockierendem `runBlocking` auf dem Main-Thread während des Activity-Starts (`attachBaseContext`).
 - **Sicherheit:** `cleartextTrafficPermitted="true"` global im gesamten Netzwerk-Manifest aktiv und API-Keys unverschlüsselt im Standard-DataStore.
 - **Resilienz & Datenhaltung:** `fallbackToDestructiveMigration()` bei Room-Datenbanken aktiv (Gefahr des kompletten Datenverlusts bei Updates) und `configChanges` in `MainActivity` deaktiviert Standard-Activity-Recreations.
@@ -38,7 +37,6 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 |---|---|---|---|
 | **P0 (Kritisch)** | Threading | `runBlocking` in `MainActivity.attachBaseContext` | Längere Startzeiten, Risiko von Application Not Responding (ANR) |
 | **P0 (Kritisch)** | Sicherheit | Globales `cleartextTrafficPermitted="true"` & Klartext-API-Keys | Sicherheitsrisiko für sensible Nutzerdaten & API-Zugänge |
-| **P1 (Hoch)** | Architektur | `Context` in ViewModels & UI-getriebene Side-Effects | Speicherlecks, schlechte Testbarkeit, instabile State-Machines |
 | **P1 (Hoch)** | Persistence | `fallbackToDestructiveMigration()` in Room | Verlust aller Verlaufsdaten bei Schema-Änderungen |
 | **P1 (Hoch)** | Compose | Monolithische Composables (z. B. `MainScreen.kt` > 900 Zeilen) | Mangelnde Wiederverwendbarkeit, unnötige Recompositions |
 | **P2 (Mittel)** | Lifecycle / System | `android:configChanges` & manueller Locale ContextWrapper | Umgeht Standard-Lifecycle, ignoriert Android 13+ Per-App-Language-APIs |
@@ -83,39 +81,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ### 3.2 Architektur & State Management (MVVM / Clean Architecture)
 
-#### Finding 3.2.1: Android `Context` in ViewModels und Domain-Klassen
-- **Betroffene Dateien:** `ProfileViewModel.kt` (Z. 70), `SetupViewModel.kt` (Z. 108), `PromptBuilder.kt` (Z. 62)
-- **Problem:**
-  Methoden wie `ProfileViewModel.save(ctx: Context?, ...)` oder `SetupViewModel.startSplitGoals(ctx: Context?, ...)` nehmen `Context`-Referenzen entgegen, um Fehlermeldungen oder Strings aus Ressourcen zu lesen.
-- **Risiko:** Bruch der Schichtentrennung, Gefahr von Memory Leaks und Verunmöglichung reiner JVM-Unit-Tests ohne Robolectric/Mocks.
-- **Empfohlene Best Practice:**
-  ViewModels dürfen **keine** `Context`-Instanzen halten oder als Parameter annehmen. Für lokalisierte Fehlermeldungen sollte ein `UiText`-Wrapper (Sealed Interface) verwendet werden:
-  ```kotlin
-  sealed interface UiText {
-      data class DynamicString(val value: String) : UiText
-      class StringResource(@StringRes val resId: Int, vararg val args: Any) : UiText
-      
-      @Composable
-      fun asString(): String = when (this) {
-          is DynamicString -> value
-          is StringResource -> stringResource(resId, *args)
-      }
-  }
-  ```
-
----
-
-#### Finding 3.2.2: UI-getriebene Geschäftslogik und Seiteneffekte
-- **Betroffene Dateien:** `HistoryScreen.kt` (`HistoryAutoFazitEffect`), `MainScreen.kt` (`createAnalyzePrompts`)
-- **Problem:**
-  In `HistoryScreen.kt` entscheidet ein Composable (`HistoryAutoFazitEffect` mit `LaunchedEffect`), ob ein Tages- oder Wochenfazit fällig ist, baut Strings und Prompts mithilfe von `LocalContext` zusammen und ruft `viewModel.generateFazit(...)` auf.
-- **Risiko:** Wird der Screen verlassen oder re-composed, können Side-Effects unterbrochen oder mehrfach ausgeführt werden. Die Logik existiert nicht auf ViewModel-/Domain-Ebene.
-- **Empfohlene Best Practice:**
-  Auslagerung in einen **Use Case** / Interactor (z. B. `EvaluateDayFazitUseCase`), der reaktiv auf Datenänderungen im `HistoryRepository` hört oder im ViewModel-Scope ausgeführt wird. Die UI beobachtet ausschließlich den resultierenden Zustand (`UiState`).
-
----
-
-#### Finding 3.2.3: Imperative ViewModel-Initialisierung (`startObserving()`)
+#### Finding 3.2.1: Imperative ViewModel-Initialisierung (`startObserving()`)
 - **Betroffene Dateien:** `HistoryViewModel.kt` (Z. 71), `HistoryScreen.kt` (Z. 51–53)
 - **Problem:**
   In `HistoryScreen` wird über `LaunchedEffect(Unit) { viewModel.startObserving() }` eine Methode aufgerufen, um Flows zu starten.
@@ -291,10 +257,9 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 3. **Main-Thread Entlastung:** `runBlocking` in `attachBaseContext` durch native Locale-APIs ersetzen.
 
 ### Phase 2: Architektur-Refactoring & Entkopplung (Mittelfristig)
-1. **Clean ViewModels:** Alle `Context`-Parameter aus ViewModels (`ProfileViewModel`, `SetupViewModel`) entfernen und auf `UiText` / Resource-IDs umstellen.
-2. **Decomposition:** `MainScreen.kt` in fokussierte Sub-Composables zerlegen.
-3. **Domain Layer einführen:** `GenerateFazitUseCase` und `AnalyzeMealUseCase` erstellen, um Business-Logik aus `HistoryScreen` / `MainScreen` zu extrahieren.
-4. **Dispatcher Injection:** `CoroutineDispatchers` für saubere Testbarkeit injizierbar machen.
+1. **Decomposition:** `MainScreen.kt` in fokussierte Sub-Composables zerlegen.
+2. **Reaktive State-Pipelines:** `startObserving()` durch deklarative `stateIn`-Pipelines ersetzen.
+3. **Dispatcher Injection:** `CoroutineDispatchers` für saubere Testbarkeit injizierbar machen.
 
 ### Phase 3: Qualitäts- & Test-Offensive (Langfristig)
 1. **Compose-Tests & Screenshot-Testing:** Integration von `androidx.compose.ui.test` und Roborazzi für Snapshot-Tests.

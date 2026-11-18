@@ -1,9 +1,8 @@
 package de.gurum.besseresser.data
-import android.content.Context
-import de.gurum.besseresser.R
 
 /**
  * Erstellung und Zusammenstellung lokalisierter Prompt-Templates für die KI-Kommunikation.
+ * Rein logikorientiert ohne Android-Context-Abhängigkeiten.
  */
 object PromptBuilder {
 
@@ -59,21 +58,21 @@ object PromptBuilder {
      * Erstellt den Prompt für die reine Textanalyse (Nacherfassung ohne Foto).
      */
     fun createAnalyzeTextPrompt(
-        ctx: Context,
         goals: List<String>,
-        userDescription: String
+        promptBundle: PromptBundle,
+        textOnlyContext: String
     ): String = buildString {
-        appendLine(ctx.getString(R.string.prompt_eval_intro_textonly))
+        appendLine(promptBundle.intro)
         goals.forEachIndexed { i, g -> appendLine("${i + 1}. $g") }
         appendLine("")
-        appendLine(ctx.getString(R.string.prompt_textonly_context, userDescription.trim()))
+        appendLine(textOnlyContext)
         appendLine("")
-        appendLine(ctx.getString(R.string.prompt_eval_format))
+        appendLine(promptBundle.formatIntro)
         appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","begruendung":"<short reason>"}],"zusatz":"<one-sentence overall impression>","erkannt":"<one short sentence: what the description says the meal was, with quantities>"}""")
-        appendLine(ctx.getString(R.string.prompt_eval_ampel_meaning))
-        appendLine(ctx.getString(R.string.prompt_eval_exactly_one))
-        appendLine(ctx.getString(R.string.prompt_honesty))
-        appendLine(ctx.getString(R.string.prompt_eval_language))
+        appendLine(promptBundle.ampelMeaning)
+        appendLine(promptBundle.exactlyOne)
+        if (promptBundle.honesty.isNotBlank()) appendLine(promptBundle.honesty)
+        appendLine(promptBundle.responseLanguage)
     }
 
     /**

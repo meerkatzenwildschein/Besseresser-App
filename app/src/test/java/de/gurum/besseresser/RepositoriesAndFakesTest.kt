@@ -61,6 +61,8 @@ import de.gurum.besseresser.model.TrafficLight
 import de.gurum.besseresser.model.weekKeyOf
 import de.gurum.besseresser.model.DayFazit
 import de.gurum.besseresser.model.DayFazitSession
+import de.gurum.besseresser.ui.UiText
+import de.gurum.besseresser.R
 
 // ----------------------------------------------------------------- In-Memory Test Fakes
 
@@ -457,16 +459,18 @@ class RepositoriesAndFakesTest {
 
         // Invalid weight test
         vm.setWeightText("-5")
-        val savedInvalid = vm.save(weightErrMsg = "Fehler Gewicht", heightErrMsg = "Fehler Größe")
+        val savedInvalid = vm.save()
         assertFalse(savedInvalid)
-        assertEquals("Fehler Gewicht", vm.uiState.value.error)
+        assertTrue(vm.uiState.value.error is UiText.StringResource)
+        assertEquals(R.string.profile_err_weight, (vm.uiState.value.error as UiText.StringResource).resId)
 
         // Invalid height test
         vm.setWeightText("75")
         vm.setHeightText("350")
-        val savedInvalidHeight = vm.save(weightErrMsg = "Fehler Gewicht", heightErrMsg = "Fehler Größe")
+        val savedInvalidHeight = vm.save()
         assertFalse(savedInvalidHeight)
-        assertEquals("Fehler Größe", vm.uiState.value.error)
+        assertTrue(vm.uiState.value.error is UiText.StringResource)
+        assertEquals(R.string.profile_err_height, (vm.uiState.value.error as UiText.StringResource).resId)
 
         // Valid save
         vm.setHeightText("178")
@@ -835,5 +839,56 @@ class RepositoriesAndFakesTest {
         assertTrue(vm.uiState.value.entries.isEmpty())
         assertTrue(vm.uiState.value.fazitMap.isEmpty())
         assertNull(vm.uiState.value.weekFazit)
+    }
+
+    @Test
+    fun testUiTextDataClassAndEquality() {
+        val dynamic1 = UiText.DynamicString("Fehler aufgetreten")
+        val dynamic2 = UiText.DynamicString("Fehler aufgetreten")
+        val dynamic3 = UiText.DynamicString("Anderer Text")
+        assertEquals(dynamic1, dynamic2)
+        assertFalse(dynamic1 == dynamic3)
+
+        val res1 = UiText.StringResource(R.string.profile_err_weight)
+        val res2 = UiText.StringResource(R.string.profile_err_weight)
+        val res3 = UiText.StringResource(R.string.profile_err_height)
+        assertEquals(res1, res2)
+        assertEquals(res1.hashCode(), res2.hashCode())
+        assertFalse(res1 == res3)
+    }
+
+    @Test
+    fun testHistoryViewModelAutoFazitTriggering() = runTest(testDispatcher) {
+        val api = FakeApiService()
+        val histRepo = FakeHistoryRepository()
+        val setRepo = FakeSettingsRepository()
+        val vm = HistoryViewModel(
+            apiService = api,
+            historyRepository = histRepo,
+            settingsRepository = setRepo,
+            imagePreprocessor = FakeImagePreprocessor()
+        )
+        vm.startObserving()
+
+        val pastDay = LocalDate.now().minusDays(1)
+        val pastDayMillis = pastDay.atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val entry = histRepo.add(null, Evaluation(erkannt = "Salat"), dateOverride = pastDayMillis)
+        advanceUntilIdle()
+
+        DayFazitSession.attempted.clear()
+        vm.checkAndTriggerAutoFazits(
+            settings = Settings("", "", "", listOf("Ziel 1")),
+            promptContext = null,
+            dayPrompts = FazitPromptBundle("Intro", "Rules", "de", "Ehrlich"),
+            weekPromptsProvider = { FazitPromptBundle("WeekIntro", "Rules", "de", "Ehrlich") },
+            dayMealLinesProvider = { list -> list.map { it.erkannt } },
+            weekMealLinesProvider = { list -> list.map { it.erkannt } }
+        )
+        advanceTimeBy(1300)
+        advanceUntilIdle()
+
+        val savedFazit = histRepo.loadDayFazit(dayKeyOf(pastDay))
+        assertNotNull(savedFazit)
+        assertEquals(TrafficLight.GREEN, savedFazit?.ampel)
     }
 }

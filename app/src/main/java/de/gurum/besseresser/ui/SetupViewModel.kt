@@ -1,5 +1,5 @@
 package de.gurum.besseresser.ui
-import android.content.Context
+
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import de.gurum.besseresser.R
 import de.gurum.besseresser.data.ApiClient
 import de.gurum.besseresser.data.ApiException
 import de.gurum.besseresser.data.BackupService
@@ -105,8 +104,9 @@ class SetupViewModel(
     }
 
     fun startSplitGoals(
-        ctx: Context? = null,
         rawGoals: String,
+        splitIntro: String? = null,
+        splitRules: String? = null,
         splitRequest: SplitGoalsRequest? = null,
         onDone: (Settings) -> Unit = {}
     ) {
@@ -117,8 +117,8 @@ class SetupViewModel(
             apiKey = state.key.trim(),
             model = state.model.trim(),
             rawGoals = rawGoals,
-            splitIntro = ctx?.getString(R.string.prompt_split_intro) ?: "Split the following free text containing health goals into individual goals.",
-            splitRules = ctx?.getString(R.string.prompt_split_rules) ?: "Rules: one goal per item, concise (max. 8 words), no numbering."
+            splitIntro = splitIntro ?: "Split the following free text containing health goals into individual goals.",
+            splitRules = splitRules ?: "Rules: one goal per item, concise (max. 8 words), no numbering."
         )
         viewModelScope.launch {
             val result = apiService.splitGoals(

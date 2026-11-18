@@ -324,38 +324,6 @@ fun latestDueWeekKey(
     .sortedDescending()
     .firstOrNull { wk -> isWeekFazitDue(wk, nowDate, nowHour) }
 
-@Composable
-fun HistoryAutoFazitEffect(
-    entries: List<HistoryEntry>,
-    fazitMap: Map<String, DayFazit>,
-    loadingFazits: List<String>,
-    weekFazitMap: Map<String, DayFazit>,
-    loadingWeeks: Set<String>,
-    onGenerateFazit: (LocalDate, List<HistoryEntry>) -> Unit,
-    onGenerateWeekFazit: (String) -> Unit
-) {
-    LaunchedEffect(entries, fazitMap, weekFazitMap) {
-        if (entries.isEmpty()) return@LaunchedEffect
-        delay(1200)   // Debounce
-        val nowDate = LocalDate.now()
-        val nowHour = LocalTime.now().hour
-        val autoFazitTime = nowHour >= FAZIT_AUTO_HOUR
-        groupByDay(entries).take(2).forEach { group ->
-            val dayAutoReady = group.day.isBefore(nowDate) || autoFazitTime
-            handleAutoDayFazit(group, fazitMap, loadingFazits, dayAutoReady, onGenerateFazit)
-        }
-        val dueWk = latestDueWeekKey(entries, nowDate, nowHour)
-        if (dueWk != null) {
-            handleAutoWeekFazitForKey(
-                weekKey = dueWk,
-                weekFazitMap = weekFazitMap,
-                loadingWeeks = loadingWeeks,
-                onGenerateWeekFazit = onGenerateWeekFazit
-            )
-        }
-    }
-}
-
 fun handleAutoDayFazit(
     group: DayGroup,
     fazitMap: Map<String, DayFazit>,
