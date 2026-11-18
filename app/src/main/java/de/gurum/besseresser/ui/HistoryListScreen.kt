@@ -57,6 +57,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -144,7 +145,7 @@ fun HistoryListContent(
     if (entries.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
         Text(
-            stringResource(R.string.history_list_hint, entries.size),
+            pluralStringResource(R.plurals.history_list_hint, entries.size, entries.size),
             fontSize = 12.5.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 4.dp)
