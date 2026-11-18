@@ -45,7 +45,7 @@ hin zu einer sauberen MVVM-Schichtenarchitektur. Status: **abgeschlossen**.
 
 **Ziel:** Boolesche Screen-Navigation durch Navigation Compose ersetzen; UI-Direktzugriffe auf Repositories in ViewModels verschieben.
 
-- `MainActivity` nutzt `NavHost` mit typisierten Routen (`main`, `setup`, `profile`, `history`, `config`, `detail/{entryId}`).
+- `MainActivity` nutzt `NavHost` mit typsicheren `@Serializable`-Routen (`Routes.Main`, `Routes.Setup`, `Routes.Profile`, `Routes.History`, `Routes.Config`, `Routes.Detail(entryId)` via `toRoute()`).
 - Neue ViewModels: `HistoryDetailViewModel` (pro entryId), `ConfigViewModel`, `RecentNotesViewModel`.
 - `BesseresserApiService` ohne `Context` (Prompts/Bild-Aufbereitung in die ViewModel-/UI-Schicht); `ImagePreprocessor` injizierbar.
 - UI ruft Datenzugriffe ausschließlich über ViewModels auf (kein `koinInject` von Repositories/Services in Composables).

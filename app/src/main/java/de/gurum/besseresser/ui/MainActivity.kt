@@ -38,12 +38,12 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
+import androidx.navigation.toRoute
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.Serializable
 import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
@@ -131,15 +131,20 @@ private val BesseresserShapes = Shapes(
 
 // ----------------------------------------------------------------- Activity & Navigation
 
-/** Routen der Root-Navigation (Navigation Compose). */
+/** Routen der Root-Navigation (Navigation Compose, Type-Safe). */
 object Routes {
-    const val MAIN = "main"
-    const val SETUP = "setup"
-    const val PROFILE = "profile"
-    const val HISTORY = "history"
-    const val CONFIG = "config"
-    const val DETAIL = "detail/{entryId}"
-    fun detail(entryId: Long) = "detail/$entryId"
+    @Serializable
+    data object Main
+    @Serializable
+    data object Setup
+    @Serializable
+    data object Profile
+    @Serializable
+    data object History
+    @Serializable
+    data object Config
+    @Serializable
+    data class Detail(val entryId: Long)
 }
 
 class MainActivity : ComponentActivity() {
@@ -228,7 +233,7 @@ private fun AppNavHost(
 ) {
     val navController = rememberNavController()
     val mainViewModel: MainViewModel = koinViewModel()
-    val startDestination = if (appState.settings.isComplete) Routes.MAIN else Routes.SETUP
+    val startDestination: Any = if (appState.settings.isComplete) Routes.Main else Routes.Setup
 
     NavHost(
         navController = navController,
@@ -246,17 +251,17 @@ private fun AppNavHost(
             slideOutHorizontally(tween(280, easing = FastOutSlowInEasing)) { it } + fadeOut(tween(220))
         }
     ) {
-        composable(Routes.MAIN) {
+        composable<Routes.Main> {
             MainScreen(
                 settings = appState.settings,
-                onEditSettings = { navController.navigate(Routes.SETUP) },
-                onOpenProfile = { navController.navigate(Routes.PROFILE) },
-                onOpenHistory = { navController.navigate(Routes.HISTORY) },
-                onOpenConfig = { navController.navigate(Routes.CONFIG) },
+                onEditSettings = { navController.navigate(Routes.Setup) },
+                onOpenProfile = { navController.navigate(Routes.Profile) },
+                onOpenHistory = { navController.navigate(Routes.History) },
+                onOpenConfig = { navController.navigate(Routes.Config) },
                 viewModel = mainViewModel
             )
         }
-        composable(Routes.SETUP) {
+        composable<Routes.Setup> {
             SetupScreen(
                 initial = appState.settings,
                 firstRun = !appState.settings.isComplete,
@@ -269,21 +274,21 @@ private fun AppNavHost(
                     appStateViewModel.saveSettings(neu)
                     if (firstRun) {
                         // Nach dem ERSTEN Erfassen einmalig das Profil öffnen (Setup aus dem Stack lösen)
-                        navController.navigate(Routes.MAIN) { popUpTo(Routes.SETUP) { inclusive = true } }
-                        navController.navigate(Routes.PROFILE)
+                        navController.navigate(Routes.Main) { popUpTo<Routes.Setup> { inclusive = true } }
+                        navController.navigate(Routes.Profile)
                     } else {
                         navController.popBackStack()
                     }
                 },
                 onBackupImported = { importedSettings ->
                     if (importedSettings.isComplete) {
-                        navController.navigate(Routes.MAIN) { popUpTo(Routes.SETUP) { inclusive = true } }
+                        navController.navigate(Routes.Main) { popUpTo<Routes.Setup> { inclusive = true } }
                     }
                 },
                 viewModel = koinViewModel()
             )
         }
-        composable(Routes.PROFILE) {
+        composable<Routes.Profile> {
             ProfileScreen(
                 initial = appState.profile,
                 onCancel = { navController.popBackStack() },
@@ -294,16 +299,16 @@ private fun AppNavHost(
                 viewModel = koinViewModel()
             )
         }
-        composable(Routes.HISTORY) {
+        composable<Routes.History> {
             HistoryScreen(
                 settings = appState.settings,
                 profile = appState.profile,
-                onPick = { navController.navigate(Routes.detail(it.id)) },
+                onPick = { navController.navigate(Routes.Detail(it.id)) },
                 onBack = { navController.popBackStack() },
                 viewModel = koinViewModel()
             )
         }
-        composable(Routes.CONFIG) {
+        composable<Routes.Config> {
             ConfigScreen(
                 themeMode = appState.themeMode,
                 onThemeModeChange = { appStateViewModel.setThemeMode(it) },
@@ -313,21 +318,18 @@ private fun AppNavHost(
                 onDataImported = { },
                 onHistoryCleared = {
                     mainViewModel.reset()
-                    navController.popBackStack(Routes.MAIN, inclusive = false)
+                    navController.popBackStack<Routes.Main>(inclusive = false)
                 },
                 viewModel = koinViewModel()
             )
         }
-        composable(
-            route = Routes.DETAIL,
-            arguments = listOf(navArgument("entryId") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val entryId = backStackEntry.arguments?.getLong("entryId") ?: return@composable
+        composable<Routes.Detail> { backStackEntry ->
+            val detail: Routes.Detail = backStackEntry.toRoute()
             HistoryDetailScreen(
-                entryId = entryId,
+                entryId = detail.entryId,
                 settings = appState.settings,
                 onBack = { navController.popBackStack() },
-                viewModel = koinViewModel { parametersOf(entryId) }
+                viewModel = koinViewModel { parametersOf(detail.entryId) }
             )
         }
     }
