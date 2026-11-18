@@ -1,0 +1,9 @@
+Code quality and architecture improvements (refactoring):
+- Extracted PhotoCaptureManager: camera temp files are now created fresh on each capture, preventing stale file name reuse
+- Split MainScreen.kt into focused composables (MainReviewScreen, MainReportView, MainTopBar, MainCtaBar)
+- History ViewModel flows start in init block instead of requiring a manual startObserving() call from the UI
+- Introduced injectable AppDispatchers for deterministic coroutine testing
+- Orphaned photo files are now cleaned up automatically on app start
+- Language switching uses LocaleManager on Android 13+ for native OS integration
+- Renamed all German code identifiers to English (recognizedMeal, rating, reason, etc.)
+- Added ViewModel-level user flow tests for setup, retro capture and history detail
