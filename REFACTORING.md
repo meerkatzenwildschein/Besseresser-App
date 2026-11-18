@@ -8,6 +8,8 @@ Dieses Dokument fasst die Ergebnisse des umfassenden Code-Reviews der **Besseres
 1. [Management Summary](#1-management-summary)
 2. [Prioritäten-Matrix](#2-prioritäten-matrix)
 3. [Detaillierte Findings & Best Practice Empfehlungen](#3-detaillierte-findings--best-practice-empfehlungen)
+   - [3.1 UI & Jetpack Compose](#31-ui--jetpack-compose)
+   - [3.2 Architektur & State Management (MVVM / Clean Architecture)](#32-architektur--state-management-mvvm--clean-architecture)
    - [3.3 Threading, Concurrency & Coroutines](#33-threading-concurrency--coroutines)
    - [3.4 Datenhaltung, Persistence & Room](#34-datenhaltung-persistence--room)
    - [3.5 Android Lifecycle & Lokalisierung](#35-android-lifecycle--lokalisierung)
@@ -27,15 +29,46 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ## 2. Prioritäten-Matrix
 
-| Priorität | Bereich | Finding | Auswirkung |
-|---|---|---|---|
-| **P2 (Mittel)** | Lifecycle / System | Manueller Locale ContextWrapper | Umgeht Android 13+ Per-App-Language-APIs |
-| **P2 (Mittel)** | Testing & DI | Harte `Dispatchers.IO`-Referenzen & fehlende Dispatcher-Injection | Erschwerte deterministische Unit- & Coroutine-Tests |
-| **P3 (Niedrig)** | Code-Qualität | Denglish-Bezeichner & String-basierte Magic Keys | Wartungsaufwand, Fehleranfälligkeit bei Refactorings |
+| Priorität | Bereich | Finding | Auswirkung | Status |
+|---|---|---|---|---|
+| ~~**P1 (Hoch)**~~ | ~~Persistence~~ | ~~`fallbackToDestructiveMigration()` in Room~~ | ~~Verlust aller Verlaufsdaten bei Schema-Änderungen~~ | ✅ |
+| ~~**P1 (Hoch)**~~ | ~~Compose~~ | ~~Monolithische Composables (`MainScreen.kt` > 900 Zeilen)~~ | ~~Mangelnde Wiederverwendbarkeit, unnötige Recompositions~~ | ✅ |
+| ~~**P2 (Mittel)**~~ | ~~Lifecycle / System~~ | ~~`android:configChanges` in `MainActivity`~~ | ~~Umgeht Standard-Lifecycle bei Rotation/Split-Screen~~ | ✅ |
+| ~~**P2 (Mittel)**~~ | ~~Architektur~~ | ~~Imperative `startObserving()`-Initialisierung~~ | ~~Fehleranfälliger manueller Kick aus der UI~~ | ✅ |
+| ~~**P2 (Mittel)**~~ | ~~Compose~~ | ~~`remember`-basierte Foto-Dateierstellung~~ | ~~Veralteter Dateiname bei Wiederaufnahme~~ | ✅ |
+| **P2 (Mittel)** | Lifecycle / System | Manueller Locale ContextWrapper | Umgeht Android 13+ Per-App-Language-APIs | offen |
+| **P2 (Mittel)** | Testing & DI | Harte `Dispatchers.IO`-Referenzen & fehlende Dispatcher-Injection | Erschwerte deterministische Unit- & Coroutine-Tests | offen |
+| **P3 (Niedrig)** | Code-Qualität | Denglish-Bezeichner & String-basierte Magic Keys | Wartungsaufwand, Fehleranfälligkeit bei Refactorings | offen |
 
 ---
 
 ## 3. Detaillierte Findings & Best Practice Empfehlungen
+
+### 3.1 UI & Jetpack Compose
+
+#### ✅ Finding 3.1.1: ~~State & File-Erzeugung in `remember` ohne Re-Evaluation~~
+- **Betroffene Dateien:** `MainScreen.kt`, `HistoryScreen.kt`
+- **Problem:**
+  Dateiobjekte und FileProvider-URIs wurden in `remember { ... }` ohne Dependencies erzeugt und führten I/O (`mkdirs()`) während der Initial-Composition aus. Bei verworfenen oder wiederholten Fotos verwies `photoFile` immer noch auf denselben alten Zeitstempel-Dateinamen.
+- **Umgesetzt:** `PhotoCaptureManager` in `data/` extrahiert; Datei wird erst beim tatsächlichen Kamera-Start angelegt (`createCaptureFile()`). Koin-Binding als `single`. State in der UI als `mutableStateOf<Pair<File, Uri>?>(null)`, beim Abbrechen/Verwerfen auf `null` zurückgesetzt.
+
+---
+
+#### ✅ Finding 3.1.2: ~~Monolithische Screen-Dateien und fehlende Dekomposition~~
+- **Betroffene Dateien:** `MainScreen.kt` (war 930 Zeilen)
+- **Problem:**
+  `MainScreen.kt` bündelte Kamera-Aufnahme, Review-Screen, Auswertungsansicht, Edit-Dialoge, Dropdown-Menüs und Floating Buttons in einer einzigen Datei.
+- **Umgesetzt:** Aufgeteilt in `MainScreen.kt` (Root), `MainReviewScreen.kt`, `MainReportView.kt`, `MainTopBar.kt`, `MainCtaBar.kt`.
+
+---
+
+### 3.2 Architektur & State Management (MVVM / Clean Architecture)
+
+#### ✅ Finding 3.2.1: ~~Imperative ViewModel-Initialisierung (`startObserving()`)~~
+- **Betroffene Dateien:** `HistoryViewModel.kt`, `HistoryScreen.kt`
+- **Problem:**
+  In `HistoryScreen` wurde über `LaunchedEffect(Unit) { viewModel.startObserving() }` eine Methode aufgerufen, um Flows zu starten.
+- **Umgesetzt:** `startObserving()` entfernt, Flow-Collection in den `init`-Block des ViewModels verschoben. `LaunchedEffect`-Aufruf in der UI entfernt.
 
 ---
 
@@ -59,8 +92,15 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ### 3.4 Datenhaltung, Persistence & Room
 
+#### ✅ Finding 3.4.0: ~~`fallbackToDestructiveMigration()` aktiv~~
+- **Betroffene Dateien:** `AppDatabase.kt`
+- **Problem:** Bei Schema-Upgrades ohne explizite Migration löschte Room die komplette Datenbank.
+- **Umgesetzt:** `fallbackToDestructiveMigration()` entfernt; explizite `Migration(1, 2)`-Klasse für `sortOrder`-Spalte implementiert.
+
+---
+
 #### Finding 3.4.1: Getrennte Verwaltung von SQLite-Daten und Foto-Dateien (Dangling Files)
-- **Betroffene Dateien:** `HistoryRepository.kt`, `RoomDatabase.kt`
+- **Betroffene Dateien:** `HistoryRepository.kt`, `AppDatabase.kt`
 - **Problem:**
   Metadaten liegen in Room, Foto-Dateien im Dateisystem (`filesDir/history`). Beim Löschen, Bereinigen (`purgeOlderThanWeeks`) oder Importieren von Backups muss das Löschen von Dateien manuell synchron gehalten werden.
 - **Empfohlene Best Practice:**
@@ -70,6 +110,13 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 ---
 
 ### 3.5 Android Lifecycle & Lokalisierung
+
+#### ✅ Finding 3.5.0: ~~`android:configChanges` in `MainActivity`~~
+- **Betroffene Dateien:** `AndroidManifest.xml`
+- **Problem:** `android:configChanges="orientation|screenSize|keyboardHidden"` unterdrückte Standard-Activity-Recreations bei Rotation und Split-Screen.
+- **Umgesetzt:** Attribut aus dem Manifest entfernt. Alle UI-Zustände liegen in ViewModels oder `rememberSaveable`.
+
+---
 
 #### Finding 3.5.1: Manuelle Locale-Hacks statt Android 13+ App-Sprachen API
 - **Betroffene Dateien:** `MainActivity.kt` (`withAppLanguage`)
