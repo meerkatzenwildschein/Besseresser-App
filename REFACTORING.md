@@ -25,7 +25,6 @@ Dieses Dokument fasst die Ergebnisse des umfassenden Code-Reviews der **Besseres
 Die Besseresser-App verfügt über eine moderne technische Basis (Kotlin 2.0+, Jetpack Compose, Material 3, Type-Safe Navigation Compose, Room, DataStore, Koin). Die bestehende Unit-Test-Abdeckung für Serialisierung, Repositories und Fingerprint-Berechnungen ist solide.
 
 Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von etablierten Android Best Practices auf:
-- **Threading:** Verwendung von blockierendem `runBlocking` auf dem Main-Thread während des Activity-Starts (`attachBaseContext`).
 - **Sicherheit:** `cleartextTrafficPermitted="true"` global im gesamten Netzwerk-Manifest aktiv und API-Keys unverschlüsselt im Standard-DataStore.
 - **Resilienz & Datenhaltung:** `fallbackToDestructiveMigration()` bei Room-Datenbanken aktiv (Gefahr des kompletten Datenverlusts bei Updates) und `configChanges` in `MainActivity` deaktiviert Standard-Activity-Recreations.
 
@@ -35,7 +34,6 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 | Priorität | Bereich | Finding | Auswirkung |
 |---|---|---|---|
-| **P0 (Kritisch)** | Threading | `runBlocking` in `MainActivity.attachBaseContext` | Längere Startzeiten, Risiko von Application Not Responding (ANR) |
 | **P0 (Kritisch)** | Sicherheit | Globales `cleartextTrafficPermitted="true"` & Klartext-API-Keys | Sicherheitsrisiko für sensible Nutzerdaten & API-Zugänge |
 | **P1 (Hoch)** | Persistence | `fallbackToDestructiveMigration()` in Room | Verlust aller Verlaufsdaten bei Schema-Änderungen |
 | **P1 (Hoch)** | Compose | Monolithische Composables (z. B. `MainScreen.kt` > 900 Zeilen) | Mangelnde Wiederverwendbarkeit, unnötige Recompositions |
@@ -106,23 +104,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ### 3.3 Threading, Concurrency & Coroutines
 
-#### Finding 3.3.1: Blockierendes `runBlocking` im Main-Thread während des App-Starts
-- **Betroffene Dateien:** `MainActivity.kt` (Z. 154–160)
-- **Problem:**
-  ```kotlin
-  override fun attachBaseContext(newBase: Context) {
-      val lang = runBlocking { uiPrefsRepository.currentLanguage() }
-      super.attachBaseContext(newBase.withAppLanguage(lang))
-  }
-  ```
-  `runBlocking` zwingt den UI-Thread zum Warten auf DataStore I/O beim Kaltstart der Activity.
-- **Risiko:** Verlängerte App-Startzeit (Startup Latency), Warnungen im Android Vitals Dashboard, ANR-Gefahr bei I/O-Lags.
-- **Empfohlene Best Practice:**
-  Nutzung der offiziellen Android 13+ App-Sprachen-API (siehe Abschnitt 3.6). DataStore-Werte sollten rein asynchron über StateFlow konsumiert werden.
-
----
-
-#### Finding 3.3.2: Harte `Dispatchers.IO`-Referenzen in Klassen
+#### Finding 3.3.1: Harte `Dispatchers.IO`-Referenzen in Klassen
 - **Betroffene Dateien:** `HistoryRepository.kt`, `ImagePreprocessor.kt`, `BackupService.kt`, `ConfigViewModel.kt`
 - **Problem:**
   Direkte Aufrufe von `withContext(Dispatchers.IO)` erschweren das Testen mit `StandardTestDispatcher` oder `UnconfinedTestDispatcher`.
@@ -218,11 +200,11 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 ---
 
 #### Finding 3.6.2: Manuelle Locale-Hacks statt Android 13+ App-Sprachen API
-- **Betroffene Dateien:** `MainActivity.kt` (`withAppLanguage`), `MainActivity.attachBaseContext`
+- **Betroffene Dateien:** `MainActivity.kt` (`withAppLanguage`)
 - **Problem:**
-  Die App manipuliert `ConfigurationContext` und `Locale.setDefault(...)` manuell in `attachBaseContext` und `CompositionLocalProvider`, obwohl `locales_config.xml` bereits vorhanden ist.
+  Die App manipuliert `ConfigurationContext` und `Locale.setDefault(...)` manuell im `CompositionLocalProvider`, obwohl `locales_config.xml` bereits vorhanden ist.
 - **Empfohlene Best Practice:**
-  Migration auf `AppCompatDelegate.setApplicationLocales()` bzw. `android.app.LocaleManager` (ab Android 13, API 33). Dies wird vom Betriebssystem nativ unterstützt, funktioniert ohne `runBlocking` und integriert sich in die Systemeinstellungen von Android.
+  Migration auf `AppCompatDelegate.setApplicationLocales()` bzw. `android.app.LocaleManager` (ab Android 13, API 33). Dies wird vom Betriebssystem nativ unterstützt und integriert sich in die Systemeinstellungen von Android.
 
 ---
 
@@ -254,7 +236,6 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 ### Phase 1: Stabilität, Performance & Sicherheit (Sofortmaßnahmen)
 1. **Sicherheitslücke schließen:** `cleartextTrafficPermitted="false"` in `network_security_config.xml` umstellen.
 2. **Room-Sicherheit:** `fallbackToDestructiveMigration()` entfernen und Migrationsstrategie etablieren.
-3. **Main-Thread Entlastung:** `runBlocking` in `attachBaseContext` durch native Locale-APIs ersetzen.
 
 ### Phase 2: Architektur-Refactoring & Entkopplung (Mittelfristig)
 1. **Decomposition:** `MainScreen.kt` in fokussierte Sub-Composables zerlegen.
