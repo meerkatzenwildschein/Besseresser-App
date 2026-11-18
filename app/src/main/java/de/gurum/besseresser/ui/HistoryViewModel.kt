@@ -91,7 +91,7 @@ class HistoryViewModel(
                     val wkEntries = list.filter { weekKeyOf(it.dateMillis) == targetWk }
                     validateWeekFazit(targetWk, wf, wkEntries)
                 }
-                val mergedWeekMap = validWf?.let { validWeekMap + (targetWk to it) } ?: validWeekMap
+                val mergedWeekMap = if (validWf != null) validWeekMap + (targetWk to validWf) else validWeekMap
                 _uiState.update { current ->
                     current.copy(
                         entries = list,
