@@ -227,14 +227,17 @@ private class HistorySwipeBackState(
 ) {
     private var acc = 0f
     private var hintShown = false
+    private var triggered = false  // prevent multiple back navigations in one drag gesture
 
     fun reset() {
         acc = 0f
         hintShown = false
+        triggered = false
     }
 
     fun onDrag(dragAmount: Float) {
         if (dragAmount == 0f) return
+        if (triggered) return
         acc += dragAmount
         if (kotlin.math.abs(acc) <= 160f) return
 
@@ -242,6 +245,7 @@ private class HistorySwipeBackState(
         if (isBlocked) {
             handleBlocked()
         } else if (dragAmount > 0) {
+            triggered = true
             onBack()
         }
     }
