@@ -187,15 +187,15 @@ data class Settings(
     }
 }
 
-/** Bewertung fuer EIN Ziel: Ampel + Begruendung. */
+/** Bewertung fuer EIN Ziel: Ampel + reason. */
 @Serializable
 data class GoalResult(
     @SerialName("ziel")
     val goal: String = "",
     @SerialName("ampel")
-    val ampel: TrafficLight = TrafficLight.UNKNOWN,
-    @SerialName("begruendung")
-    val begruendung: String = ""
+    val rating: TrafficLight = TrafficLight.UNKNOWN,
+    @SerialName("reason")
+    val reason: String = ""
 )
 
 /** Ergebnis einer Foto-Bewertung durch die KI. */
@@ -203,7 +203,7 @@ data class GoalResult(
 data class Evaluation(
     val goalResults: List<GoalResult> = emptyList(),
     val summary: String = "",
-    val erkannt: String = ""    // Was die KI auf dem Foto (inkl. Nutzer-Anmerkung) erkannt zu haben meint
+    val recognizedMeal: String = ""    // Was die KI auf dem Foto (inkl. Nutzer-Anmerkung) recognizedMeal zu haben meint
 ) {
     /** Prüft, ob diese Bewertung vollständig und passend für die übergebenen Ziele [goals] vorliegt. */
     fun matchesGoals(goals: List<String>): Boolean {

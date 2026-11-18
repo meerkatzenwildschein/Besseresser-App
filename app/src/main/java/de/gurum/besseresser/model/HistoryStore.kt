@@ -20,8 +20,8 @@ data class HistoryEntry(
     val summary: String = "",
     @SerialName("anmerkung")
     val note: String = "",          // Nutzer-Anmerkung zum Foto (WhatsApp-Stil)
-    @SerialName("erkannt")
-    val erkannt: String = "",       // Was die KI auf dem Foto erkannt zu haben meint
+    @SerialName("recognizedMeal")
+    val recognizedMeal: String = "",       // Was die KI auf dem Foto recognizedMeal zu haben meint
     @SerialName("nacherfasst")
     val backdated: Boolean = false, // nachträglich erfasst (keine echte Uhrzeit bekannt)
     @SerialName("sortOrder")
@@ -33,10 +33,10 @@ data class HistoryEntry(
     /** Ampel-Score 0..100 (gruen=100, gelb=50, rot=0, grau ausgeschlossen); -1 = nicht bewertbar. */
     val score: Int
         get() {
-            val known = goalResults.filter { it.ampel != TrafficLight.UNKNOWN }
+            val known = goalResults.filter { it.rating != TrafficLight.UNKNOWN }
             if (known.isEmpty()) return -1
             val avg = known.sumOf {
-                when (it.ampel) {
+                when (it.rating) {
                     TrafficLight.GREEN -> 100.0
                     TrafficLight.YELLOW -> 50.0
                     else -> 0.0
@@ -162,7 +162,7 @@ data class DayFazit(
     @SerialName("tag")
     val dayKey: String = "",
     @SerialName("ampel")
-    val ampel: TrafficLight = TrafficLight.UNKNOWN,              // GREEN | YELLOW | RED
+    val rating: TrafficLight = TrafficLight.UNKNOWN,              // GREEN | YELLOW | RED
     @SerialName("text")
     val text: String = "",
     @SerialName("eintrage")
@@ -170,7 +170,7 @@ data class DayFazit(
     @SerialName("erstellt")
     val createdAt: Long = 0L,
     @SerialName("fp")
-    val fingerprint: String = ""    // Hash-Mix aus ID+erkannt je Eintrag (Text-Korrekturen → veraltet)
+    val fingerprint: String = ""    // Hash-Mix aus ID+recognizedMeal je Eintrag (Text-Korrekturen → veraltet)
 )
 
 /** In-Memory-Sitzungsguard: Auto-Bewertung „kein Fazit" max. 1× pro Tag und App-Session. */
@@ -179,7 +179,7 @@ object DayFazitSession {
     val attemptedWeekly = mutableSetOf<String>()
 }
 
-/** „Quellen-Fingerprint" eines Tages: ID+erkannt je Eintrag. Bearbeitete erkannt-Texte
+/** „Quellen-Fingerprint" eines Tages: ID+recognizedMeal je Eintrag. Bearbeitete recognizedMeal-Texte
  *  oder gelöschte/ergänzte Einträge machen jedes Tagesfazit auf dieser Basis KEINEN gültigen Basis mehr. */
 fun dayFingerprint(entries: List<HistoryEntry>): String =
-    entries.sortedBy { it.id }.joinToString("|") { "${it.id}:${it.erkannt}" }.hashCode().toString(16)
+    entries.sortedBy { it.id }.joinToString("|") { "${it.id}:${it.recognizedMeal}" }.hashCode().toString(16)

@@ -36,8 +36,8 @@ class DomainLogicAndFingerprintTest {
 
     @Test
     fun testDayFingerprintDeterminismAndSorting() {
-        val entry1 = HistoryEntry(id = 10L, erkannt = "Salat")
-        val entry2 = HistoryEntry(id = 20L, erkannt = "Suppe")
+        val entry1 = HistoryEntry(id = 10L, recognizedMeal = "Salat")
+        val entry2 = HistoryEntry(id = 20L, recognizedMeal = "Suppe")
 
         val fp1 = dayFingerprint(listOf(entry1, entry2))
         val fp2 = dayFingerprint(listOf(entry2, entry1))
@@ -47,12 +47,12 @@ class DomainLogicAndFingerprintTest {
 
     @Test
     fun testDayFingerprintChangesOnErkanntCorrection() {
-        val entry1 = HistoryEntry(id = 10L, erkannt = "Salat")
-        val entry2 = HistoryEntry(id = 20L, erkannt = "Suppe")
+        val entry1 = HistoryEntry(id = 10L, recognizedMeal = "Salat")
+        val entry2 = HistoryEntry(id = 20L, recognizedMeal = "Suppe")
 
         val fpOriginal = dayFingerprint(listOf(entry1, entry2))
 
-        val entry2Corrected = entry2.copy(erkannt = "Gulaschsuppe")
+        val entry2Corrected = entry2.copy(recognizedMeal = "Gulaschsuppe")
         val fpModified = dayFingerprint(listOf(entry1, entry2Corrected))
 
         assertNotEquals("Fingerprint must change when recognized food text changes", fpOriginal, fpModified)
@@ -60,9 +60,9 @@ class DomainLogicAndFingerprintTest {
 
     @Test
     fun testDayFingerprintChangesOnAddedOrRemovedEntry() {
-        val entry1 = HistoryEntry(id = 10L, erkannt = "Salat")
-        val entry2 = HistoryEntry(id = 20L, erkannt = "Suppe")
-        val entry3 = HistoryEntry(id = 30L, erkannt = "Kaffee")
+        val entry1 = HistoryEntry(id = 10L, recognizedMeal = "Salat")
+        val entry2 = HistoryEntry(id = 20L, recognizedMeal = "Suppe")
+        val entry3 = HistoryEntry(id = 30L, recognizedMeal = "Kaffee")
 
         val fpTwo = dayFingerprint(listOf(entry1, entry2))
         val fpThree = dayFingerprint(listOf(entry1, entry2, entry3))
@@ -72,14 +72,14 @@ class DomainLogicAndFingerprintTest {
 
     @Test
     fun testIsFazitOutdatedWithMatchingEntries() {
-        val entry1 = HistoryEntry(id = 10L, erkannt = "Salat")
-        val entry2 = HistoryEntry(id = 20L, erkannt = "Suppe")
+        val entry1 = HistoryEntry(id = 10L, recognizedMeal = "Salat")
+        val entry2 = HistoryEntry(id = 20L, recognizedMeal = "Suppe")
         val entries = listOf(entry1, entry2)
         val fp = dayFingerprint(entries)
 
         val fazit = DayFazit(
             dayKey = "20261106",
-            ampel = TrafficLight.GREEN,
+            rating = TrafficLight.GREEN,
             text = "Super",
             entryIds = listOf(10L, 20L),
             fingerprint = fp
@@ -90,35 +90,35 @@ class DomainLogicAndFingerprintTest {
 
     @Test
     fun testIsFazitOutdatedWithModifiedFood() {
-        val entry1 = HistoryEntry(id = 10L, erkannt = "Salat")
-        val entry2 = HistoryEntry(id = 20L, erkannt = "Suppe")
+        val entry1 = HistoryEntry(id = 10L, recognizedMeal = "Salat")
+        val entry2 = HistoryEntry(id = 20L, recognizedMeal = "Suppe")
         val originalEntries = listOf(entry1, entry2)
         val fp = dayFingerprint(originalEntries)
 
         val fazit = DayFazit(
             dayKey = "20261106",
-            ampel = TrafficLight.GREEN,
+            rating = TrafficLight.GREEN,
             text = "Super",
             entryIds = listOf(10L, 20L),
             fingerprint = fp
         )
 
-        val modifiedEntries = listOf(entry1, entry2.copy(erkannt = "Minestrone"))
+        val modifiedEntries = listOf(entry1, entry2.copy(recognizedMeal = "Minestrone"))
         assertTrue("Fazit must be outdated when food recognition text was edited", isFazitOutdated(fazit, modifiedEntries))
     }
 
     @Test
     fun testIsFazitOutdatedWithDifferentEntryIds() {
-        val entry1 = HistoryEntry(id = 10L, erkannt = "Salat")
+        val entry1 = HistoryEntry(id = 10L, recognizedMeal = "Salat")
         val fazit = DayFazit(
             dayKey = "20261106",
-            ampel = TrafficLight.GREEN,
+            rating = TrafficLight.GREEN,
             text = "Super",
             entryIds = listOf(10L),
             fingerprint = dayFingerprint(listOf(entry1))
         )
 
-        val entry2 = HistoryEntry(id = 20L, erkannt = "Snack")
+        val entry2 = HistoryEntry(id = 20L, recognizedMeal = "Snack")
         assertTrue("Fazit must be outdated when entry IDs differ", isFazitOutdated(fazit, listOf(entry1, entry2)))
     }
 
@@ -234,9 +234,9 @@ class DomainLogicAndFingerprintTest {
         val day2MillisA = LocalDate.of(2026, 11, 6).atTime(18, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val day2MillisB = LocalDate.of(2026, 11, 6).atTime(8, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-        val e1 = HistoryEntry(id = 1L, dateMillis = day1Millis, erkannt = "Suppe")
-        val e2a = HistoryEntry(id = 2L, dateMillis = day2MillisA, erkannt = "Abendbrot")
-        val e2b = HistoryEntry(id = 3L, dateMillis = day2MillisB, erkannt = "Frühstück")
+        val e1 = HistoryEntry(id = 1L, dateMillis = day1Millis, recognizedMeal = "Suppe")
+        val e2a = HistoryEntry(id = 2L, dateMillis = day2MillisA, recognizedMeal = "Abendbrot")
+        val e2b = HistoryEntry(id = 3L, dateMillis = day2MillisB, recognizedMeal = "Frühstück")
 
         val groups = groupByDay(listOf(e1, e2a, e2b))
         assertEquals(2, groups.size)
@@ -285,7 +285,7 @@ class DomainLogicAndFingerprintTest {
         DayFazitSession.attempted.clear()
         val date = LocalDate.of(2026, 11, 5)
         val key = dayKeyOf(date)
-        val entry = HistoryEntry(id = 10L, erkannt = "Salat")
+        val entry = HistoryEntry(id = 10L, recognizedMeal = "Salat")
         val group = DayGroup(day = date, entries = listOf(entry))
 
         var triggeredCount = 0
@@ -332,7 +332,7 @@ class DomainLogicAndFingerprintTest {
         assertEquals(1, triggeredCount)
 
         // 5. Existing fazit that became outdated (new meal added) -> DOES re-trigger
-        val outdatedFazit = DayFazit(dayKey = key, ampel = TrafficLight.GREEN, text = "Alt", entryIds = listOf(999L))
+        val outdatedFazit = DayFazit(dayKey = key, rating = TrafficLight.GREEN, text = "Alt", entryIds = listOf(999L))
         handleAutoDayFazit(
             group = group,
             fazitMap = mapOf(key to outdatedFazit),
@@ -357,7 +357,7 @@ class DomainLogicAndFingerprintTest {
             ),
             summary = "Sehr ausgewogenes Mittagessen",
             note = "Selbstgekocht ohne Zusatzstoffe",
-            erkannt = "250 g Gemüse-Curry mit Reis",
+            recognizedMeal = "250 g Gemüse-Curry mit Reis",
             backdated = false
         )
 
@@ -365,12 +365,12 @@ class DomainLogicAndFingerprintTest {
         val existingTargetEntry = HistoryEntry(
             id = 2001L,
             dateMillis = targetDay.atTime(8, 15).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            erkannt = "150 g Skyr mit Beeren"
+            recognizedMeal = "150 g Skyr mit Beeren"
         )
         // Target day had a valid Fazit before duplication
         val targetDayFazit = DayFazit(
             dayKey = dayKeyOf(targetDay),
-            ampel = TrafficLight.GREEN,
+            rating = TrafficLight.GREEN,
             text = "Bisher ein guter Tag",
             entryIds = listOf(existingTargetEntry.id),
             fingerprint = dayFingerprint(listOf(existingTargetEntry))
@@ -393,7 +393,7 @@ class DomainLogicAndFingerprintTest {
         assertEquals(source.goalResults, duplicated.goalResults)
         assertEquals(source.summary, duplicated.summary)
         assertEquals(source.note, duplicated.note)
-        assertEquals(source.erkannt, duplicated.erkannt)
+        assertEquals(source.recognizedMeal, duplicated.recognizedMeal)
         assertEquals(source.score, duplicated.score)
         // Has an explicit user-chosen time on targetDay -> backdated is false
         assertFalse(duplicated.backdated)
@@ -411,7 +411,7 @@ class DomainLogicAndFingerprintTest {
         val legacyBackdatedEntry = HistoryEntry(
             id = 2002L,
             dateMillis = targetDay.atTime(23, 59).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            erkannt = "Alter nacherfasster Eintrag",
+            recognizedMeal = "Alter nacherfasster Eintrag",
             backdated = true,
             sortOrder = targetDay.atTime(23, 59).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         )
@@ -429,7 +429,7 @@ class DomainLogicAndFingerprintTest {
     @Test
     fun testBuildShareTextFormatting() {
         val both = buildShareText(
-            erkannt = "250 g Gemüse-Curry mit Reis",
+            recognizedMeal = "250 g Gemüse-Curry mit Reis",
             summary = "Sehr ausgewogenes Mittagessen."
         )
         assertEquals(
@@ -438,18 +438,18 @@ class DomainLogicAndFingerprintTest {
         )
 
         val onlyDetected = buildShareText(
-            erkannt = "100 g Haferflocken",
+            recognizedMeal = "100 g Haferflocken",
             summary = "   "
         )
         assertEquals("🍽️ 100 g Haferflocken", onlyDetected)
 
         val onlySummary = buildShareText(
-            erkannt = "",
+            recognizedMeal = "",
             summary = "Gute Wahl."
         )
         assertEquals("🧠 Gute Wahl.", onlySummary)
 
-        val neither = buildShareText(erkannt = "", summary = "")
+        val neither = buildShareText(recognizedMeal = "", summary = "")
         assertEquals("", neither)
     }
 
@@ -475,12 +475,12 @@ class DomainLogicAndFingerprintTest {
         val saturdayEntry = HistoryEntry(
             id = 1L,
             dateMillis = LocalDate.of(2026, 11, 7).atTime(13, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            erkannt = "Linsensuppe"
+            recognizedMeal = "Linsensuppe"
         )
         val mondayMorningEntry = HistoryEntry(
             id = 2L,
             dateMillis = LocalDate.of(2026, 11, 9).atTime(8, 30).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
-            erkannt = "Müsli"
+            recognizedMeal = "Müsli"
         )
 
         // On Monday morning, latestDueWeekKey picks last week ("20261102"), even if Monday already has an entry

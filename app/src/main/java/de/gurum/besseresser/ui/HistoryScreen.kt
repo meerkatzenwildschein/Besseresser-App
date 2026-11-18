@@ -84,8 +84,8 @@ fun HistoryScreen(
             promptContext = profileContextLine(ctx, profile),
             dayPrompts = createDayFazitPrompts(ctx),
             weekPromptsProvider = { calWeek -> createWeekFazitPrompts(ctx, calWeek) },
-            dayMealLinesProvider = { list -> dayFazitMealLines(ctx, list) },
-            weekMealLinesProvider = { list -> weekFazitMealLines(ctx, list) }
+            daymealDescriptionsProvider = { list -> dayFazitmealDescriptions(ctx, list) },
+            weekmealDescriptionsProvider = { list -> weekFazitmealDescriptions(ctx, list) }
         )
     }
 
@@ -127,7 +127,7 @@ fun HistoryScreen(
                         entriesOfDay = list,
                         settings = settings,
                         promptContext = profileContextLine(ctx, profile),
-                        mealLines = dayFazitMealLines(ctx, list),
+                        mealDescriptions = dayFazitmealDescriptions(ctx, list),
                         prompts = createDayFazitPrompts(ctx)
                     )
                 },
@@ -136,7 +136,7 @@ fun HistoryScreen(
                         settings = settings,
                         promptContext = profileContextLine(ctx, profile),
                         weekKey = wk,
-                        mealLines = weekFazitMealLines(ctx, uiState.entries.filter { weekKeyOf(it.dateMillis) == wk }),
+                        mealDescriptions = weekFazitmealDescriptions(ctx, uiState.entries.filter { weekKeyOf(it.dateMillis) == wk }),
                         prompts = createWeekFazitPrompts(ctx, calendarWeekOfKey(wk))
                     )
                 },

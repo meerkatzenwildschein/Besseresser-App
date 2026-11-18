@@ -29,7 +29,7 @@ data class MainUiState(
     val note: String = "",
     val showReview: Boolean = false,
     val showCamera: Boolean = false,
-    val showErkanntEdit: Boolean = false,
+    val showRecognizedEdit: Boolean = false,
     val savedEntryId: Long? = null,
     val menuOpen: Boolean = false
 )
@@ -69,8 +69,8 @@ class MainViewModel(
         _uiState.update { it.copy(showReview = show) }
     }
 
-    fun setShowErkanntEdit(show: Boolean) {
-        _uiState.update { it.copy(showErkanntEdit = show) }
+    fun setshowRecognizedEdit(show: Boolean) {
+        _uiState.update { it.copy(showRecognizedEdit = show) }
     }
 
     fun onPhotoTaken(uri: Uri) {
@@ -169,8 +169,8 @@ class MainViewModel(
         val currentNote = _uiState.value.note.trim()
         var updatedEv: Evaluation? = null
         _uiState.update { state ->
-            updatedEv = state.evaluation?.copy(erkannt = trimmed)
-            state.copy(evaluation = updatedEv, showErkanntEdit = false)
+            updatedEv = state.evaluation?.copy(recognizedMeal = trimmed)
+            state.copy(evaluation = updatedEv, showRecognizedEdit = false)
         }
         val evToSave = updatedEv
         if (evToSave != null && currentNote.isNotBlank()) {

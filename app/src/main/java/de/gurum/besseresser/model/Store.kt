@@ -151,7 +151,7 @@ object RecentNotesLogic {
     }
 
     /** Aktualisiert die gespeicherte KI-Antwort eines bestehenden Menü-Eintrags (z. B. nach Korrektur
-     *  des erkannt-Textes oder Re-Evaluierung), ohne Reihenfolge oder Stern-Status zu ändern. */
+     *  des recognizedMeal-Textes oder Re-Evaluierung), ohne Reihenfolge oder Stern-Status zu ändern. */
     fun updateEvaluationInList(
         all: List<RecentNote>,
         note: String,

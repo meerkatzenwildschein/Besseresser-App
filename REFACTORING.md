@@ -40,7 +40,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 | ~~**P2 (Mittel)**~~ | ~~Lifecycle / System~~ | ~~Manueller Locale ContextWrapper~~ | ~~Umgeht Android 13+ Per-App-Language-APIs~~ | ✅ |
 | ~~**P2 (Mittel)**~~ | ~~Testing & DI~~ | ~~Harte `Dispatchers.IO`-Referenzen & fehlende Dispatcher-Injection~~ | ~~Erschwerte deterministische Unit- & Coroutine-Tests~~ | ✅ |
 | ~~**P3 (Niedrig)**~~ | ~~Testing & DI~~ | ~~Fehlende User-Flow-Tests~~ | ~~Keine Testabdeckung für zentrale Flows~~ | ✅ |
-| **P3 (Niedrig)** | Code-Qualität | Denglish-Bezeichner & String-basierte Magic Keys | Wartungsaufwand, Fehleranfälligkeit bei Refactorings | offen |
+| ~~**P3 (Niedrig)**~~ | ~~Code-Qualität~~ | ~~Denglish-Bezeichner & String-basierte Magic Keys~~ | ~~Wartungsaufwand, Fehleranfälligkeit bei Refactorings~~ | ✅ |
 
 ---
 
@@ -135,11 +135,19 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ### 3.7 Code-Style, Naming & Lokalisierung
 
-#### Finding 3.7.1: Vermischung von Deutsch und Englisch (Denglish)
-- **Betroffene Dateien:** Projektweit (z. B. `TrafficLight` vs. `erkannt`, `MainViewModel.showErkanntEdit`, `DayFazit`, `mealLines`)
-- **Empfohlene Best Practice:**
-  Einheitliche Naming Convention im Code: **Englisch für allen Code** (Klassen, Variablen, Methoden, Kommentare, DB-Tabellen), Lokalisierung (Deutsch/Englisch) ausschließlich in `strings.xml`.
-  - Beispiel: `erkannt` -> `recognizedMeal`, `DayFazit` -> `DailySummary`, `TrafficLight` -> `TrafficLight`.
+#### ✅ Finding 3.7.1: ~~Vermischung von Deutsch und Englisch (Denglish)~~
+- **Betroffene Dateien:** Projektweit
+- **Problem:** Deutsche Bezeichner (`erkannt`, `ampel`, `begruendung`, `showErkanntEdit`, `mealLines`, `ErkanntEditDialog`) im Kotlin-Code.
+- **Umgesetzt (codeweites Rename):**
+  - `GoalResult.ampel` → `.rating` (DB-Spalte via `@ColumnInfo(name = "ampel")` unverändert)
+  - `GoalResult.begruendung` → `.reason` (`@SerialName("begruendung")` unverändert)
+  - `HistoryEntry.erkannt` / `Evaluation.erkannt` → `.recognizedMeal` (`@SerialName("erkannt")` unverändert, DB-Spalte via `@ColumnInfo(name = "erkannt")` unverändert)
+  - `DayFazit.ampel` / Entity-Felder → `.rating` (`@ColumnInfo(name = "ampel")` unverändert)
+  - `showErkanntEdit` → `showRecognizedEdit`
+  - `ErkanntEditDialog` → `RecognizedMealEditDialog`
+  - `mealLines` → `mealDescriptions`
+  - Parameter `onEditErkannt` → `onEditRecognizedMeal`
+  - JSON-Schlüssel und DB-Spaltennamen bleiben unberührt — keine Migration nötig.
 
 ---
 

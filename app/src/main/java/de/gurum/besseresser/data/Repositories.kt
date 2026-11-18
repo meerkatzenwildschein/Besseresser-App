@@ -373,7 +373,7 @@ class DefaultHistoryRepository(
         val entry = HistoryEntry(
             id = id, dateMillis = date, photoFile = photoFile,
             goalResults = ev.goalResults, summary = ev.summary,
-            note = note, erkannt = ev.erkannt, backdated = backdated,
+            note = note, recognizedMeal = ev.recognizedMeal, backdated = backdated,
             sortOrder = date
         )
         val dao = historyDao
@@ -394,8 +394,8 @@ class DefaultHistoryRepository(
         deleteWeekFazitForEntry(entry)
     }
 
-    /** erkannt-Text eines gespeicherten Eintrags userkorrigieren (in Room DB aktualisieren).
-     *  Das Tagesfazit bleibt in der DB, wird aber über den Fingerprint als veraltet erkannt. */
+    /** recognizedMeal-Text eines gespeicherten Eintrags userkorrigieren (in Room DB aktualisieren).
+     *  Das Tagesfazit bleibt in der DB, wird aber über den Fingerprint als veraltet recognizedMeal. */
     override suspend fun updateErkannt(id: Long, newText: String) {
         historyDao.updateErkannt(id, newText.trim())
     }

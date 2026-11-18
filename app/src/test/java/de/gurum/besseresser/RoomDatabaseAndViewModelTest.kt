@@ -97,7 +97,7 @@ class RoomDatabaseAndViewModelTest {
             goalResults = listOf(GoalResult("Z1", TrafficLight.GREEN, "B1")),
             summary = "Summary",
             note = "Note",
-            erkannt = "Pizza",
+            recognizedMeal = "Pizza",
             backdated = true,
             sortOrder = 1700000005000L
         )
@@ -108,7 +108,7 @@ class RoomDatabaseAndViewModelTest {
         assertEquals(domain.goalResults, entity.goalResults)
         assertEquals(domain.summary, entity.summary)
         assertEquals(domain.note, entity.note)
-        assertEquals(domain.erkannt, entity.erkannt)
+        assertEquals(domain.recognizedMeal, entity.recognizedMeal)
         assertEquals(domain.backdated, entity.backdated)
         assertEquals(domain.sortOrder, entity.sortOrder)
 
@@ -120,7 +120,7 @@ class RoomDatabaseAndViewModelTest {
     fun testDayFazitEntityMapping() {
         val domain = DayFazit(
             dayKey = "20261106",
-            ampel = TrafficLight.GREEN,
+            rating = TrafficLight.GREEN,
             text = "Super Tag",
             entryIds = listOf(1L, 2L),
             createdAt = 1730000000000L,
@@ -128,7 +128,7 @@ class RoomDatabaseAndViewModelTest {
         )
         val entity = domain.toEntity()
         assertEquals(domain.dayKey, entity.dayKey)
-        assertEquals(domain.ampel, entity.ampel)
+        assertEquals(domain.rating, entity.rating)
         assertEquals(domain.text, entity.text)
         assertEquals(domain.entryIds, entity.entryIds)
         assertEquals(domain.createdAt, entity.createdAt)
@@ -142,7 +142,7 @@ class RoomDatabaseAndViewModelTest {
     fun testWeekFazitEntityMapping() {
         val domain = DayFazit(
             dayKey = "20261102",
-            ampel = TrafficLight.YELLOW,
+            rating = TrafficLight.YELLOW,
             text = "Gute Woche",
             entryIds = listOf(10L, 20L),
             createdAt = 1730000000000L,
@@ -150,7 +150,7 @@ class RoomDatabaseAndViewModelTest {
         )
         val entity = domain.toWeekEntity()
         assertEquals(domain.dayKey, entity.weekKey)
-        assertEquals(domain.ampel, entity.ampel)
+        assertEquals(domain.rating, entity.rating)
         assertEquals(domain.text, entity.text)
         assertEquals(domain.entryIds, entity.entryIds)
         assertEquals(domain.createdAt, entity.createdAt)

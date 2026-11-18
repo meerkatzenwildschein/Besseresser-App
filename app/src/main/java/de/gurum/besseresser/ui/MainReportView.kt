@@ -60,7 +60,7 @@ internal fun MainReportView(
     onOpenHistory: () -> Unit,
     onEditSettings: () -> Unit,
     onOpenConfig: () -> Unit,
-    onEditErkannt: () -> Unit,
+    onEditRecognizedMeal: () -> Unit,
     onTakePhoto: () -> Unit,
     onSaveToHistory: () -> Unit,
     onDiscard: () -> Unit
@@ -150,13 +150,13 @@ internal fun MainReportView(
 
         if (lastGoaled && !results.isNullOrEmpty() && !savedToHistory) {
             val summary = evaluation?.summary ?: ""
-            val det = evaluation?.erkannt.orEmpty()
+            val det = evaluation?.recognizedMeal.orEmpty()
             if (summary.isNotBlank() || det.isNotBlank()) {
                 CollapsibleSummaryBlock(
                     summary = summary,
-                    erkannt = det,
+                    recognizedMeal = det,
                     note = note,
-                    onEditErkannt = { if (det.isNotBlank()) onEditErkannt() }
+                    onEditRecognizedMeal = { if (det.isNotBlank()) onEditRecognizedMeal() }
                 )
             }
             Spacer(Modifier.height(2.dp))

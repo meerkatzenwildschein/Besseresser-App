@@ -125,7 +125,7 @@ fun HeadChip(
 /** Aufgeklappter Fazit-Textblock (Tages- & Wochenfazit) mit Ampel-Akzentrand. */
 @Composable
 fun FazitExpandedCard(fazit: DayFazit) {
-    val accent = ampelColor(fazit.ampel)
+    val accent = ampelColor(fazit.rating)
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -216,7 +216,7 @@ fun WeekFazitRow(
                 else -> HeadChip(
                     label = stringResource(R.string.weekfazit_chip_label),
                     onClick = onToggleExpand,
-                    accent = ampelColor(fazit.ampel),
+                    accent = ampelColor(fazit.rating),
                     leading = { Box(Modifier.size(10.dp).clip(CircleShape).background(Color.White)) },
                     trailing = {
                         Icon(
@@ -244,13 +244,13 @@ fun WeekFazitRow(
 
 /** Mahlzeiten-Zeilen für den Tagesfazit-Prompt: „HH:mm · Erkanntes mit Menge · Anmerkung";
  *  nachgetragene Einträge ohne echte Uhrzeit → Label „nachträglich erfasst". */
-fun dayFazitMealLines(ctx: Context, entriesOfDay: List<HistoryEntry>): List<String> =
+fun dayFazitmealDescriptions(ctx: Context, entriesOfDay: List<HistoryEntry>): List<String> =
     entriesOfDay.sortedBy { it.effectiveSortOrder }.map { e ->
         val time = if (e.backdated)
             ctx.getString(R.string.nacherfassen_label)
         else
             SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(e.dateMillis))
-        val recog = e.erkannt.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
+        val recog = e.recognizedMeal.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
         var line = "$time · $recog"
         e.note.takeIf { it.isNotBlank() }
             ?.let { line += " · " + ctx.getString(R.string.dayfazit_line_note, it.trim()) }
@@ -259,7 +259,7 @@ fun dayFazitMealLines(ctx: Context, entriesOfDay: List<HistoryEntry>): List<Stri
 
 /** Mahlzeiten-Zeilen für den Wochenfazit-Prompt: „dd.MM.yyyy · Erkanntes mit Menge · Anmerkung"
  *  (chronologisch aufsteigend, mit Tagesdatum statt Uhrzeit). */
-fun weekFazitMealLines(ctx: Context, entriesOfWeek: List<HistoryEntry>): List<String> =
+fun weekFazitmealDescriptions(ctx: Context, entriesOfWeek: List<HistoryEntry>): List<String> =
     entriesOfWeek.sortedWith(
         compareBy<HistoryEntry> {
             Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate()
@@ -269,7 +269,7 @@ fun weekFazitMealLines(ctx: Context, entriesOfWeek: List<HistoryEntry>): List<St
             .atZone(ZoneId.systemDefault())
             .toLocalDate()
             .format(DATE_FORMATTER)
-        val recog = e.erkannt.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
+        val recog = e.recognizedMeal.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
         var line = "$dateStr · $recog"
         e.note.takeIf { it.isNotBlank() }
             ?.let { line += " · " + ctx.getString(R.string.dayfazit_line_note, it.trim()) }

@@ -1,4 +1,5 @@
 package de.gurum.besseresser.data
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -32,7 +33,8 @@ data class HistoryEntryEntity(
     val goalResults: List<GoalResult>,
     val summary: String,
     val note: String,
-    val erkannt: String,
+    @ColumnInfo(name = "recognizedMeal")
+    val recognizedMeal: String,
     val backdated: Boolean,
     val sortOrder: Long = dateMillis
 ) {
@@ -43,7 +45,7 @@ data class HistoryEntryEntity(
         goalResults = goalResults,
         summary = summary,
         note = note,
-        erkannt = erkannt,
+        recognizedMeal = recognizedMeal,
         backdated = backdated,
         sortOrder = if (sortOrder != 0L) sortOrder else dateMillis
     )
@@ -56,7 +58,7 @@ fun HistoryEntry.toEntity(): HistoryEntryEntity = HistoryEntryEntity(
     goalResults = goalResults,
     summary = summary,
     note = note,
-    erkannt = erkannt,
+    recognizedMeal = recognizedMeal,
     backdated = backdated,
     sortOrder = effectiveSortOrder
 )
@@ -65,7 +67,8 @@ fun HistoryEntry.toEntity(): HistoryEntryEntity = HistoryEntryEntity(
 data class DayFazitEntity(
     @PrimaryKey
     val dayKey: String,
-    val ampel: TrafficLight,
+    @ColumnInfo(name = "ampel")
+    val rating: TrafficLight,
     val text: String,
     val entryIds: List<Long>,
     val createdAt: Long,
@@ -73,7 +76,7 @@ data class DayFazitEntity(
 ) {
     fun toDomain(): DayFazit = DayFazit(
         dayKey = dayKey,
-        ampel = ampel,
+        rating = rating,
         text = text,
         entryIds = entryIds,
         createdAt = createdAt,
@@ -83,7 +86,7 @@ data class DayFazitEntity(
 
 fun DayFazit.toEntity(): DayFazitEntity = DayFazitEntity(
     dayKey = dayKey,
-    ampel = ampel,
+    rating = rating,
     text = text,
     entryIds = entryIds,
     createdAt = createdAt,
@@ -94,7 +97,8 @@ fun DayFazit.toEntity(): DayFazitEntity = DayFazitEntity(
 data class WeekFazitEntity(
     @PrimaryKey
     val weekKey: String,
-    val ampel: TrafficLight,
+    @ColumnInfo(name = "ampel")
+    val rating: TrafficLight,
     val text: String,
     val entryIds: List<Long>,
     val createdAt: Long,
@@ -102,7 +106,7 @@ data class WeekFazitEntity(
 ) {
     fun toDomain(): DayFazit = DayFazit(
         dayKey = weekKey,
-        ampel = ampel,
+        rating = rating,
         text = text,
         entryIds = entryIds,
         createdAt = createdAt,
@@ -112,7 +116,7 @@ data class WeekFazitEntity(
 
 fun DayFazit.toWeekEntity(): WeekFazitEntity = WeekFazitEntity(
     weekKey = dayKey,
-    ampel = ampel,
+    rating = rating,
     text = text,
     entryIds = entryIds,
     createdAt = createdAt,
@@ -172,8 +176,8 @@ interface HistoryDao {
     @Query("DELETE FROM history_entries")
     suspend fun deleteAll()
 
-    @Query("UPDATE history_entries SET erkannt = :erkannt WHERE id = :id")
-    suspend fun updateErkannt(id: Long, erkannt: String)
+    @Query("UPDATE history_entries SET recognizedMeal = :recognizedMeal WHERE id = :id")
+    suspend fun updateErkannt(id: Long, recognizedMeal: String)
 
     @Query("UPDATE history_entries SET goalResults = :goalResults, summary = :summary WHERE id = :id")
     suspend fun updateEvaluation(id: Long, goalResults: List<GoalResult>, summary: String)

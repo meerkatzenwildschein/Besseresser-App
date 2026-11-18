@@ -141,7 +141,7 @@ fun DayGroupHeader(
             else -> HeadChip(
                 label = stringResource(R.string.dayfazit_chip_label),
                 onClick = onToggleExpand,
-                accent = ampelColor(fazit.ampel),
+                accent = ampelColor(fazit.rating),
                 leading = { Box(Modifier.size(10.dp).clip(CircleShape).background(Color.White)) },
                 trailing = {
                     Icon(
