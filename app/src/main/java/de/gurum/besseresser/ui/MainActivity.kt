@@ -42,12 +42,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
-import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
-import de.gurum.besseresser.data.UiPrefsRepository
 import de.gurum.besseresser.model.AppLanguage
 import de.gurum.besseresser.model.AppThemeMode
 
@@ -148,15 +145,6 @@ object Routes {
 }
 
 class MainActivity : ComponentActivity() {
-
-    private val uiPrefsRepository: UiPrefsRepository by inject()
-
-    override fun attachBaseContext(newBase: Context) {
-        // Einmaliger synchroner Sprach-Read beim Activity-Start (Koin läuft bereits);
-        // danach fließt die Sprache reaktiv über den AppStateViewModel.
-        val lang = runBlocking { uiPrefsRepository.currentLanguage() }
-        super.attachBaseContext(newBase.withAppLanguage(lang))
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
