@@ -61,11 +61,11 @@ class HistoryDetailViewModel(
         _uiState.value.entry?.let { historyRepository.decodeThumbnail(it, target) }
 
     /** recognizedMeal-Text korrigieren (persistiert; Fazit wird über Fingerprint veraltet). */
-    fun updateErkannt(newText: String) {
+    fun updateRecognizedMeal(newText: String) {
         val entry = _uiState.value.entry ?: return
         val trimmed = newText.trim()
         viewModelScope.launch {
-            historyRepository.updateErkannt(entry.id, trimmed)
+            historyRepository.updateRecognizedMeal(entry.id, trimmed)
             if (entry.note.isNotBlank()) {
                 settingsRepository.updateRecentNoteEvaluation(
                     entry.note,

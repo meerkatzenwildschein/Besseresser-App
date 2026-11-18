@@ -136,7 +136,7 @@ class ApiClient(
         private val BEG_KEYS = listOf("reason", "reason", "erklaerung", "beschreibung", "kommentar", "text", "note")
         private val RESULT_ARRAY_KEYS = listOf("bewertung", "bewertungen", "results", "ampeln", "ratings", "ziele", "goals")
 
-        private val ERKANNT_INTRO_PATTERNS = listOf(
+        private val RECOGNIZED_MEAL_INTRO_PATTERNS = listOf(
             Regex("^zu sehen (sind|ist)\\b[:,\\s]*", RegexOption.IGNORE_CASE),
             Regex("^zu sehen\\b[:,\\s]*", RegexOption.IGNORE_CASE),
             Regex("^zu erkennen\\b[:,\\s]*", RegexOption.IGNORE_CASE),
@@ -225,18 +225,18 @@ class ApiClient(
                 }
             }
             val summary = pickString(obj, listOf("zusatz", "summary"))
-            val recognizedMeal = stripErkanntIntro(
+            val recognizedMeal = stripRecognizedMealIntro(
                 pickString(obj, listOf("recognizedMeal", "detected", "food", "meal"))
             )
             return Evaluation(list, summary, recognizedMeal)
         }
 
-        internal fun stripErkanntIntro(raw: String): String {
+        internal fun stripRecognizedMealIntro(raw: String): String {
             var t = raw.trim()
             var changed = true
             while (changed) {
                 changed = false
-                for (p in ERKANNT_INTRO_PATTERNS) {
+                for (p in RECOGNIZED_MEAL_INTRO_PATTERNS) {
                     val stripped = p.replaceFirst(t, "")
                     if (stripped.isNotBlank() && stripped != t) {
                         t = stripped.trim()

@@ -86,7 +86,7 @@ interface HistoryRepository {
     fun getWeekFazitsFlow(): Flow<Map<String, DayFazit>>
     suspend fun getAll(): List<HistoryEntry>
     suspend fun add(photoUri: Uri?, ev: Evaluation, note: String = "", dateOverride: Long? = null, backdated: Boolean = false): HistoryEntry
-    suspend fun updateErkannt(id: Long, newText: String)
+    suspend fun updateRecognizedMeal(id: Long, newText: String)
     suspend fun updateEvaluation(id: Long, goalResults: List<GoalResult>, summary: String)
     suspend fun reorderEntries(reordered: List<HistoryEntry>)
     suspend fun delete(entry: HistoryEntry)
@@ -396,8 +396,8 @@ class DefaultHistoryRepository(
 
     /** recognizedMeal-Text eines gespeicherten Eintrags userkorrigieren (in Room DB aktualisieren).
      *  Das Tagesfazit bleibt in der DB, wird aber über den Fingerprint als veraltet recognizedMeal. */
-    override suspend fun updateErkannt(id: Long, newText: String) {
-        historyDao.updateErkannt(id, newText.trim())
+    override suspend fun updateRecognizedMeal(id: Long, newText: String) {
+        historyDao.updateRecognizedMeal(id, newText.trim())
     }
 
     /** Ziele + Gesamteindruck eines Eintrags neu schreiben (KI-Re-Bewertung nach Korrektur). */

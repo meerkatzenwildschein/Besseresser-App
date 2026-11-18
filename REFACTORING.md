@@ -147,15 +147,23 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
   - `ErkanntEditDialog` → `RecognizedMealEditDialog`
   - `mealLines` → `mealDescriptions`
   - Parameter `onEditErkannt` → `onEditRecognizedMeal`
+  - `updateErkannt()` (DAO, Repository-Interface, Implementierung, ViewModels) → `updateRecognizedMeal()`
+  - `stripErkanntIntro()` → `stripRecognizedMealIntro()` (private in `ApiClient`)
+  - `ERKANNT_INTRO_PATTERNS` → `RECOGNIZED_MEAL_INTRO_PATTERNS` (private Konstante in `ApiClient`)
   - JSON-Schlüssel und DB-Spaltennamen bleiben unberührt — keine Migration nötig.
+  - `DayFazit`-Klassenname und lokale `fazit`-Variablen bleiben (Klassenumbenennung würde DB-Migration erfordern).
 
 ---
 
 ## 4. Empfohlene Roadmap & Nächste Schritte
 
-### Phase 1: Architektur-Refactoring & Entkopplung (Mittelfristig)
+### Phase 1: Architektur-Refactoring & Entkopplung
 ~~1. **Dispatcher Injection:** `CoroutineDispatchers` für saubere Testbarkeit injizierbar machen.~~ ✅
 
-### Phase 2: Qualitäts- & Test-Offensive (Langfristig)
-1. **Compose-Tests & Screenshot-Testing:** Integration von `androidx.compose.ui.test` und Roborazzi für Snapshot-Tests.
-2. **Naming-Konsolidierung:** Schrittweise Vereinheitlichung auf englische Bezeichner in Datenmodellen und Repositories.
+### Phase 2: Qualitäts- & Test-Offensive
+~~1. **Compose-Tests & Screenshot-Testing:** Integration von `androidx.compose.ui.test` und Roborazzi für Snapshot-Tests.~~ ✅ (als ViewModel-Level-Tests in `UserFlowsTest.kt` umgesetzt; Compose UI-Tests erfordern einen Emulator und sind außerhalb des JVM-Test-Scopes)
+~~2. **Naming-Konsolidierung:** Schrittweise Vereinheitlichung auf englische Bezeichner in Datenmodellen und Repositories.~~ ✅ (alle exportierten Bezeichner in Modellen, Repositories und ViewModels auf Englisch umbenannt; `DayFazit`-Klassenname und lokale Variablen bleiben wegen DB-Rückwärtskompatibilität)
+
+---
+
+**Alle Findings und Roadmap-Punkte abgeschlossen.** Die Codebasis entspricht den dokumentierten Android Best Practices.
