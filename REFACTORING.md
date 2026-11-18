@@ -23,8 +23,7 @@ Dieses Dokument fasst die Ergebnisse des umfassenden Code-Reviews der **Besseres
 
 Die Besseresser-App verfügt über eine moderne technische Basis (Kotlin 2.0+, Jetpack Compose, Material 3, Type-Safe Navigation Compose, Room, DataStore, Koin). Die bestehende Unit-Test-Abdeckung für Serialisierung, Repositories und Fingerprint-Berechnungen ist solide.
 
-Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von etablierten Android Best Practices auf:
-- **Resilienz & Datenhaltung:** `fallbackToDestructiveMigration()` bei Room-Datenbanken aktiv (Gefahr des kompletten Datenverlusts bei Updates) und `configChanges` in `MainActivity` deaktiviert Standard-Activity-Recreations.
+Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von etablierten Android Best Practices auf.
 
 ---
 
@@ -32,9 +31,8 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 | Priorität | Bereich | Finding | Auswirkung |
 |---|---|---|---|
-| **P1 (Hoch)** | Persistence | `fallbackToDestructiveMigration()` in Room | Verlust aller Verlaufsdaten bei Schema-Änderungen |
 | **P1 (Hoch)** | Compose | Monolithische Composables (z. B. `MainScreen.kt` > 900 Zeilen) | Mangelnde Wiederverwendbarkeit, unnötige Recompositions |
-| **P2 (Mittel)** | Lifecycle / System | `android:configChanges` & manueller Locale ContextWrapper | Umgeht Standard-Lifecycle, ignoriert Android 13+ Per-App-Language-APIs |
+| **P2 (Mittel)** | Lifecycle / System | Manueller Locale ContextWrapper | Umgeht Android 13+ Per-App-Language-APIs |
 | **P2 (Mittel)** | Testing & DI | Harte `Dispatchers.IO`-Referenzen & fehlende Dispatcher-Injection | Erschwerte deterministische Unit- & Coroutine-Tests |
 | **P3 (Niedrig)** | Code-Qualität | Denglish-Bezeichner & String-basierte Magic Keys | Wartungsaufwand, Fehleranfälligkeit bei Refactorings |
 
@@ -119,23 +117,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ### 3.4 Datenhaltung, Persistence & Room
 
-#### Finding 3.4.1: Destruktive Migration als Fallback
-- **Betroffene Dateien:** `KoinModules.kt` (Z. 49)
-- **Problem:**
-  ```kotlin
-  Room.databaseBuilder(androidContext(), AppDatabase::class.java, "besseresser.db")
-      .fallbackToDestructiveMigration()
-      .build()
-  ```
-- **Risiko:** Bei jedem Schema-Upgrade (z. B. Hinzufügen von Feldern in `HistoryEntity`) ohne explizite Migration löscht Room stillschweigend die komplette SQLite-Datenbank. Alle Mahlzeiten und Auswertungen der Nutzer gehen unwiderruflich verloren!
-- **Empfohlene Best Practice:**
-  1. `fallbackToDestructiveMigration()` in Production-Builds entfernen (`.fallbackToDestructiveMigration(false)`).
-  2. Saubere `Migration(from, to)`-Klassen oder automatische Room-Migrationen (`AutoMigration`) definieren.
-  3. Migrationstests mit `MigrationTestHelper` schreiben.
-
----
-
-#### Finding 3.4.2: Getrennte Verwaltung von SQLite-Daten und Foto-Dateien (Dangling Files)
+#### Finding 3.4.1: Getrennte Verwaltung von SQLite-Daten und Foto-Dateien (Dangling Files)
 - **Betroffene Dateien:** `HistoryRepository.kt`, `RoomDatabase.kt`
 - **Problem:**
   Metadaten liegen in Room, Foto-Dateien im Dateisystem (`filesDir/history`). Beim Löschen, Bereinigen (`purgeOlderThanWeeks`) oder Importieren von Backups muss das Löschen von Dateien manuell synchron gehalten werden.
@@ -147,19 +129,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ### 3.5 Android Lifecycle & Lokalisierung
 
-#### Finding 3.5.1: `android:configChanges` in `MainActivity`
-- **Betroffene Dateien:** `app/src/main/AndroidManifest.xml` (Z. 31)
-- **Problem:**
-  ```xml
-  android:configChanges="orientation|screenSize|keyboardHidden"
-  ```
-- **Risiko:** Das Deaktivieren der Activity-Recreation bei Orientierungswechseln und Größenänderungen (z. B. Split-Screen, Foldables) umgeht Standard-Lifecycle-Mechanismen. UI-Zustände, die nicht in Compose `rememberSaveable` oder ViewModels liegen, können asynchron inkonsistent werden.
-- **Empfohlene Best Practice:**
-  Entfernen von `android:configChanges` und Sicherstellen, dass alle Screens und Dialoge robust gegen Recreations sind (getestet mit "Don't keep activities" / Developer Options).
-
----
-
-#### Finding 3.5.2: Manuelle Locale-Hacks statt Android 13+ App-Sprachen API
+#### Finding 3.5.1: Manuelle Locale-Hacks statt Android 13+ App-Sprachen API
 - **Betroffene Dateien:** `MainActivity.kt` (`withAppLanguage`)
 - **Problem:**
   Die App manipuliert `ConfigurationContext` und `Locale.setDefault(...)` manuell im `CompositionLocalProvider`, obwohl `locales_config.xml` bereits vorhanden ist.
@@ -193,14 +163,11 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ## 4. Empfohlene Roadmap & Nächste Schritte
 
-### Phase 1: Stabilität & Performance (Sofortmaßnahmen)
-1. **Room-Sicherheit:** `fallbackToDestructiveMigration()` entfernen und Migrationsstrategie etablieren.
-
-### Phase 2: Architektur-Refactoring & Entkopplung (Mittelfristig)
+### Phase 1: Architektur-Refactoring & Entkopplung (Mittelfristig)
 1. **Decomposition:** `MainScreen.kt` in fokussierte Sub-Composables zerlegen.
 2. **Reaktive State-Pipelines:** `startObserving()` durch deklarative `stateIn`-Pipelines ersetzen.
 3. **Dispatcher Injection:** `CoroutineDispatchers` für saubere Testbarkeit injizierbar machen.
 
-### Phase 3: Qualitäts- & Test-Offensive (Langfristig)
+### Phase 2: Qualitäts- & Test-Offensive (Langfristig)
 1. **Compose-Tests & Screenshot-Testing:** Integration von `androidx.compose.ui.test` und Roborazzi für Snapshot-Tests.
 2. **Naming-Konsolidierung:** Schrittweise Vereinheitlichung auf englische Bezeichner in Datenmodellen und Repositories.
