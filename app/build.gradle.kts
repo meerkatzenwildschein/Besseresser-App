@@ -1,6 +1,7 @@
+@file:Suppress("UnstableApiUsage")
+
 import java.io.FileInputStream
 import java.time.Instant
-import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Properties
@@ -37,17 +38,18 @@ val keystoreProps = Properties().apply {
 val hasSigningConfig = keystoreProps.getProperty("storeFile") != null
 
 val composeBomVersion = "2024.12.01"
-val coreKtxVersion = "1.15.0"
-val activityComposeVersion = "1.9.3"
+val coreKtxVersion = "1.16.0"
+val activityComposeVersion = "1.10.1"
 val lifecycleVersion = "2.8.7"
-val cameraVersion = "1.4.2"
+val cameraVersion = "1.5.0"
 val kotlinxSerializationVersion = "1.7.3"
-val roomVersion = "2.6.1"
+val roomVersion = "2.7.0"
 val koinVersion = "4.0.4"
-val datastoreVersion = "1.1.1"
-val navigationVersion = "2.8.4"
+val datastoreVersion = "1.1.3"
+val navigationVersion = "2.8.8"
 val exifVersion = "1.3.7"
 val junitVersion = "4.13.2"
+val coroutinesVersion = "1.9.0"
 
 android {
     namespace = "de.gurum.besseresser"
@@ -137,7 +139,7 @@ dependencies {
     implementation("androidx.exifinterface:exifinterface:$exifVersion")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:$junitVersion")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
     testImplementation("io.insert-koin:koin-test:$koinVersion")
     testImplementation("io.insert-koin:koin-test-junit4:$koinVersion")
