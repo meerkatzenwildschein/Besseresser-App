@@ -71,7 +71,7 @@ class DataSerializationTest {
         val json = AppJson.encodeToString(result)
         assertTrue(json.contains("\"ziel\":\"2l Wasser trinken\""))
         assertTrue(json.contains("\"ampel\":\"gruen\""))
-        assertTrue(json.contains("\"reason\":\"Genug Wasser getrunken.\""))
+        assertTrue(json.contains("\"begruendung\":\"Genug Wasser getrunken.\""))
 
         val decoded = AppJson.decodeFromString<GoalResult>(json)
         assertEquals(result, decoded)
@@ -80,7 +80,7 @@ class DataSerializationTest {
     @Test
     fun testGoalResultDeserializationTolerant() {
         // KI returns english or alternate words in ampel field
-        val json = """{"ziel":"Gemüse","ampel":"green","reason":"Viel Salat gegessen"}"""
+        val json = """{"ziel":"Gemüse","ampel":"green","begruendung":"Viel Salat gegessen"}"""
         val decoded = AppJson.decodeFromString<GoalResult>(json)
         assertEquals("Gemüse", decoded.goal)
         assertEquals(TrafficLight.GREEN, decoded.rating)
@@ -114,7 +114,7 @@ class DataSerializationTest {
         assertTrue(json.contains("\"foto\":\"123456789.jpg\""))
         assertTrue(json.contains("\"zusatz\":\"Gesamteindruck gut\""))
         assertTrue(json.contains("\"anmerkung\":\"Mittagessen\""))
-        assertTrue(json.contains("\"recognizedMeal\":\"Pasta mit Tomatensoße\""))
+        assertTrue(json.contains("\"erkannt\":\"Pasta mit Tomatensoße\""))
 
         val decoded = AppJson.decodeFromString<HistoryEntry>(json)
         assertEquals(entry, decoded)

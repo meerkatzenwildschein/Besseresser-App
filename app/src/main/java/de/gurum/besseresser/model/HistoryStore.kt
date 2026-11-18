@@ -20,8 +20,8 @@ data class HistoryEntry(
     val summary: String = "",
     @SerialName("anmerkung")
     val note: String = "",          // Nutzer-Anmerkung zum Foto (WhatsApp-Stil)
-    @SerialName("recognizedMeal")
-    val recognizedMeal: String = "",       // Was die KI auf dem Foto recognizedMeal zu haben meint
+    @SerialName("erkannt")
+    val recognizedMeal: String = "",       // Was die KI auf dem Foto erkannt hat (inkl. Mengenangabe)
     @SerialName("nacherfasst")
     val backdated: Boolean = false, // nachträglich erfasst (keine echte Uhrzeit bekannt)
     @SerialName("sortOrder")

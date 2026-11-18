@@ -194,7 +194,7 @@ data class GoalResult(
     val goal: String = "",
     @SerialName("ampel")
     val rating: TrafficLight = TrafficLight.UNKNOWN,
-    @SerialName("reason")
+    @SerialName("begruendung")
     val reason: String = ""
 )
 
@@ -203,7 +203,8 @@ data class GoalResult(
 data class Evaluation(
     val goalResults: List<GoalResult> = emptyList(),
     val summary: String = "",
-    val recognizedMeal: String = ""    // Was die KI auf dem Foto (inkl. Nutzer-Anmerkung) recognizedMeal zu haben meint
+    @SerialName("erkannt")
+    val recognizedMeal: String = ""    // Was die KI auf dem Foto erkannt hat (inkl. Mengenangabe)
 ) {
     /** Prüft, ob diese Bewertung vollständig und passend für die übergebenen Ziele [goals] vorliegt. */
     fun matchesGoals(goals: List<String>): Boolean {
