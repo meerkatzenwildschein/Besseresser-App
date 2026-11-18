@@ -12,18 +12,4 @@ hin zu einer sauberen MVVM-Schichtenarchitektur. Status: **abgeschlossen**.
 
 - `Theme.GesundEssen` → `Theme.Besseresser` (Manifest + themes.xml).
 - `REFACTORING.md` angelegt (diese Roadmap; vorher nur referenziert, nicht vorhanden).
-- Dependency-Bump: Kotlin 2.0.21, KSP 2.0.21-1.0.25, Compose BOM 2024.12.01, core-ktx 1.15.0, lifecycle 2.8.7, activity-compose 1.9.3, coroutines-test 1.9.0.
-
----
-
-## Offene Punkte & Lint-Findings
-
-### 3. Gezielte Dependency-Updates (Wägung von Stabilität vs. Aktualität)
-- **AndroidX & Lifecycle-Bibliotheken schrittweise und testgetrieben aktualisieren**:
-  - `androidx.core:core-ktx`: `1.15.0` → `1.19.1`
-  - `androidx.activity:activity-compose`: `1.9.3` → `1.13.0`
-  - `androidx.lifecycle:*`: `2.8.7` → `2.11.0`
-  - `androidx.camera:*`: `1.4.2` → `1.6.2`
-  - `androidx.room:*`: `2.6.1` → `2.8.5`
-  - `androidx.datastore:datastore-preferences`: `1.1.1` → `1.3.0`
-  - `androidx.navigation:navigation-compose`: `2.8.4` → `2.10.2`
+- Dependency-Bump: Kotlin 2.0.21, KSP 2.0.21-1.0.26, Compose BOM 2024.12.01, core-ktx 1.16.0, lifecycle 2.8.7, activity-compose 1.10.1, camera 1.5.0, room 2.7.0, datastore 1.1.3, navigation-compose 2.8.8, coroutines-test 1.9.0.
