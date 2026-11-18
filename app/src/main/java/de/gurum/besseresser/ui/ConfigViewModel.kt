@@ -3,13 +3,13 @@ package de.gurum.besseresser.ui
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.BackupService
 import de.gurum.besseresser.data.BackupSummary
 import de.gurum.besseresser.data.HistoryRepository
@@ -18,7 +18,8 @@ import de.gurum.besseresser.data.HistoryRepository
  *  Meldet Ergebnisse als State (UI formatiert die Meldungen). */
 class ConfigViewModel(
     private val backupService: BackupService,
-    private val historyRepository: HistoryRepository
+    private val historyRepository: HistoryRepository,
+    private val dispatchers: AppDispatchers = AppDispatchers()
 ) : ViewModel() {
 
     data class ConfigUiState(
@@ -35,7 +36,7 @@ class ConfigViewModel(
     fun exportBackup() {
         _uiState.update { it.copy(busy = true, error = null, importSummary = null, exportSummary = null, cleared = false) }
         viewModelScope.launch {
-            val res = withContext(Dispatchers.IO) { backupService.exportToDownloads() }
+            val res = withContext(dispatchers.io) { backupService.exportToDownloads() }
             res.onSuccess { summary ->
                 _uiState.update { it.copy(busy = false, exportSummary = summary) }
             }.onFailure { e ->
@@ -47,7 +48,7 @@ class ConfigViewModel(
     fun importBackup(uri: Uri) {
         _uiState.update { it.copy(busy = true, error = null, importSummary = null, exportSummary = null, cleared = false) }
         viewModelScope.launch {
-            val res = withContext(Dispatchers.IO) { backupService.importFromUri(uri) }
+            val res = withContext(dispatchers.io) { backupService.importFromUri(uri) }
             res.onSuccess { summary ->
                 _uiState.update { it.copy(busy = false, importSummary = summary) }
             }.onFailure { e ->
@@ -60,7 +61,7 @@ class ConfigViewModel(
         _uiState.update { it.copy(busy = true, error = null, importSummary = null, exportSummary = null, cleared = false) }
         viewModelScope.launch {
             runCatching {
-                withContext(Dispatchers.IO) { historyRepository.clearAll() }
+                withContext(dispatchers.io) { historyRepository.clearAll() }
             }.onSuccess {
                 _uiState.update { it.copy(busy = false, cleared = true) }
             }.onFailure { e ->

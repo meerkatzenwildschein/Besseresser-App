@@ -1,5 +1,6 @@
 package de.gurum.besseresser.di
 
+import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.ApiClient
 import de.gurum.besseresser.data.AppDatabase
 import de.gurum.besseresser.data.BackupManager
@@ -32,6 +33,8 @@ import org.koin.dsl.module
 
 /** Zentrales Koin-Modul: Datenbank, DataStore, Repositories, API-Service und ViewModels. */
 val appModule = module {
+
+    single { AppDispatchers() }
 
     single { AppDatabase.getInstance(androidContext()) }
     single { get<AppDatabase>().historyDao() }

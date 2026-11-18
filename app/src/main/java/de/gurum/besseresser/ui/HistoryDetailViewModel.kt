@@ -3,7 +3,6 @@ package de.gurum.besseresser.ui
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,6 +12,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
 import java.time.LocalTime
+import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.data.ImagePreprocessor
@@ -29,7 +29,8 @@ class HistoryDetailViewModel(
     val historyRepository: HistoryRepository,
     private val settingsRepository: SettingsRepository,
     private val apiService: BesseresserApiService,
-    private val imagePreprocessor: ImagePreprocessor
+    private val imagePreprocessor: ImagePreprocessor,
+    private val dispatchers: AppDispatchers = AppDispatchers()
 ) : ViewModel() {
 
     data class DetailUiState(
@@ -95,7 +96,7 @@ class HistoryDetailViewModel(
             // imagePreprocessor liest intern via openInputStream: file://-Uri reicht.
             val result: Result<Evaluation> = if (photoFile != null && photoPromptBundle != null) {
                 val dataUri = runCatching {
-                    withContext(Dispatchers.IO) { imagePreprocessor.prepareImageDataUri(Uri.fromFile(photoFile)) }
+                    withContext(dispatchers.io) { imagePreprocessor.prepareImageDataUri(Uri.fromFile(photoFile)) }
                 }.getOrElse { e ->
                     _uiState.update { it.copy(reEvalBusy = false, error = e.message) }
                     return@launch

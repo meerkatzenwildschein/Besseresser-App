@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -296,7 +295,8 @@ class DefaultHistoryRepository(
     private val photoStorage: PhotoStorage,
     private val historyDao: HistoryDao,
     private val dayFazitDao: DayFazitDao,
-    private val weekFazitDao: WeekFazitDao
+    private val weekFazitDao: WeekFazitDao,
+    private val dispatchers: AppDispatchers = AppDispatchers()
 ) : HistoryRepository {
 
     @Volatile
@@ -305,7 +305,7 @@ class DefaultHistoryRepository(
     /** Einmalige Migration historischer JSON-Dateien (filesDir/history) nach Room. */
     override suspend fun ensureMigrated() {
         if (migrationChecked) return
-        withContext(Dispatchers.IO) {
+        withContext(dispatchers.io) {
             synchronized(this@DefaultHistoryRepository) {
                 if (migrationChecked) return@withContext
                 migrationChecked = true

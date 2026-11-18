@@ -2,7 +2,6 @@ package de.gurum.besseresser.ui
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.model.HistoryEntry
@@ -38,7 +38,8 @@ class MainViewModel(
     private val apiService: BesseresserApiService,
     private val historyRepository: HistoryRepository,
     private val settingsRepository: SettingsRepository,
-    private val imagePreprocessor: ImagePreprocessor
+    private val imagePreprocessor: ImagePreprocessor,
+    private val dispatchers: AppDispatchers = AppDispatchers()
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MainUiState())
@@ -119,7 +120,7 @@ class MainViewModel(
             if (tryUseCachedEvaluation(settings)) return@launch
             _uiState.update { it.copy(isBusy = true, error = null) }
             val dataUri = runCatching {
-                withContext(Dispatchers.IO) { imagePreprocessor.prepareImageDataUri(uri) }
+                withContext(dispatchers.io) { imagePreprocessor.prepareImageDataUri(uri) }
             }.getOrElse { e ->
                 _uiState.update { it.copy(error = e.message ?: "Foto konnte nicht gelesen werden.", isBusy = false) }
                 return@launch
