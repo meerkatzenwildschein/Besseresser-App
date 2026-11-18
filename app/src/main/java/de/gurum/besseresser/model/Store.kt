@@ -93,7 +93,7 @@ object RecentNotesLogic {
                                 val text = ((item["t"] ?: item["text"])?.jsonPrimitive?.contentOrNull ?: "").trim()
                                 val sPrimitive = (item["s"] ?: item["starred"])?.jsonPrimitive
                                 val starred = sPrimitive?.booleanOrNull
-                                    ?: (sPrimitive?.intOrNull == 1)
+                                    ?: (sPrimitive?.intOrNull?.let { it == 1 })
                                     ?: (sPrimitive?.contentOrNull?.equals("true", ignoreCase = true) == true)
                                 val evalElem = item["ev"] ?: item["evaluation"]
                                 val ev = evalElem?.let {

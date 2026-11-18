@@ -180,331 +180,443 @@ fun SetupScreen(
                     .padding(horizontal = 20.dp, vertical = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (firstRun) {
-                        Text(
-                            stringResource(R.string.setup_welcome),
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            stringResource(R.string.setup_welcome_text),
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
-                        )
-                        if (onBackupImported != null) {
-                            Spacer(Modifier.height(6.dp))
-                            OutlinedButton(
-                                onClick = { backupImportLauncher.launch(arrayOf("*/*")) },
-                                enabled = !importingBackup && !uiState.splitting,
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                if (importingBackup) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                } else {
-                                    Icon(
-                                        Icons.Filled.Build,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                }
-                                Text(
-                                    stringResource(R.string.setup_import_backup_button),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    } else {
-                        Text(
-                            stringResource(R.string.setup_edit_title),
-                            fontSize = 19.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            stringResource(R.string.setup_edit_text),
-                            fontSize = 12.5.sp,
-                            lineHeight = 17.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
-                        )
-                    }
-                }
-            }
-
-            importError?.let { msg ->
-                ErrorBanner(msg)
-            }
-
-            SectionCard(title = stringResource(R.string.setup_section_api)) {
-                LabelledField(stringResource(R.string.setup_url_label)) {
-                    OutlinedTextField(
-                        value = uiState.url,
-                        onValueChange = { viewModel.setUrl(it) },
-                        placeholder = { Text("https://api.openai.com/v1") },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-                FilledTonalButton(
-                    onClick = { viewModel.setShowProviders(true) },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.setup_pick_provider), fontWeight = FontWeight.SemiBold)
-                }
-
-                LabelledField(stringResource(R.string.setup_key_label)) {
-                    OutlinedTextField(
-                        value = uiState.key,
-                        onValueChange = { viewModel.setKey(it) },
-                        placeholder = { Text(stringResource(R.string.setup_key_placeholder)) },
-                        visualTransformation = PasswordVisualTransformation(),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-
-                LabelledField(stringResource(R.string.setup_model_label)) {
-                    OutlinedTextField(
-                        value = uiState.model,
-                        onValueChange = { viewModel.setModel(it) },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                }
-                FilledTonalButton(
-                    onClick = { viewModel.setShowModels(true) },
-                    enabled = uiState.url.trim().startsWith("http"),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(stringResource(R.string.setup_models_link), fontWeight = FontWeight.SemiBold)
-                }
-            }
-
-            SectionCard(title = stringResource(R.string.setup_section_goals)) {
-                LabelledField(stringResource(R.string.setup_goals_label), required = false) {
-                    OutlinedTextField(
-                        value = uiState.goals,
-                        onValueChange = { viewModel.setGoals(it) },
-                        placeholder = { Text(defaultGoals.joinToString("\n")) },
-                        shape = RoundedCornerShape(12.dp),
-                        minLines = 4,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-
-                if (uiState.splitting) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                        Spacer(Modifier.width(10.dp))
-                        Text(stringResource(R.string.setup_ai_splitting_text), fontSize = 13.sp)
-                    }
-                }
-            }
-
-            SectionCard(title = stringResource(R.string.setup_section_retention)) {
-                LabelledField(stringResource(R.string.setup_retention_label), required = false) {
-                    OutlinedTextField(
-                        value = uiState.retentionWeeks,
-                        onValueChange = { viewModel.setRetentionWeeks(it) },
-                        placeholder = { Text(Settings.DEFAULT_RETENTION_WEEKS.toString()) },
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                Text(
-                    stringResource(R.string.setup_retention_hint),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                SetupHeaderCard(
+                    firstRun = firstRun,
+                    hasBackupImport = onBackupImported != null,
+                    importingBackup = importingBackup,
+                    isSplitting = uiState.splitting,
+                    onImportBackupClick = { backupImportLauncher.launch(arrayOf("*/*")) }
                 )
-            }
 
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.build_label, BuildConfig.APP_VERSION, BuildConfig.BUILD_TIME),
-                fontSize = 11.5.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
-            )
+                importError?.let { msg ->
+                    ErrorBanner(msg)
+                }
 
-            Spacer(Modifier.height(95.dp))
+                SetupApiSection(
+                    url = uiState.url,
+                    key = uiState.key,
+                    model = uiState.model,
+                    onUrlChange = { viewModel.setUrl(it) },
+                    onKeyChange = { viewModel.setKey(it) },
+                    onModelChange = { viewModel.setModel(it) },
+                    onShowProviders = { viewModel.setShowProviders(true) },
+                    onShowModels = { viewModel.setShowModels(true) }
+                )
+
+                SetupGoalsSection(
+                    goals = uiState.goals,
+                    defaultGoalsText = defaultGoals.joinToString("\n"),
+                    splitting = uiState.splitting,
+                    onGoalsChange = { viewModel.setGoals(it) }
+                )
+
+                SetupRetentionSection(
+                    retentionWeeks = uiState.retentionWeeks,
+                    onRetentionWeeksChange = { viewModel.setRetentionWeeks(it) }
+                )
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.build_label, BuildConfig.APP_VERSION, BuildConfig.BUILD_TIME),
+                    fontSize = 11.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+
+                Spacer(Modifier.height(95.dp))
             }
         }
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.Transparent,
-                            MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
-                            MaterialTheme.colorScheme.background
-                        )
-                    )
-                )
-        ) {
-            Button(
-                onClick = save,
-                enabled = valid,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
-                    .fillMaxWidth()
-                    .height(56.dp)
-            ) {
-                Text(
-                    stringResource(if (uiState.splitting) R.string.setup_ai_splitting_button else R.string.setup_save_continue),
-                    fontSize = 16.5.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
+        Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+            SetupBottomSaveBar(
+                valid = valid,
+                isSplitting = uiState.splitting,
+                onSave = save
+            )
         }
     }
 
     if (uiState.showProviders) {
-        AlertDialog(
-            onDismissRequest = { viewModel.setShowProviders(false) },
-            title = { Text(stringResource(R.string.provider_picker_title), fontWeight = FontWeight.Bold) },
-            text = {
-                LazyColumn(
-                    modifier = Modifier.heightIn(max = 450.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(PROVIDERS) { p ->
-                        val isSelected = uiState.url.trim().trimEnd('/') == p.url.trim().trimEnd('/')
-                        Surface(
-                            onClick = {
-                                viewModel.setUrl(p.url)
-                                viewModel.setShowProviders(false)
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (isSelected)
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
-                            else
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                            border = BorderStroke(
-                                1.dp,
-                                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Text(p.name, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
-                                if (p.noteRes != 0) {
-                                    Text(
-                                        stringResource(p.noteRes),
-                                        fontSize = 11.5.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Text(
-                                    p.url,
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
-                        }
-                    }
-                }
+        ProviderPickerDialog(
+            currentUrl = uiState.url,
+            onSelectProvider = {
+                viewModel.setUrl(it)
+                viewModel.setShowProviders(false)
             },
-            confirmButton = {
-                TextButton(onClick = { viewModel.setShowProviders(false) }) { Text(stringResource(R.string.close)) }
-            }
+            onDismiss = { viewModel.setShowProviders(false) }
         )
     }
 
     if (uiState.showSplit) {
-        AlertDialog(
-            onDismissRequest = { viewModel.setShowSplit(false) },
-            title = {
-                Text(
-                    stringResource(
-                        if (uiState.splitDebug == null) R.string.split_title_ok else R.string.split_title_fail
-                    ),
-                    fontWeight = FontWeight.Bold
-                )
+        SplitGoalsDialog(
+            splitDebug = uiState.splitDebug,
+            splitEdited = uiState.splitEdited,
+            onSplitEditedChange = { viewModel.setSplitEdited(it) },
+            onConfirm = {
+                val liste = uiState.splitEdited.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+                viewModel.setShowSplit(false)
+                doSave(liste, true)
             },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (uiState.splitDebug != null) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.errorContainer,
-                            shape = MaterialTheme.shapes.small,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            SelectionContainer {
-                                Text(
-                                    uiState.splitDebug.orEmpty(),
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp,
-                                    modifier = Modifier.padding(8.dp)
-                                )
-                            }
-                        }
-                        Text(
-                            stringResource(R.string.split_local_hint),
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    } else {
-                        Text(stringResource(R.string.split_check_hint), fontSize = 13.sp)
-                    }
-                    OutlinedTextField(
-                        value = uiState.splitEdited,
-                        onValueChange = { viewModel.setSplitEdited(it) },
-                        shape = RoundedCornerShape(12.dp),
-                        minLines = 5,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+            onKeepOriginal = {
+                viewModel.setShowSplit(false)
+                doSave(listOf(uiState.splitRaw), true)
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    val liste = uiState.splitEdited.split("\n").map { it.trim() }.filter { it.isNotBlank() }
-                    viewModel.setShowSplit(false)
-                    doSave(liste, true)
-                }) { Text(stringResource(R.string.split_save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    viewModel.setShowSplit(false)
-                    doSave(listOf(uiState.splitRaw), true)
-                }) { Text(stringResource(R.string.split_keep_original)) }
-            }
+            onDismiss = { viewModel.setShowSplit(false) }
         )
     }
+}
+
+@Composable
+private fun SetupHeaderCard(
+    firstRun: Boolean,
+    hasBackupImport: Boolean,
+    importingBackup: Boolean,
+    isSplitting: Boolean,
+    onImportBackupClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (firstRun) {
+                Text(
+                    stringResource(R.string.setup_welcome),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Text(
+                    stringResource(R.string.setup_welcome_text),
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                )
+                if (hasBackupImport) {
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedButton(
+                        onClick = onImportBackupClick,
+                        enabled = !importingBackup && !isSplitting,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (importingBackup) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        } else {
+                            Icon(
+                                Icons.Filled.Build,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        Text(
+                            stringResource(R.string.setup_import_backup_button),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            } else {
+                Text(
+                    stringResource(R.string.setup_edit_title),
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Text(
+                    stringResource(R.string.setup_edit_text),
+                    fontSize = 12.5.sp,
+                    lineHeight = 17.sp,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetupApiSection(
+    url: String,
+    key: String,
+    model: String,
+    onUrlChange: (String) -> Unit,
+    onKeyChange: (String) -> Unit,
+    onModelChange: (String) -> Unit,
+    onShowProviders: () -> Unit,
+    onShowModels: () -> Unit
+) {
+    SectionCard(title = stringResource(R.string.setup_section_api)) {
+        LabelledField(stringResource(R.string.setup_url_label)) {
+            OutlinedTextField(
+                value = url,
+                onValueChange = onUrlChange,
+                placeholder = { Text("https://api.openai.com/v1") },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+        FilledTonalButton(
+            onClick = onShowProviders,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.setup_pick_provider), fontWeight = FontWeight.SemiBold)
+        }
+
+        LabelledField(stringResource(R.string.setup_key_label)) {
+            OutlinedTextField(
+                value = key,
+                onValueChange = onKeyChange,
+                placeholder = { Text(stringResource(R.string.setup_key_placeholder)) },
+                visualTransformation = PasswordVisualTransformation(),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+
+        LabelledField(stringResource(R.string.setup_model_label)) {
+            OutlinedTextField(
+                value = model,
+                onValueChange = onModelChange,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+        FilledTonalButton(
+            onClick = onShowModels,
+            enabled = url.trim().startsWith("http"),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.setup_models_link), fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun SetupGoalsSection(
+    goals: String,
+    defaultGoalsText: String,
+    splitting: Boolean,
+    onGoalsChange: (String) -> Unit
+) {
+    SectionCard(title = stringResource(R.string.setup_section_goals)) {
+        LabelledField(stringResource(R.string.setup_goals_label), required = false) {
+            OutlinedTextField(
+                value = goals,
+                onValueChange = onGoalsChange,
+                placeholder = { Text(defaultGoalsText) },
+                shape = RoundedCornerShape(12.dp),
+                minLines = 4,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        if (splitting) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(R.string.setup_ai_splitting_text), fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetupRetentionSection(
+    retentionWeeks: String,
+    onRetentionWeeksChange: (String) -> Unit
+) {
+    SectionCard(title = stringResource(R.string.setup_section_retention)) {
+        LabelledField(stringResource(R.string.setup_retention_label), required = false) {
+            OutlinedTextField(
+                value = retentionWeeks,
+                onValueChange = onRetentionWeeksChange,
+                placeholder = { Text(Settings.DEFAULT_RETENTION_WEEKS.toString()) },
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        Text(
+            stringResource(R.string.setup_retention_hint),
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun SetupBottomSaveBar(
+    valid: Boolean,
+    isSplitting: Boolean,
+    onSave: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color.Transparent,
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                        MaterialTheme.colorScheme.background
+                    )
+                )
+            )
+    ) {
+        Button(
+            onClick = onSave,
+            enabled = valid,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .fillMaxWidth()
+                .height(56.dp)
+        ) {
+            Text(
+                stringResource(if (isSplitting) R.string.setup_ai_splitting_button else R.string.setup_save_continue),
+                fontSize = 16.5.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProviderPickerDialog(
+    currentUrl: String,
+    onSelectProvider: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.provider_picker_title), fontWeight = FontWeight.Bold) },
+        text = {
+            LazyColumn(
+                modifier = Modifier.heightIn(max = 450.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(PROVIDERS) { p ->
+                    val isSelected = currentUrl.trim().trimEnd('/') == p.url.trim().trimEnd('/')
+                    Surface(
+                        onClick = { onSelectProvider(p.url) },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isSelected)
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(p.name, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
+                            if (p.noteRes != 0) {
+                                Text(
+                                    stringResource(p.noteRes),
+                                    fontSize = 11.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                p.url,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
+        }
+    )
+}
+
+@Composable
+private fun SplitGoalsDialog(
+    splitDebug: String?,
+    splitEdited: String,
+    onSplitEditedChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onKeepOriginal: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                stringResource(
+                    if (splitDebug == null) R.string.split_title_ok else R.string.split_title_fail
+                ),
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (splitDebug != null) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        SelectionContainer {
+                            Text(
+                                splitDebug,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(8.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        stringResource(R.string.split_local_hint),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Text(stringResource(R.string.split_check_hint), fontSize = 13.sp)
+                }
+                OutlinedTextField(
+                    value = splitEdited,
+                    onValueChange = onSplitEditedChange,
+                    shape = RoundedCornerShape(12.dp),
+                    minLines = 5,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.split_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onKeepOriginal) { Text(stringResource(R.string.split_keep_original)) }
+        }
+    )
 }
 
 // ----------------------------------------------------------------- Modell-Liste (eigener Screen)

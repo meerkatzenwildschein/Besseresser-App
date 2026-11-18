@@ -85,13 +85,13 @@ class HistoryViewModel(
     private fun observeEntries(repo: HistoryRepository) {
         viewModelScope.launch {
             repo.getAllFlow().collect { list ->
-                val validWeekMap = validateAllWeekFazits(repo, list, latestRawWeekMap)
+                val validWeekMap = validateAllWeekFazits(list, latestRawWeekMap)
                 val targetWk = latestDueWeekKey(list) ?: weekKeyOf(System.currentTimeMillis())
                 val validWf = validWeekMap[targetWk] ?: repo.loadWeekFazit(targetWk)?.let { wf ->
                     val wkEntries = list.filter { weekKeyOf(it.dateMillis) == targetWk }
                     validateWeekFazit(targetWk, wf, wkEntries)
                 }
-                val mergedWeekMap = if (validWf != null) validWeekMap + (targetWk to validWf) else validWeekMap
+                val mergedWeekMap = validWf?.let { validWeekMap + (targetWk to it) } ?: validWeekMap
                 _uiState.update { current ->
                     current.copy(
                         entries = list,
@@ -104,7 +104,6 @@ class HistoryViewModel(
     }
 
     private suspend fun validateAllWeekFazits(
-        repo: HistoryRepository,
         entries: List<HistoryEntry>,
         rawMap: Map<String, DayFazit>
     ): Map<String, DayFazit> {
@@ -147,7 +146,7 @@ class HistoryViewModel(
             repo.getWeekFazitsFlow().collect { map ->
                 latestRawWeekMap = map
                 val entries = _uiState.value.entries
-                val validWeekMap = validateAllWeekFazits(repo, entries, map)
+                val validWeekMap = validateAllWeekFazits(entries, map)
                 val targetWk = latestDueWeekKey(entries) ?: weekKeyOf(System.currentTimeMillis())
                 _uiState.update {
                     it.copy(
