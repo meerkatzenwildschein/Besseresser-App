@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.util.Base64
+import androidx.core.graphics.scale
 import java.io.ByteArrayOutputStream
 
 /** Schnittstelle für die Bild-Aufbereitung (ermöglicht einfache Test-Fakes). */
@@ -40,6 +41,6 @@ class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor
         val maxOrig = maxOf(bmp.width, bmp.height)
         if (maxOrig <= maxSide) return bmp
         val factor = maxSide.toFloat() / maxOrig
-        return Bitmap.createScaledBitmap(bmp, (bmp.width * factor).toInt(), (bmp.height * factor).toInt(), true)
+        return bmp.scale((bmp.width * factor).toInt(), (bmp.height * factor).toInt())
     }
 }
