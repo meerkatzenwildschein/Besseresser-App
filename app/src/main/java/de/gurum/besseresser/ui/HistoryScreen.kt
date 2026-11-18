@@ -161,7 +161,8 @@ fun HistoryScreen(
                 onUndoDeleteEntry = { entry -> viewModel.undoDeleteEntry(entry.id) },
                 onMoveEntryWithinDay = { day, fromIdx, toIdx ->
                     viewModel.moveEntryWithinDay(day, fromIdx, toIdx)
-                }
+                },
+                onDecodeThumbnail = { viewModel.decodeThumbnail(it) }
             )
         }
 

@@ -503,4 +503,6 @@ class HistoryViewModel(
             }
         }
     }
+    fun decodeThumbnail(entry: HistoryEntry, target: Int = 128): android.graphics.Bitmap? =
+        historyRepository.decodeThumbnail(entry, target)
 }

@@ -67,7 +67,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import org.koin.compose.koinInject
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -83,7 +82,6 @@ import de.gurum.besseresser.model.dayFingerprint
 import de.gurum.besseresser.model.dayKeyOf
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.weekKeyOf
-import de.gurum.besseresser.data.HistoryRepository
 
 /** Ein Kalendertag mit allen gespeicherten Bewertungen desselben Tages. */
 data class DayGroup(
@@ -120,7 +118,8 @@ fun HistoryListContent(
     onAddMealForDay: (LocalDate) -> Unit,
     onDeleteEntry: (HistoryEntry) -> Unit,
     onUndoDeleteEntry: (HistoryEntry) -> Unit = {},
-    onMoveEntryWithinDay: (LocalDate, Int, Int) -> Unit = { _, _, _ -> }
+    onMoveEntryWithinDay: (LocalDate, Int, Int) -> Unit = { _, _, _ -> },
+    onDecodeThumbnail: (HistoryEntry) -> android.graphics.Bitmap? = { null }
 ) {
     TopBarRow(
         title = stringResource(R.string.history_title),
@@ -222,7 +221,8 @@ fun HistoryListContent(
                     if (isPendingDelete) {
                         PendingDeleteHistoryItem(
                             entry = entry,
-                            onUndo = { onUndoDeleteEntry(entry) }
+                            onUndo = { onUndoDeleteEntry(entry) },
+                            onDecodeThumbnail = onDecodeThumbnail
                         )
                     } else {
                         ReorderableDayMealBox(
@@ -235,7 +235,12 @@ fun HistoryListContent(
                                 enabled = !isDragging,
                                 onTriggerDelete = { onDeleteEntry(entry) }
                             ) {
-                                HistoryItem(entry, onClick = { onPick(entry) }, isLifted = isDragging)
+                                HistoryItem(
+                                    entry = entry,
+                                    onClick = { onPick(entry) },
+                                    isLifted = isDragging,
+                                    onDecodeThumbnail = onDecodeThumbnail
+                                )
                             }
                         }
                     }
@@ -292,9 +297,9 @@ fun HistoryListContent(
 fun HistoryItem(
     entry: HistoryEntry,
     onClick: () -> Unit,
-    isLifted: Boolean = false
+    isLifted: Boolean = false,
+    onDecodeThumbnail: (HistoryEntry) -> android.graphics.Bitmap? = { null }
 ) {
-    val historyRepository: HistoryRepository = koinInject()
     val scale by animateFloatAsState(
         targetValue = if (isLifted) 1.025f else 1f,
         animationSpec = tween(150),
@@ -326,7 +331,7 @@ fun HistoryItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             val thumb = remember(entry.id) {
-                historyRepository.decodeThumbnail(entry)
+                onDecodeThumbnail(entry)
             }
             if (thumb != null) {
                 Image(
@@ -624,9 +629,9 @@ private fun ShortSwipeToDeleteBox(
 @Composable
 fun PendingDeleteHistoryItem(
     entry: HistoryEntry,
-    onUndo: () -> Unit
+    onUndo: () -> Unit,
+    onDecodeThumbnail: (HistoryEntry) -> android.graphics.Bitmap? = { null }
 ) {
-    val historyRepository: HistoryRepository = koinInject()
     val progress = remember(entry.id) { Animatable(1f) }
     LaunchedEffect(entry.id) {
         progress.animateTo(
@@ -652,7 +657,7 @@ fun PendingDeleteHistoryItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val thumb = remember(entry.id) {
-                    historyRepository.decodeThumbnail(entry)
+                    onDecodeThumbnail(entry)
                 }
                 Box(modifier = Modifier.alpha(0.32f)) {
                     if (thumb != null) {
