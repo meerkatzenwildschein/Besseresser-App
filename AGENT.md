@@ -251,15 +251,50 @@ Besseresser-App/
 ### Versionsanhebung & Release-Build
 
 1. `appVersion` und `versionCode` in `app/build.gradle.kts` erhöhen und committen
-   (`versionCode = 4 ↔ 1.3.0`, `5 ↔ 1.4.0`, …).
-2. Tag `vX.Y.Z` auf den Versionsbump-Commit setzen und mit `git push --tags` pushen.
-3. `.\gradlew.bat assembleRelease` → signierte APK liegt unter `app\build\outputs\apk\release\app-release.apk`.
-4. APK als Release-Asset zum GitHub-Release des Tags hochladen (Name: `Besseresser-X.Y.Z.apk`),
-   alternativ über die GitHub-API (Token aus dem Git Credential Manager ziehen; nie ausgeben).
+   (`versionCode = 6 ↔ 1.5.0`, `7 ↔ 1.6.0`, …).
+2. Tag `vX.Y.Z` auf den Versionsbump-Commit setzen:
+   ```powershell
+   git tag vX.Y.Z
+   git push origin main
+   git push origin vX.Y.Z
+   ```
+3. `.\gradlew.bat clean testDebugUnitTest assembleRelease` → signierte APK unter
+   `app\build\outputs\apk\release\app-release.apk`; Signatur danach immer prüfen (s. o.).
+4. GitHub Release anlegen und APK hochladen – **per PowerShell + `Invoke-RestMethod`**:
+   ```powershell
+   # Token aus dem Windows Credential Manager lesen
+   $token = (
+       "protocol=https`nhost=github.com`n" |
+       git credential fill 2>$null |
+       Select-String "^password=(.+)" |
+       ForEach-Object { $_.Matches[0].Groups[1].Value }
+   )
+
+   # Release anlegen (tag muss bereits gepusht sein)
+   $notes = "## What's new in vX.Y.Z`n`n- ..."
+   $release = Invoke-RestMethod `
+       -Uri "https://api.github.com/repos/meerkatzenwildschein/Besseresser-App/releases" `
+       -Method Post `
+       -Headers @{ Authorization = "token $token"; "User-Agent" = "Besseresser-Agent" } `
+       -ContentType "application/json" `
+       -Body (@{ tag_name="vX.Y.Z"; name="vX.Y.Z"; body=$notes; draft=$false; prerelease=$false } | ConvertTo-Json)
+
+   # APK hochladen
+   $apk = "app\build\outputs\apk\release\app-release.apk"
+   $uploadUrl = $release.upload_url -replace '\{.*\}', ''
+   Invoke-RestMethod `
+       -Uri "${uploadUrl}?name=besseresser-vX.Y.Z.apk" `
+       -Method Post `
+       -Headers @{ Authorization = "token $token"; "User-Agent" = "Besseresser-Agent" } `
+       -ContentType "application/vnd.android.package-archive" `
+       -InFile $apk
+   ```
+
+
 5. **Release-Notes auf GitHub immer auf Englisch verfassen** (internationaler Leserkreis, F-Droid).
    Format: `**What's new in Besseresser vX.Y.Z (versionCode N)**` als Überschrift, darunter
    Stichpunkte mit den Nutzer-Features (Fach-Jargon und interne Refactorings weglassen),
-   am Ende primär die `Full changelog:`-Vergleichslinks.
+   am Ende optional `Full changelog:`-Vergleichslinks.
 
 ### Hinweise zur Reproduzierbarkeit
 
