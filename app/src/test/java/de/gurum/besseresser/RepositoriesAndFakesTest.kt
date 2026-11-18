@@ -297,14 +297,18 @@ class FakeApiService(
             summary = "Super Mahlzeit"
         )
     ),
+    var analyzeTextResult: Result<Evaluation>? = null,
     var dayFazitResult: Result<DayFazitResult> = Result.success(
         DayFazitResult(TrafficLight.GREEN, "Guter Tag!")
     ),
     var splitResult: Result<List<String>> = Result.success(listOf("Ziel A", "Ziel B")),
+    var splitGoalsResult: Result<List<String>>? = null,
     var modelsResult: Result<ApiClient.ModelsResult> = Result.success(
         ApiClient.ModelsResult(vision = listOf("gpt-4o", "gpt-4o-mini"), all = listOf("gpt-4o", "gpt-4o-mini"))
     )
 ) : BesseresserApiService {
+
+    var analyzeTextCallCount = 0
 
     override suspend fun analyze(
         imageDataUri: String,
@@ -315,7 +319,10 @@ class FakeApiService(
     override suspend fun analyzeText(
         prompt: String,
         settings: Settings
-    ): Result<Evaluation> = analyzeResult
+    ): Result<Evaluation> {
+        analyzeTextCallCount++
+        return analyzeTextResult ?: analyzeResult
+    }
 
     override suspend fun dayFazit(
         settings: Settings,
@@ -327,7 +334,7 @@ class FakeApiService(
 
     override suspend fun splitGoals(
         request: SplitGoalsRequest
-    ): Result<List<String>> = splitResult
+    ): Result<List<String>> = splitGoalsResult ?: splitResult
 
     override suspend fun fetchModels(baseUrl: String, apiKey: String): Result<ApiClient.ModelsResult> = modelsResult
 }

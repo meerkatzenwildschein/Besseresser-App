@@ -39,6 +39,7 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 | ~~**P2 (Mittel)**~~ | ~~Datenhaltung~~ | ~~Verwaiste Foto-Dateien (Dangling Files)~~ | ~~Speicherleck nach Abstürzen oder Migrationsfehlern~~ | ✅ |
 | ~~**P2 (Mittel)**~~ | ~~Lifecycle / System~~ | ~~Manueller Locale ContextWrapper~~ | ~~Umgeht Android 13+ Per-App-Language-APIs~~ | ✅ |
 | ~~**P2 (Mittel)**~~ | ~~Testing & DI~~ | ~~Harte `Dispatchers.IO`-Referenzen & fehlende Dispatcher-Injection~~ | ~~Erschwerte deterministische Unit- & Coroutine-Tests~~ | ✅ |
+| ~~**P3 (Niedrig)**~~ | ~~Testing & DI~~ | ~~Fehlende User-Flow-Tests~~ | ~~Keine Testabdeckung für zentrale Flows~~ | ✅ |
 | **P3 (Niedrig)** | Code-Qualität | Denglish-Bezeichner & String-basierte Magic Keys | Wartungsaufwand, Fehleranfälligkeit bei Refactorings | offen |
 
 ---
@@ -121,14 +122,14 @@ Gleichzeitig weisen zentrale Bereiche der Codebasis deutliche Abweichungen von e
 
 ### 3.6 Dependency Injection & Testbarkeit
 
-#### Finding 3.6.1: Fehlende UI- & Screenshot-Tests
+#### ✅ Finding 3.6.1: ~~Fehlende UI- & Screenshot-Tests~~
 - **Problem:**
-  Es existieren derzeit Unit-Tests für Serialisierung, Repositories und Room, jedoch keine Compose-UI-Tests (`createComposeRule`) oder Screenshot-Regressionstests (z. B. mit Roborazzi oder Paparazzi).
-- **Empfohlene Best Practice:**
-  Hinzufügen von UI-Tests für zentrale User Flows:
-  - Setup Flow (Ersteinrichtung der API)
-  - Manuelle Nach-Erfassung (`ManualEntryDialog`)
-  - Historien-Filterung und Detailansicht
+  Es existierten Unit-Tests für Serialisierung, Repositories und Room, jedoch keine Tests für die zentralen User Flows.
+- **Umgesetzt:** Neue Testdatei `UserFlowsTest.kt` mit 9 ViewModel-Tests (JVM, kein Emulator):
+  - **Setup Flow** (4 Tests): `init()` aus Settings, unabhängige Setter, `goalsDirty`-Flag, `startSplitGoals()` mit erfolgreichem API-Response.
+  - **Manual Retro-Capture** (3 Tests): `submitBackdated()` ohne Foto speichert Eintrag, Cache-Treffer überspringt API-Aufruf, API-Fehler setzt `addError`.
+  - **History List + Detail** (4 Tests): Einträge reaktiv sichtbar, Pending-Delete undoable, `HistoryDetailViewModel` findet Eintrag per ID, unbekannte ID liefert `null`, `updateErkannt()` persistiert.
+  `FakeApiService` um `analyzeTextResult`, `splitGoalsResult` und `analyzeTextCallCount` erweitert.
 
 ---
 
