@@ -308,10 +308,7 @@ private fun AppNavHost(
             ProfileScreen(
                 initial = appState.profile,
                 onCancel = { navController.popBackStack() },
-                onSave = { p ->
-                    appStateViewModel.saveProfile(p)
-                    navController.popBackStack()
-                },
+                onSave = { navController.popBackStack() },
                 viewModel = koinViewModel()
             )
         }

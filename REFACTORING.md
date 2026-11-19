@@ -90,11 +90,12 @@ Die Findings sind nach Schweregrad klassifiziert:
 * **Empfehlung:** Repository als `private val` deklarieren; nur benötigte Aktionen als ViewModel-Methoden anbieten.
 * **Status:** ✅ Erledigt – `HistoryDetailViewModel` deklariert `historyRepository` nun als `private val`. Sämtliche UI-Interaktionen sind über ViewModel-Methoden gekapselt.
 
-#### 🟡 Finding B.4: Doppelte und unkoordinierte Zustandsspeicherung
+#### 🟡 Finding B.4: Doppelte und unkoordinierte Zustandsspeicherung (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/ProfileViewModel.kt` (Zeilen 70–96) und `MainActivity.kt`
 * **Problem:** Beim Speichern des Profils triggert `ProfileViewModel.save()` eigenständig ein `profileRepository.save()`. Gleichzeitig ruft die `MainActivity` im Callback `appStateViewModel.saveProfile(p)` auf.
 * **Auswirkung:** Doppelte Datenbank-Schreibvorgänge und unklarer Single Source of Truth für Profil-Zustände.
 * **Empfehlung:** Speicherung zentral im `ProfileViewModel` belassen und den globalen `AppStateViewModel` rein reaktiv über Flow-Updates informieren.
+* **Status:** ✅ Erledigt – Die Profil-Speicherung erfolgt nun zentral und ausschließlich über `ProfileViewModel.save()`. `MainActivity` navigiert nach dem Speichern ohne redundanten Aufruf zurück; die redundante Methode `saveProfile` wurde aus `AppStateViewModel` entfernt und `AppStateViewModel` empfängt Profilaktualisierungen rein reaktiv über den `ProfileRepository`-Flow. Verifiziert durch Unit-Tests.
 
 #### 🟡 Finding B.5: Fehlende `SavedStateHandle`-Integration
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/MainViewModel.kt`, `HistoryViewModel.kt`, `SetupViewModel.kt`

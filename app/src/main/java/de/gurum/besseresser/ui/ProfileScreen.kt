@@ -95,7 +95,7 @@ fun profileContextLine(ctx: Context, profile: Profile): String? {
 fun ProfileScreen(
     initial: Profile,
     onCancel: () -> Unit,
-    onSave: (Profile) -> Unit,
+    onSave: () -> Unit,
     viewModel: ProfileViewModel = koinViewModel()
 ) {
     BackHandler(onBack = onCancel)
@@ -268,7 +268,7 @@ fun ProfileScreen(
         ) {
             Button(
                 onClick = {
-                    viewModel.save(onSaved = onSave)
+                    viewModel.save(onSaved = { onSave() })
                 },
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier

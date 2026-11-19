@@ -398,7 +398,7 @@ class RoomDatabaseAndViewModelTest {
     }
 
     @Test
-    fun testAppStateViewModelUiStateTransitions() {
+    fun testAppStateViewModelUiStateTransitions() = runTest(testDispatcher) {
         val settingsRepo = FakeSettingsRepository()
         val profileRepo = FakeProfileRepository()
         val uiPrefsRepo = FakeUiPrefsRepository()
@@ -414,7 +414,7 @@ class RoomDatabaseAndViewModelTest {
         val newSettings = Settings(baseUrl = "https://custom.api", apiKey = "sk-custom", model = "gpt-4o", goals = listOf("Goal 1"))
         viewModel.saveSettings(newSettings)
         val newProfile = Profile(birthDate = "1990-01-01", weightKg = 70.0, heightCm = 175, gender = Gender.MALE)
-        viewModel.saveProfile(newProfile)
+        profileRepo.save(newProfile)
 
         testDispatcher.scheduler.advanceUntilIdle()
 
@@ -423,5 +423,44 @@ class RoomDatabaseAndViewModelTest {
         assertEquals(AppLanguage.EN, updatedState.language)
         assertEquals(newSettings, updatedState.settings)
         assertEquals(newProfile, updatedState.profile)
+    }
+
+    @Test
+    fun testProfileViewModelSavesCentrallyAndAppStateReceivesFlowUpdate() = runTest(testDispatcher) {
+        val settingsRepo = FakeSettingsRepository()
+        val profileRepo = FakeProfileRepository()
+        val uiPrefsRepo = FakeUiPrefsRepository()
+        val historyRepo = FakeHistoryRepository()
+
+        val appStateViewModel = AppStateViewModel(settingsRepo, profileRepo, uiPrefsRepo, historyRepo)
+        val profileViewModel = ProfileViewModel(profileRepo)
+
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(Profile(), appStateViewModel.uiState.value.profile)
+
+        profileViewModel.setBirthDate("1992-06-15")
+        profileViewModel.setWeightText("68,5")
+        profileViewModel.setHeightText("172")
+        profileViewModel.setGender(Gender.FEMALE)
+        profileViewModel.setNotesText("Keine Laktose")
+
+        var onSavedCalled = false
+        val success = profileViewModel.save(onSaved = { onSavedCalled = true })
+        assertTrue(success)
+        assertTrue(onSavedCalled)
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val expectedProfile = Profile(
+            birthDate = "1992-06-15",
+            weightKg = 68.5,
+            heightCm = 172,
+            gender = Gender.FEMALE,
+            notes = "Keine Laktose"
+        )
+        // Repository has received the saved profile
+        assertEquals(expectedProfile, profileRepo.currentProfile())
+        // AppStateViewModel received the update purely reactively via Flow without duplicate save call
+        assertEquals(expectedProfile, appStateViewModel.uiState.value.profile)
     }
 }

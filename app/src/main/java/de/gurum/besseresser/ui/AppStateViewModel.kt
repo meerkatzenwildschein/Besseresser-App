@@ -66,10 +66,6 @@ class AppStateViewModel(
         viewModelScope.launch { settingsRepository.save(settings) }
     }
 
-    fun saveProfile(profile: Profile) {
-        viewModelScope.launch { profileRepository.save(profile) }
-    }
-
     fun setThemeMode(mode: AppThemeMode) {
         viewModelScope.launch { uiPrefsRepository.saveThemeMode(mode) }
     }
