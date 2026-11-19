@@ -9,10 +9,12 @@ import org.junit.Test
 import java.time.LocalDate
 import java.time.ZoneId
 import de.gurum.besseresser.ui.buildShareText
+import de.gurum.besseresser.ui.buildHistoryUiItems
 import de.gurum.besseresser.ui.color
 import de.gurum.besseresser.ui.formatDate
 import de.gurum.besseresser.ui.formatDateTime
 import de.gurum.besseresser.ui.formatTime
+import de.gurum.besseresser.ui.HistoryUiItem
 import de.gurum.besseresser.model.calendarWeekOf
 import de.gurum.besseresser.model.calendarWeekOfKey
 import de.gurum.besseresser.model.DayFazit
@@ -514,5 +516,74 @@ class DomainLogicAndFingerprintTest {
         assertEquals("14:30", formatTime(millis))
         assertEquals("19.11.2026", formatDate(millis))
         assertEquals("19.11.2026 14:30", formatDateTime(millis))
+    }
+
+    @Test
+    fun testBuildHistoryUiItemsPureConstructionAndOrdering() {
+        val today = LocalDate.of(2026, 11, 9) // Monday KW 46
+        val sundayLastWeek = LocalDate.of(2026, 11, 8) // Sunday KW 45
+
+        // Empty entries: produces only today's DayHeaderItem (empty)
+        val emptyUiItems = buildHistoryUiItems(emptyList(), today = today, nowHour = 10)
+        assertEquals(1, emptyUiItems.size)
+        val emptyHeader = emptyUiItems[0] as HistoryUiItem.DayHeaderItem
+        assertEquals(today, emptyHeader.day)
+        assertFalse(emptyHeader.hasEntries)
+        assertEquals("day-20261109", emptyHeader.key)
+
+        // Entries across last week (KW 45) and today (KW 46)
+        val eSun1 = HistoryEntry(
+            id = 101L,
+            dateMillis = sundayLastWeek.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            recognizedMeal = "Sonntagsbraten"
+        )
+        val eSun2 = HistoryEntry(
+            id = 102L,
+            dateMillis = sundayLastWeek.atTime(19, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            recognizedMeal = "Abendbrot"
+        )
+        val eMon1 = HistoryEntry(
+            id = 201L,
+            dateMillis = today.atTime(8, 30).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            recognizedMeal = "Müsli"
+        )
+
+        val items = buildHistoryUiItems(listOf(eSun1, eSun2, eMon1), today = today, nowHour = 10)
+
+        // Expected sequence:
+        // 1. Today DayHeaderItem (Monday KW 46 - not due yet for week fazit)
+        // 2. Monday MealEntryItem (eMon1)
+        // 3. KW 45 WeekFazitItem (due because KW 45 ended and we are on Monday)
+        // 4. Sunday DayHeaderItem (Sunday KW 45)
+        // 5. Sunday MealEntryItem (eSun2 - 19:00 sorted above 12:00)
+        // 6. Sunday MealEntryItem (eSun1 - 12:00)
+
+        assertEquals(6, items.size)
+        assertTrue(items[0] is HistoryUiItem.DayHeaderItem)
+        assertEquals(today, (items[0] as HistoryUiItem.DayHeaderItem).day)
+
+        assertTrue(items[1] is HistoryUiItem.MealEntryItem)
+        assertEquals(201L, (items[1] as HistoryUiItem.MealEntryItem).entry.id)
+        assertEquals(0, (items[1] as HistoryUiItem.MealEntryItem).indexOnDay)
+        assertEquals(1, (items[1] as HistoryUiItem.MealEntryItem).totalCountOnDay)
+
+        assertTrue(items[2] is HistoryUiItem.WeekFazitItem)
+        assertEquals("20261102", (items[2] as HistoryUiItem.WeekFazitItem).weekKey)
+        assertEquals(45, (items[2] as HistoryUiItem.WeekFazitItem).calendarWeek)
+        assertEquals("week-20261102", items[2].key)
+
+        assertTrue(items[3] is HistoryUiItem.DayHeaderItem)
+        assertEquals(sundayLastWeek, (items[3] as HistoryUiItem.DayHeaderItem).day)
+        assertTrue((items[3] as HistoryUiItem.DayHeaderItem).hasEntries)
+
+        assertTrue(items[4] is HistoryUiItem.MealEntryItem)
+        assertEquals(102L, (items[4] as HistoryUiItem.MealEntryItem).entry.id)
+        assertEquals(0, (items[4] as HistoryUiItem.MealEntryItem).indexOnDay)
+        assertEquals(2, (items[4] as HistoryUiItem.MealEntryItem).totalCountOnDay)
+
+        assertTrue(items[5] is HistoryUiItem.MealEntryItem)
+        assertEquals(101L, (items[5] as HistoryUiItem.MealEntryItem).entry.id)
+        assertEquals(1, (items[5] as HistoryUiItem.MealEntryItem).indexOnDay)
+        assertEquals(2, (items[5] as HistoryUiItem.MealEntryItem).totalCountOnDay)
     }
 }
