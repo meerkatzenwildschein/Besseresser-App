@@ -57,8 +57,11 @@ class HistoryDetailViewModel(
     /** Foto-Datei des aktuellen Eintrags (für Anzeige/Teilen; null wenn keins vorhanden). */
     fun photoFile(): File? = _uiState.value.entry?.let { historyRepository.photoFileOf(it) }
 
-    fun thumbnail(target: Int = 1280): android.graphics.Bitmap? =
-        _uiState.value.entry?.let { historyRepository.decodeThumbnail(it, target) }
+    /** Asynchrone Decodierung eines Thumbnails über Dispatchers.IO. */
+    suspend fun thumbnail(target: Int = 1280): android.graphics.Bitmap? =
+        withContext(dispatchers.io) {
+            _uiState.value.entry?.let { historyRepository.decodeThumbnail(it, target) }
+        }
 
     /** recognizedMeal-Text korrigieren (persistiert; Fazit wird über Fingerprint veraltet). */
     fun updateRecognizedMeal(newText: String) {

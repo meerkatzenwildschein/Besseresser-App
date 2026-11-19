@@ -270,7 +270,7 @@ class FakeHistoryRepository : HistoryRepository {
     }
 
     override fun photoFileOf(entry: HistoryEntry): File? = null
-    override fun decodeThumbnail(entry: HistoryEntry, target: Int): Bitmap? = null
+    override suspend fun decodeThumbnail(entry: HistoryEntry, target: Int): Bitmap? = null
 
     override suspend fun purgeOlderThanWeeks(weeks: Int): Int {
         if (weeks <= 0) return 0
