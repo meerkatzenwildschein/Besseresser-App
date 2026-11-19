@@ -96,14 +96,14 @@ fun CameraCaptureScreen(
     }
 
     val providerHolder = remember { mutableStateOf<ProcessCameraProvider?>(null) }
-    val previewView = remember { PreviewView(context) }
+    var previewView by remember { mutableStateOf<PreviewView?>(null) }
     val imageCapture = remember { ImageCapture.Builder().build() }
     var hasCaptured by remember { mutableStateOf(false) }
     var isCapturing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // Bindet die (neu gebaute) Vorschau an den Lifecycle
-    val bindCamera: () -> Unit = {
+    val bindCamera: (PreviewView) -> Unit = { view ->
         try {
             val future = ProcessCameraProvider.getInstance(context)
             future.addListener({
@@ -112,7 +112,7 @@ fun CameraCaptureScreen(
                     providerHolder.value = provider
                     provider.unbindAll()
                     val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
+                        it.setSurfaceProvider(view.surfaceProvider)
                     }
                     provider.bindToLifecycle(
                         lifecycleOwner,
@@ -134,7 +134,7 @@ fun CameraCaptureScreen(
         if (isCapturing) return
         isCapturing = true
         // Kritisch: ImageCapture kennt die Display-Rotation sonst nicht → schiefes EXIF
-        previewView.display?.let { imageCapture.targetRotation = it.rotation }
+        previewView?.display?.let { imageCapture.targetRotation = it.rotation }
         imageCapture.takePicture(
             ImageCapture.OutputFileOptions.Builder(outputFile).build(),
             ContextCompat.getMainExecutor(context),
@@ -192,11 +192,23 @@ fun CameraCaptureScreen(
             }
 
             !hasCaptured -> {
-                // Live-Vorschau
-                AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
-                LaunchedEffect(granted) { if (granted) bindCamera() }
+                // Live-Vorschau: PreviewView idiomatisch in der AndroidView-Factory erzeugen (Finding E.1)
+                AndroidView(
+                    factory = { ctx ->
+                        PreviewView(ctx).apply {
+                            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+                        }.also { view ->
+                            previewView = view
+                            bindCamera(view)
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
                 DisposableEffect(Unit) {
-                    onDispose { providerHolder.value?.unbindAll() }
+                    onDispose {
+                        providerHolder.value?.unbindAll()
+                        previewView = null
+                    }
                 }
 
                 // Kopfzeile über dem Kamerabild mit abgedunkeltem Kreis-Button & Hinweis-Chip
