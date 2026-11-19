@@ -56,9 +56,9 @@ val appModule = module {
     single<BackupService> { BackupManager(androidContext(), get(), get(), get(), get(), get()) }
 
     viewModel { AppStateViewModel(get(), get(), get(), get()) }
-    viewModel { MainViewModel(get(), get(), get(), get()) }
-    viewModel { HistoryViewModel(get(), get(), get(), get()) }
-    viewModel { SetupViewModel(get(), get(), get()) }
+    viewModel { MainViewModel(get(), get(), get(), get(), savedStateHandle = get()) }
+    viewModel { HistoryViewModel(get(), get(), get(), get(), savedStateHandle = get()) }
+    viewModel { SetupViewModel(get(), get(), get(), savedStateHandle = get()) }
     viewModel { ProfileViewModel(get()) }
     viewModel { ConfigViewModel(get(), get()) }
     viewModel { RecentNotesViewModel(get()) }

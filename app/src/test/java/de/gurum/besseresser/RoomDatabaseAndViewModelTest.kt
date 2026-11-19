@@ -1,5 +1,9 @@
 package de.gurum.besseresser
 
+import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
+import java.time.LocalDate
+import java.time.LocalTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -462,5 +466,159 @@ class RoomDatabaseAndViewModelTest {
         assertEquals(expectedProfile, profileRepo.currentProfile())
         // AppStateViewModel received the update purely reactively via Flow without duplicate save call
         assertEquals(expectedProfile, appStateViewModel.uiState.value.profile)
+    }
+
+    @Test
+    fun testMainViewModelSavedStateHandlePersistenceAndRestoration() {
+        val handle = SavedStateHandle()
+        val viewModel1 = MainViewModel(
+            apiService = FakeApiService(),
+            historyRepository = FakeHistoryRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            savedStateHandle = handle
+        )
+
+        viewModel1.setNote("Frühstücks-Müsli")
+        viewModel1.setMenuOpen(true)
+        viewModel1.setShowCamera(true)
+        viewModel1.setShowReview(true)
+        viewModel1.setshowRecognizedEdit(true)
+
+        // Simuliere Prozess-Beendigung und Wiederherstellung via SavedStateHandle
+        val viewModel2 = MainViewModel(
+            apiService = FakeApiService(),
+            historyRepository = FakeHistoryRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            savedStateHandle = handle
+        )
+
+        val restoredState = viewModel2.uiState.value
+        assertEquals("Frühstücks-Müsli", restoredState.note)
+        assertTrue(restoredState.menuOpen)
+        assertTrue(restoredState.showCamera)
+        assertTrue(restoredState.showReview)
+        assertTrue(restoredState.showRecognizedEdit)
+
+        // Reset löscht SavedState
+        viewModel2.reset()
+        val viewModel3 = MainViewModel(
+            apiService = FakeApiService(),
+            historyRepository = FakeHistoryRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            savedStateHandle = handle
+        )
+        assertEquals("", viewModel3.uiState.value.note)
+        assertFalse(viewModel3.uiState.value.menuOpen)
+        assertFalse(viewModel3.uiState.value.showCamera)
+        assertFalse(viewModel3.uiState.value.showReview)
+        assertFalse(viewModel3.uiState.value.showRecognizedEdit)
+    }
+
+    @Test
+    fun testHistoryViewModelSavedStateHandlePersistenceAndRestoration() {
+        val handle = SavedStateHandle()
+        val historyRepo = FakeHistoryRepository()
+        val viewModel1 = HistoryViewModel(
+            apiService = FakeApiService(),
+            historyRepository = historyRepo,
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            savedStateHandle = handle
+        )
+
+        val targetDay = LocalDate.of(2026, 11, 19)
+        val targetTime = LocalTime.of(14, 30)
+
+        viewModel1.setAddNote("Zwischenmahlzeit Apfel")
+        viewModel1.setAddTargetDay(targetDay)
+        viewModel1.setAddTargetTime(targetTime)
+        viewModel1.setAddDialogForDay(targetDay)
+        viewModel1.setShowAddCamera(true)
+        viewModel1.setShowAddReview(true)
+        viewModel1.setShowAddText(true)
+        viewModel1.toggleFazitExpanded("2026-11-19")
+        viewModel1.toggleWeekExpanded("2026-W47")
+
+        // Simuliere Prozess-Wiederherstellung mit demselben SavedStateHandle
+        val viewModel2 = HistoryViewModel(
+            apiService = FakeApiService(),
+            historyRepository = historyRepo,
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            savedStateHandle = handle
+        )
+
+        val restoredState = viewModel2.uiState.value
+        assertEquals("Zwischenmahlzeit Apfel", restoredState.addNote)
+        assertEquals(targetDay, restoredState.addTargetDay)
+        assertEquals(targetTime, restoredState.addTargetTime)
+        assertEquals(targetDay, restoredState.addDialogForDay)
+        assertTrue(restoredState.showAddCamera)
+        assertTrue(restoredState.showAddReview)
+        assertTrue(restoredState.showAddText)
+        assertTrue(restoredState.expandedFazits.contains("2026-11-19"))
+        assertTrue(restoredState.expandedWeeks.contains("2026-W47"))
+        assertTrue(restoredState.expandedWeek)
+    }
+
+    @Test
+    fun testSetupViewModelSavedStateHandlePersistenceAndPreservationOnReinit() {
+        val handle = SavedStateHandle()
+        val viewModel1 = SetupViewModel(
+            apiService = FakeApiService(),
+            backupService = FakeBackupService(),
+            settingsRepository = FakeSettingsRepository(),
+            savedStateHandle = handle
+        )
+
+        viewModel1.setUrl("https://my-custom-proxy.internal")
+        viewModel1.setKey("sk-secret-key-42")
+        viewModel1.setModel("claude-3-5-sonnet")
+        viewModel1.setGoals("Mehr Wasser trinken\nKein Zucker")
+        viewModel1.setRetentionWeeks("24")
+        viewModel1.setShowModels(true)
+        viewModel1.setShowProviders(true)
+        viewModel1.setShowSplit(true)
+        viewModel1.setSplitEdited("Split Test")
+
+        // Simuliere Prozess-Beendigung und Wiederherstellung
+        val viewModel2 = SetupViewModel(
+            apiService = FakeApiService(),
+            backupService = FakeBackupService(),
+            settingsRepository = FakeSettingsRepository(),
+            savedStateHandle = handle
+        )
+
+        val stateAfterRecreate = viewModel2.uiState.value
+        assertEquals("https://my-custom-proxy.internal", stateAfterRecreate.url)
+        assertEquals("sk-secret-key-42", stateAfterRecreate.key)
+        assertEquals("claude-3-5-sonnet", stateAfterRecreate.model)
+        assertEquals("Mehr Wasser trinken\nKein Zucker", stateAfterRecreate.goals)
+        assertTrue(stateAfterRecreate.goalsDirty)
+        assertEquals("24", stateAfterRecreate.retentionWeeks)
+        assertTrue(stateAfterRecreate.showModels)
+        assertTrue(stateAfterRecreate.showProviders)
+        assertTrue(stateAfterRecreate.showSplit)
+        assertEquals("Split Test", stateAfterRecreate.splitEdited)
+
+        // Wenn SetupScreen bei Neuerstellung LaunchedEffect(initial) { init(...) } aufruft,
+        // dürfen ungespeicherte Benutzereingaben nicht durch alte Settings überschrieben werden!
+        val defaultSettings = Settings("https://api.openai.com/v1", "sk-old", "gpt-4o", listOf("Altes Ziel"))
+        viewModel2.init(defaultSettings, listOf("Default Goal"))
+
+        val stateAfterScreenReinit = viewModel2.uiState.value
+        assertEquals("https://my-custom-proxy.internal", stateAfterScreenReinit.url)
+        assertEquals("sk-secret-key-42", stateAfterScreenReinit.key)
+        assertEquals("Mehr Wasser trinken\nKein Zucker", stateAfterScreenReinit.goals)
+
+        // Bei explizitem force = true (z.B. nach Backup-Import) wird überschrieben
+        viewModel2.init(defaultSettings, listOf("Default Goal"), force = true)
+        val stateAfterForcedInit = viewModel2.uiState.value
+        assertEquals("https://api.openai.com/v1", stateAfterForcedInit.url)
+        assertEquals("sk-old", stateAfterForcedInit.key)
+        assertEquals("Altes Ziel", stateAfterForcedInit.goals)
     }
 }

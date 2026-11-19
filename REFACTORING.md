@@ -97,11 +97,12 @@ Die Findings sind nach Schweregrad klassifiziert:
 * **Empfehlung:** Speicherung zentral im `ProfileViewModel` belassen und den globalen `AppStateViewModel` rein reaktiv über Flow-Updates informieren.
 * **Status:** ✅ Erledigt – Die Profil-Speicherung erfolgt nun zentral und ausschließlich über `ProfileViewModel.save()`. `MainActivity` navigiert nach dem Speichern ohne redundanten Aufruf zurück; die redundante Methode `saveProfile` wurde aus `AppStateViewModel` entfernt und `AppStateViewModel` empfängt Profilaktualisierungen rein reaktiv über den `ProfileRepository`-Flow. Verifiziert durch Unit-Tests.
 
-#### 🟡 Finding B.5: Fehlende `SavedStateHandle`-Integration
+#### 🟡 Finding B.5: Fehlende `SavedStateHandle`-Integration (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/MainViewModel.kt`, `HistoryViewModel.kt`, `SetupViewModel.kt`
 * **Problem:** ViewModels nutzen kein `SavedStateHandle` zur Zustandssicherung bei Prozess-Beendigung im Hintergrund (System-Initiated Process Death).
 * **Auswirkung:** Temporäre Notizeingaben oder Filtereinstellungen gehen verloren, wenn Android die App im Hintergrund beendet.
 * **Empfehlung:** Wichtige UI-Zustände (z. B. eingegebener Text, ausgewählte Datumsfilter) an `SavedStateHandle` koppeln.
+* **Status:** ✅ Erledigt – `MainViewModel`, `HistoryViewModel` und `SetupViewModel` sichern ihre flüchtigen UI-Zustände (Notizeingaben, Datums- und Zeitfilter, Dialog-Zustände, UI-Eingaben) persistent in `SavedStateHandle`. Bei Prozess-Wiederherstellung werden die Werte nahtlos rekonstruiert und Re-Initialisierungen überschreiben ungespeicherte Benutzereingaben nicht. Über umfassende Unit-Tests verifiziert.
 
 ---
 

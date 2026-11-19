@@ -131,7 +131,7 @@ class DefaultSettingsRepository(private val dataStore: DataStore<Preferences>) :
         val GOALS_WERE_SPLIT = booleanPreferencesKey("goalsWereSplit")
         val RETENTION_WEEKS = intPreferencesKey("retentionWeeks")
         val RECENT_NOTES = stringPreferencesKey("recentNotes")
-        const val DEFAULT_MODEL = "gpt-4o-mini"
+        const val DEFAULT_MODEL = Settings.DEFAULT_MODEL
     }
 
     override val settings: Flow<Settings> = dataStore.data.map { p -> p.toSettings() }
