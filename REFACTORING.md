@@ -155,9 +155,9 @@ Die Findings sind nach Schweregrad klassifiziert:
 
 ### E. Kamera, I/O & Ressourcen-Management
 
-#### 🟡 Finding E.1: Erzeugung von `PreviewView` außerhalb der AndroidView-Factory
-* **Ort:** `app/src/main/java/de/gurum/besseresser/ui/CameraScreen.kt` (Zeilen 129, 218)
-* **Problem:** `val previewView = remember { PreviewView(context) }` wird im Composable-Scope erzeugt und an `AndroidView(factory = { previewView })` übergeben.
+#### 🟡 Finding E.1: Erzeugung von `PreviewView` außerhalb der AndroidView-Factory (✅ Erledigt)
+* **Ort:** `app/src/main/java/de/gurum/besseresser/ui/CameraScreen.kt`
+* **Problem:** `val previewView = remember { PreviewView(context) }` wurde im Composable-Scope erzeugt und an `AndroidView(factory = { previewView })` übergeben.
 * **Auswirkung:** Kann bei Konfigurationsänderungen oder Wiederverwendung von Views zu Memory Leaks oder veralteten Kontext-Referenzen führen.
 * **Empfehlung:** Idiomatische Nutzung der `AndroidView`-Factory:
   ```kotlin
@@ -170,6 +170,7 @@ Die Findings sind nach Schweregrad klassifiziert:
       modifier = Modifier.fillMaxSize()
   )
   ```
+* **Status:** ✅ Erledigt – `PreviewView` wird nun idiomatisch innerhalb der `AndroidView`-Factory mit `implementationMode = PreviewView.ImplementationMode.COMPATIBLE` erzeugt. Die Lifecycle-Bindung von CameraX sowie das saubere Ressourcen-Management bei Lifecycle-/Recomposition-Wechseln sind direkt an die View gekoppelt.
 
 #### 🟡 Finding E.2: Verwaiste temporäre Fotodateien im Cache
 * **Ort:** `app/src/main/java/de/gurum/besseresser/data/PhotoCaptureManager.kt`
