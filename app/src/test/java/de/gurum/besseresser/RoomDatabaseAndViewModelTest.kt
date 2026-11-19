@@ -28,7 +28,11 @@ import de.gurum.besseresser.ui.HistoryViewModel
 import de.gurum.besseresser.ui.MainViewModel
 import de.gurum.besseresser.ui.ProfileViewModel
 import de.gurum.besseresser.ui.RecentNotesViewModel
+import de.gurum.besseresser.data.AppDatabase
+import de.gurum.besseresser.data.AppDatabase_Impl
+import de.gurum.besseresser.data.HistoryEntryEntity
 import de.gurum.besseresser.data.RoomConverters
+import androidx.sqlite.db.SupportSQLiteDatabase
 import de.gurum.besseresser.ui.SetupViewModel
 import de.gurum.besseresser.data.BackupService
 import de.gurum.besseresser.data.BackupSummary
@@ -166,6 +170,53 @@ class RoomDatabaseAndViewModelTest {
 
         val restored = entity.toDomain()
         assertEquals(domain, restored)
+    }
+
+    @Test
+    fun testAppDatabaseImplSchemaAndVersion() {
+        val dbImpl = AppDatabase_Impl()
+        val delegateMethod = AppDatabase_Impl::class.java.getDeclaredMethod("createOpenDelegate")
+        delegateMethod.isAccessible = true
+        val openDelegate = delegateMethod.invoke(dbImpl) as androidx.room.RoomOpenDelegate
+        assertEquals(3, openDelegate.version)
+    }
+
+    @Test
+    fun testMigration1to2AddsSortOrder() {
+        val executedSql = mutableListOf<String>()
+        val fakeDb = java.lang.reflect.Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java)
+        ) { _, method, args ->
+            if (method.name == "execSQL" && args != null && args.isNotEmpty()) {
+                executedSql.add(args[0] as String)
+            }
+            null
+        } as SupportSQLiteDatabase
+
+        AppDatabase.MIGRATION_1_2.migrate(fakeDb)
+
+        assertTrue(executedSql.any { it.contains("ADD COLUMN sortOrder") })
+        assertTrue(executedSql.any { it.contains("SET sortOrder = dateMillis") })
+    }
+
+    @Test
+    fun testMigration2to3CreatesIndices() {
+        val executedSql = mutableListOf<String>()
+        val fakeDb = java.lang.reflect.Proxy.newProxyInstance(
+            SupportSQLiteDatabase::class.java.classLoader,
+            arrayOf(SupportSQLiteDatabase::class.java)
+        ) { _, method, args ->
+            if (method.name == "execSQL" && args != null && args.isNotEmpty()) {
+                executedSql.add(args[0] as String)
+            }
+            null
+        } as SupportSQLiteDatabase
+
+        AppDatabase.MIGRATION_2_3.migrate(fakeDb)
+
+        assertTrue(executedSql.any { it.contains("index_history_entries_dateMillis") && it.contains("dateMillis") })
+        assertTrue(executedSql.any { it.contains("index_history_entries_sortOrder") && it.contains("sortOrder") })
     }
 
     @Test
