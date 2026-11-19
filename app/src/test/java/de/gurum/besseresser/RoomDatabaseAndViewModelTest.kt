@@ -38,6 +38,10 @@ import de.gurum.besseresser.model.TrafficLight
 import de.gurum.besseresser.model.Profile
 import de.gurum.besseresser.model.Settings
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RoomDatabaseAndViewModelTest {
@@ -300,15 +304,60 @@ class RoomDatabaseAndViewModelTest {
     }
 
     @Test
-    fun testRecentNotesViewModelUiStateTransitions() {
+    fun testRecentNotesViewModelUiStateTransitions() = runTest(testDispatcher) {
         val note = RecentNote("Salat", starred = false)
         val settingsRepo = FakeSettingsRepository(initialRecentNotes = listOf(note))
         val viewModel = RecentNotesViewModel(settingsRepo)
 
+        val collectJob = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.notes.collect()
+        }
+
         testDispatcher.scheduler.advanceUntilIdle()
         viewModel.toggleStar(note)
+        testDispatcher.scheduler.advanceUntilIdle()
         val updated = checkNotNull(viewModel.notes.value.firstOrNull { it.text == "Salat" })
         assertTrue(updated.starred)
+
+        val newNote = RecentNote("Obst", starred = false)
+        viewModel.push(newNote)
+        testDispatcher.scheduler.advanceUntilIdle()
+        val pushed = checkNotNull(viewModel.notes.value.firstOrNull { it.text == "Obst" })
+        assertFalse(pushed.starred)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testRecentNotesViewModelReactiveUpdatesFromRepository() = runTest(testDispatcher) {
+        val settingsRepo = FakeSettingsRepository(initialRecentNotes = listOf(RecentNote("Suppe", starred = false)))
+        val viewModel = RecentNotesViewModel(settingsRepo)
+
+        val collectJob = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.notes.collect()
+        }
+
+        testDispatcher.scheduler.advanceUntilIdle()
+        assertEquals(1, viewModel.notes.value.size)
+        assertEquals("Suppe", viewModel.notes.value.first().text)
+
+        // Externes Hinzufügen über Repository (z.B. MainViewModel oder HistoryViewModel)
+        settingsRepo.pushRecentNote("Pizza")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(2, viewModel.notes.value.size)
+        assertTrue(viewModel.notes.value.any { it.text == "Pizza" })
+
+        // Externes Favorisieren
+        settingsRepo.toggleStarRecentNote("Pizza")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val pizza = checkNotNull(viewModel.notes.value.firstOrNull { it.text == "Pizza" })
+        assertTrue(pizza.starred)
+        // Bei sortStarredFirst = true muss Pizza an erster Stelle stehen
+        assertEquals("Pizza", viewModel.notes.value.first().text)
+
+        collectJob.cancel()
     }
 
     @Test
