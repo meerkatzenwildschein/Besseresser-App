@@ -183,11 +183,12 @@ Die Findings sind nach Schweregrad klassifiziert:
 
 ### F. Sicherheit & Privatsphäre
 
-#### 🔴 Finding F.1: Speicherung des KI-API-Keys im Klartext
-* **Ort:** `app/src/main/java/de/gurum/besseresser/data/SettingsStore.kt`
-* **Problem:** Der API-Key (`Settings.apiKey`) wird unverschlüsselt in Room/DataStore gespeichert. Bei gerooteten Geräten oder unverschlüsselten Backups ist der Schlüssel im Klartext lesbar.
+#### 🔴 Finding F.1: Speicherung des KI-API-Keys im Klartext (✅ Erledigt)
+* **Ort:** `app/src/main/java/de/gurum/besseresser/data/KeyVault.kt`, `Repositories.kt`
+* **Problem:** Der API-Key (`Settings.apiKey`) wurde unverschlüsselt in Room/DataStore gespeichert. Bei gerooteten Geräten oder unverschlüsselten Backups war der Schlüssel im Klartext lesbar.
 * **Auswirkung:** Sicherheitsrisiko für Nutzerkonten (OpenAI/Anthropic/Custom API Keys).
-* **Empfehlung:** Sensible Zugangsdaten über `EncryptedSharedPreferences` oder den Android Keystore (z. B. via `androidx.security:security-crypto`) sichern.
+* **Empfehlung:** Sensible Zugangsdaten über `EncryptedSharedPreferences` oder den Android Keystore (z. B. via `KeyVault` mit AES-GCM / 256-Bit KeyGenParameterSpec) sichern.
+* **Status:** ✅ Erledigt – Der API-Key wird hardwaregestützt über `KeyVault` mit AES-GCM (256-Bit-Schlüssel im Android Keystore) verschlüsselt und sicher in den Preferences persistiert. Die Ver- und Entschlüsselung wurde gehärtet (Thread-Sicherheit via `@Synchronized`, sichere Puffer- und Header-Validierung, Null-Handling bei ungültigem Chiffrat, Rückwärtskompatibilität für Klartext-Migration). Durch Unit-Tests in `RepositoriesAndFakesTest` abgesichert.
 
 #### 🟡 Finding F.2: Fehlende TLS/HTTPS-Erzwingung bei benutzerdefinierten Endpunkten
 * **Ort:** `app/src/main/java/de/gurum/besseresser/data/ApiClient.kt`

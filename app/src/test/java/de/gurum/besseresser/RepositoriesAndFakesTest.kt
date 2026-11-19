@@ -35,6 +35,7 @@ import de.gurum.besseresser.data.BackupSummary
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.DayFazitResult
 import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.KeyVault
 import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.DefaultPhotoCaptureManager
 import de.gurum.besseresser.data.UiPrefsRepository
@@ -1178,6 +1179,68 @@ class RepositoriesAndFakesTest {
         } finally {
             tempDir.deleteRecursively()
         }
+    }
+
+    @Test
+    fun testKeyVaultEncryptionAndDecryptionRoundTrip() {
+        val keyGen = javax.crypto.KeyGenerator.getInstance("AES")
+        keyGen.init(256)
+        val secretKey = keyGen.generateKey()
+
+        val plainApiKey = "sk-proj-1234567890abcdefABCDEF_!@#$"
+        val encrypted = KeyVault.encryptWithKey(plainApiKey, secretKey)
+
+        assertNotNull(encrypted)
+        assertTrue(encrypted.isNotBlank())
+        // Ciphertext should not contain plaintext API key
+        assertFalse(encrypted.contains(plainApiKey))
+
+        val decrypted = KeyVault.decryptWithKey(encrypted, secretKey)
+        assertEquals(plainApiKey, decrypted)
+    }
+
+    @Test
+    fun testKeyVaultBlankAndEmptyHandling() {
+        val keyGen = javax.crypto.KeyGenerator.getInstance("AES")
+        keyGen.init(256)
+        val secretKey = keyGen.generateKey()
+
+        assertEquals("", KeyVault.encryptWithKey("", secretKey))
+        assertEquals("", KeyVault.encryptWithKey("   ", secretKey))
+        assertEquals("", KeyVault.decryptWithKey("", secretKey))
+        assertEquals("", KeyVault.decryptWithKey("   ", secretKey))
+
+        assertEquals("", KeyVault.encrypt(""))
+        assertEquals("", KeyVault.encrypt("   "))
+        assertEquals("", KeyVault.decrypt(""))
+        assertEquals("", KeyVault.decrypt("   "))
+    }
+
+    @Test
+    fun testKeyVaultCorruptedAndInvalidCiphertext() {
+        val keyGen = javax.crypto.KeyGenerator.getInstance("AES")
+        keyGen.init(256)
+        val secretKey1 = keyGen.generateKey()
+        val secretKey2 = keyGen.generateKey()
+
+        val plainApiKey = "sk-secret-test-key-12345"
+        val encrypted = KeyVault.encryptWithKey(plainApiKey, secretKey1)
+
+        // Decrypting with wrong key must return null (GCM auth tag verification fails)
+        assertNull(KeyVault.decryptWithKey(encrypted, secretKey2))
+
+        // Non-base64 invalid data must return null
+        assertNull(KeyVault.decryptWithKey("not-valid-base64!@#$%", secretKey1))
+
+        // Truncated data
+        val truncatedBase64 = java.util.Base64.getEncoder().encodeToString(byteArrayOf(0x01))
+        assertNull(KeyVault.decryptWithKey(truncatedBase64, secretKey1))
+
+        // Manipulated ciphertext bytes
+        val rawBytes = java.util.Base64.getDecoder().decode(encrypted)
+        rawBytes[rawBytes.size - 1] = (rawBytes[rawBytes.size - 1].toInt() xor 0xFF).toByte()
+        val tamperedBase64 = java.util.Base64.getEncoder().encodeToString(rawBytes)
+        assertNull(KeyVault.decryptWithKey(tamperedBase64, secretKey1))
     }
 }
 
