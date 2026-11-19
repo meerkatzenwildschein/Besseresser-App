@@ -119,11 +119,12 @@ Die Findings sind nach Schweregrad klassifiziert:
   - Vorkonfigurierte, statische `DateTimeFormatter` (aus `java.time`) wiederverwenden.
 * **Status:** ✅ Erledigt – `displayGroups` und `weeksWithEntries` werden per `remember(entries, today)` stabil gecacht. `SimpleDateFormat` und flüchtige `Date`-Allokationen wurden projektweit in den UI-Screens und Cards durch wiederverwendbare, thread-sichere `DateTimeFormatter`-Helfer (`formatTime`, `formatDate`, `formatDateTime`, `DATE_FORMATTER`, `TIME_FORMATTER`, `DATE_TIME_FORMATTER`) ersetzt. Durch Unit-Tests abgesichert.
 
-#### 🟡 Finding C.2: Nebeneffekte in der LazyColumn-Konstruktion
+#### 🟡 Finding C.2: Nebeneffekte in der LazyColumn-Konstruktion (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryListScreen.kt` (Zeilen 158–178)
 * **Problem:** Ein lokales `val renderedWeeks = mutableSetOf<String>()` wird während der `LazyColumn`-DSL-Ausführung mutiert (`renderedWeeks.add(weekKey)`), um Wochenfazits nur einmal einzufügen.
 * **Auswirkung:** Compose Lazy-Layouts können Elemente in beliebiger Reihenfolge und mehrfach evaluieren. Zustandskompensierende Mutationen während des Layout-Passes verletzen die funktionale Reinheit von Composables.
 * **Empfehlung:** Die Liste der anzuzeigenden Elemente vorab im ViewModel als flache `List<HistoryUiItem>` (mit Subtypen `DayHeader`, `WeekFazitItem`, `MealEntryItem`) modellieren und als stabilen State an die `LazyColumn` übergeben.
+* **Status:** ✅ Erledigt – Die Verlaufsliste wurde auf das flache, funktionale Modell `HistoryUiItem` (`WeekFazitItem`, `DayHeaderItem`, `MealEntryItem`) und die reine Konstruktionsfunktion `buildHistoryUiItems` umgestellt. `LazyColumn` iteriert nun seiteneffektfrei über stabile Items mit eindeutigen Schlüsseln. Durch Unit-Tests in `DomainLogicAndFingerprintTest` abgesichert.
 
 #### 🟡 Finding C.3: Direkte Injektion von Domänenkomponenten in UI-Screens
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/MainScreen.kt` (Zeile 42)

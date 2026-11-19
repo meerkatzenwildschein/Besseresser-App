@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -87,6 +88,36 @@ data class DayGroup(
     val entries: List<HistoryEntry>
 )
 
+/** Flaches UI-Item-Modell für die funktionale und nebeneffektfreie Darstellung in LazyColumn. */
+sealed interface HistoryUiItem {
+    val key: Any
+
+    data class WeekFazitItem(
+        val weekKey: String,
+        val calendarWeek: Int
+    ) : HistoryUiItem {
+        override val key: String get() = "week-$weekKey"
+    }
+
+    data class DayHeaderItem(
+        val day: LocalDate,
+        val dayKey: String,
+        val entries: List<HistoryEntry>,
+        val hasEntries: Boolean
+    ) : HistoryUiItem {
+        override val key: String get() = "day-$dayKey"
+    }
+
+    data class MealEntryItem(
+        val entry: HistoryEntry,
+        val day: LocalDate,
+        val indexOnDay: Int,
+        val totalCountOnDay: Int
+    ) : HistoryUiItem {
+        override val key: Long get() = entry.id
+    }
+}
+
 /** Nach Kalendertag gruppieren (absteigend); Einträge innerhalb der Gruppe nach sortOrder absteigend. */
 fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
     entries.groupBy {
@@ -94,6 +125,65 @@ fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
     }.map { (day, list) ->
         DayGroup(day = day, entries = list.sortedByDescending { it.effectiveSortOrder })
     }.sortedByDescending { it.day }
+
+/** Erstellt eine flache, nebeneffektfreie Liste von UI-Elementen für die Historienliste. */
+fun buildHistoryUiItems(
+    entries: List<HistoryEntry>,
+    today: LocalDate = LocalDate.now(),
+    nowHour: Int = LocalTime.now().hour
+): List<HistoryUiItem> {
+    val weeksWithEntries = entries.map { weekKeyOf(it.dateMillis) }.toSet()
+    val rawGroups = groupByDay(entries)
+    val displayGroups = if (rawGroups.any { it.day == today }) {
+        rawGroups
+    } else {
+        (listOf(DayGroup(day = today, entries = emptyList())) + rawGroups)
+            .sortedByDescending { it.day }
+    }
+
+    val items = mutableListOf<HistoryUiItem>()
+    val seenWeeks = mutableSetOf<String>()
+
+    displayGroups.forEach { group ->
+        val weekKey = weekKeyOf(group.day)
+        if (weekKey !in seenWeeks &&
+            weekKey in weeksWithEntries &&
+            isWeekFazitDue(weekKey, today, nowHour)
+        ) {
+            seenWeeks.add(weekKey)
+            items.add(
+                HistoryUiItem.WeekFazitItem(
+                    weekKey = weekKey,
+                    calendarWeek = calendarWeekOfKey(weekKey)
+                )
+            )
+        }
+
+        val dayKey = dayKeyOf(group.day)
+        val hasEntries = group.entries.isNotEmpty()
+        items.add(
+            HistoryUiItem.DayHeaderItem(
+                day = group.day,
+                dayKey = dayKey,
+                entries = group.entries,
+                hasEntries = hasEntries
+            )
+        )
+
+        group.entries.forEachIndexed { indexOnDay, entry ->
+            items.add(
+                HistoryUiItem.MealEntryItem(
+                    entry = entry,
+                    day = group.day,
+                    indexOnDay = indexOnDay,
+                    totalCountOnDay = group.entries.size
+                )
+            )
+        }
+    }
+
+    return items
+}
 
 /** Merkt sich Versuche pro App-Lauf — Deklaration liegt zentral in HistoryStore.kt. */
 
@@ -128,17 +218,8 @@ fun HistoryListContent(
 
     val today = LocalDate.now()
     val nowHour = LocalTime.now().hour
-    val weeksWithEntries = remember(entries) {
-        entries.map { weekKeyOf(it.dateMillis) }.toSet()
-    }
-    val displayGroups = remember(entries, today) {
-        val rawGroups = groupByDay(entries)
-        if (rawGroups.any { it.day == today }) {
-            rawGroups
-        } else {
-            (listOf(DayGroup(day = today, entries = emptyList())) + rawGroups)
-                .sortedByDescending { it.day }
-        }
+    val uiItems = remember(entries, today, nowHour) {
+        buildHistoryUiItems(entries, today, nowHour)
     }
 
     if (entries.isNotEmpty()) {
@@ -154,90 +235,81 @@ fun HistoryListContent(
         Spacer(Modifier.height(8.dp))
     }
 
-    val renderedWeeks = mutableSetOf<String>()
-
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        displayGroups.forEach { group ->
-            val weekKey = weekKeyOf(group.day)
-            if (weekKey !in renderedWeeks &&
-                weekKey in weeksWithEntries &&
-                isWeekFazitDue(weekKey, today, nowHour)
-            ) {
-                renderedWeeks.add(weekKey)
-                item(key = "week-$weekKey") {
+        items(
+            items = uiItems,
+            key = { it.key }
+        ) { item ->
+            when (item) {
+                is HistoryUiItem.WeekFazitItem -> {
                     WeekFazitRow(
-                        fazit = weekFazitMap[weekKey],
-                        loading = weekKey in loadingWeeks,
-                        expanded = weekKey in expandedWeeks,
-                        onToggleExpand = { onToggleExpandWeek(weekKey) },
-                        onGenerate = { onGenerateWeekFazit(weekKey) },
-                        calendarWeek = calendarWeekOfKey(weekKey)
+                        fazit = weekFazitMap[item.weekKey],
+                        loading = item.weekKey in loadingWeeks,
+                        expanded = item.weekKey in expandedWeeks,
+                        onToggleExpand = { onToggleExpandWeek(item.weekKey) },
+                        onGenerate = { onGenerateWeekFazit(item.weekKey) },
+                        calendarWeek = item.calendarWeek
                     )
                 }
-            }
-
-            val dayKey = dayKeyOf(group.day)
-            val hasEntries = group.entries.isNotEmpty()
-            val fazit = if (hasEntries) fazitMap[dayKey] else null
-            val loadingFazit = hasEntries && dayKey in loadingFazits
-            val staleFazit = hasEntries && fazit != null && (
-                fazit.entryIds.toSet() != group.entries.map { it.id }.toSet() ||
-                    (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(group.entries))
-                )
-            item(key = "day-$dayKey") {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateContentSize()
-                ) {
-                    DayGroupHeader(
-                        date = group.day,
-                        fazit = fazit,
-                        loading = loadingFazit,
-                        stale = staleFazit,
-                        expanded = dayKey in expandedFazits,
-                        onToggleExpand = { onToggleExpandFazit(dayKey) },
-                        onGenerate = { onGenerateFazit(group.day, group.entries) },
-                        onAddMeal = { onAddMealForDay(group.day) },
-                        hasEntries = hasEntries
+                is HistoryUiItem.DayHeaderItem -> {
+                    val fazit = if (item.hasEntries) fazitMap[item.dayKey] else null
+                    val loadingFazit = item.hasEntries && item.dayKey in loadingFazits
+                    val staleFazit = item.hasEntries && fazit != null && (
+                        fazit.entryIds.toSet() != item.entries.map { it.id }.toSet() ||
+                            (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(item.entries))
                     )
-                    when {
-                        loadingFazit -> Text(
-                            stringResource(R.string.dayfazit_loading_line),
-                            fontSize = 11.5.sp,
-                            fontStyle = FontStyle.Italic,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 8.dp, start = 6.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize()
+                    ) {
+                        DayGroupHeader(
+                            date = item.day,
+                            fazit = fazit,
+                            loading = loadingFazit,
+                            stale = staleFazit,
+                            expanded = item.dayKey in expandedFazits,
+                            onToggleExpand = { onToggleExpandFazit(item.dayKey) },
+                            onGenerate = { onGenerateFazit(item.day, item.entries) },
+                            onAddMeal = { onAddMealForDay(item.day) },
+                            hasEntries = item.hasEntries
                         )
-                        fazit != null && !staleFazit && dayKey in expandedFazits -> {
-                            FazitExpandedCard(fazit = fazit)
+                        when {
+                            loadingFazit -> Text(
+                                stringResource(R.string.dayfazit_loading_line),
+                                fontSize = 11.5.sp,
+                                fontStyle = FontStyle.Italic,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp, start = 6.dp)
+                            )
+                            fazit != null && !staleFazit && item.dayKey in expandedFazits -> {
+                                FazitExpandedCard(fazit = fazit)
+                            }
                         }
                     }
                 }
-            }
-            group.entries.forEachIndexed { indexOnDay, entry ->
-                item(key = entry.id) {
-                    val isPendingDelete = entry.id in pendingDeleteIds
+                is HistoryUiItem.MealEntryItem -> {
+                    val isPendingDelete = item.entry.id in pendingDeleteIds
                     if (isPendingDelete) {
                         PendingDeleteHistoryItem(
-                            entry = entry,
-                            onUndo = { onUndoDeleteEntry(entry) },
+                            entry = item.entry,
+                            onUndo = { onUndoDeleteEntry(item.entry) },
                             onPhotoFile = onPhotoFile
                         )
                     } else {
                         ReorderableDayMealBox(
-                            entryId = entry.id,
-                            currentIndexOnDay = indexOnDay,
-                            totalCountOnDay = group.entries.size,
-                            onMove = { from, to -> onMoveEntryWithinDay(group.day, from, to) }
+                            entryId = item.entry.id,
+                            currentIndexOnDay = item.indexOnDay,
+                            totalCountOnDay = item.totalCountOnDay,
+                            onMove = { from, to -> onMoveEntryWithinDay(item.day, from, to) }
                         ) { isDragging ->
                             ShortSwipeToDeleteBox(
                                 enabled = !isDragging,
-                                onTriggerDelete = { onDeleteEntry(entry) }
+                                onTriggerDelete = { onDeleteEntry(item.entry) }
                             ) {
                                 HistoryItem(
-                                    entry = entry,
-                                    onClick = { onPick(entry) },
+                                    entry = item.entry,
+                                    onClick = { onPick(item.entry) },
                                     isLifted = isDragging,
                                     onPhotoFile = onPhotoFile
                                 )
