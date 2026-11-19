@@ -8,6 +8,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -150,6 +151,8 @@ class FakeHistoryRepository : HistoryRepository {
     }
 
     override fun getAllFlow(): Flow<List<HistoryEntry>> = entriesFlow.asStateFlow()
+    override fun getByIdFlow(id: Long): Flow<HistoryEntry?> =
+        entriesFlow.map { list -> list.find { it.id == id } }
     override fun getDayFazitsFlow(): Flow<Map<String, DayFazit>> = dayFazitsFlow.asStateFlow()
     override fun getWeekFazitsFlow(): Flow<Map<String, DayFazit>> = weekFazitsFlow.asStateFlow()
 
@@ -428,7 +431,17 @@ class RepositoriesAndFakesTest {
         assertEquals("Salat", entry.recognizedMeal)
         assertEquals("Mittagessen", entry.note)
 
+        val byIdFirst = repo.getByIdFlow(entry.id).first()
+        assertNotNull(byIdFirst)
+        assertEquals("Salat", byIdFirst?.recognizedMeal)
+
+        val unknownFlow = repo.getByIdFlow(99999L).first()
+        assertNull(unknownFlow)
+
         repo.updateRecognizedMeal(entry.id, "Bunter Salat")
+        val byIdUpdated = repo.getByIdFlow(entry.id).first()
+        assertEquals("Bunter Salat", byIdUpdated?.recognizedMeal)
+
         val entryDayKey = dayKeyOf(entry.dateMillis)
         val fazit = DayFazit(entryDayKey, TrafficLight.GREEN, "Klasse", listOf(entry.id), 1000L, "fp")
         repo.saveDayFazit(fazit)
@@ -440,6 +453,8 @@ class RepositoriesAndFakesTest {
         assertNull(repo.loadDayFazit(entryDayKey))
 
         repo.delete(entry)
+        val byIdDeleted = repo.getByIdFlow(entry.id).first()
+        assertNull(byIdDeleted)
     }
 
     @Test

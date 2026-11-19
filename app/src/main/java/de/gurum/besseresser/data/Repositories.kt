@@ -82,6 +82,7 @@ val Context.appDataStore: DataStore<Preferences> by preferencesDataStore(
 interface HistoryRepository {
     suspend fun ensureMigrated()
     fun getAllFlow(): Flow<List<HistoryEntry>>
+    fun getByIdFlow(id: Long): Flow<HistoryEntry?>
     fun getDayFazitsFlow(): Flow<Map<String, DayFazit>>
     fun getWeekFazitsFlow(): Flow<Map<String, DayFazit>>
     suspend fun getAll(): List<HistoryEntry>
@@ -344,6 +345,9 @@ class DefaultHistoryRepository(
 
     override fun getAllFlow(): Flow<List<HistoryEntry>> =
         historyDao.getAllFlow().map { list -> list.map { it.toDomain() } }
+
+    override fun getByIdFlow(id: Long): Flow<HistoryEntry?> =
+        historyDao.getByIdFlow(id).map { it?.toDomain() }
 
     override fun getDayFazitsFlow(): Flow<Map<String, DayFazit>> =
         dayFazitDao.getAllFlow().map { list -> list.map { it.toDomain() }.associateBy { it.dayKey } }

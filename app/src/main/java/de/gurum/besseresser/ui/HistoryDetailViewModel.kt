@@ -45,9 +45,9 @@ class HistoryDetailViewModel(
 
     init {
         viewModelScope.launch {
-            historyRepository.getAllFlow().collect { list ->
+            historyRepository.getByIdFlow(entryId).collect { entry ->
                 _uiState.update { it.copy(
-                    entry = list.find { e -> e.id == entryId } ?: it.entry,
+                    entry = entry ?: it.entry,
                     loaded = true
                 ) }
             }
