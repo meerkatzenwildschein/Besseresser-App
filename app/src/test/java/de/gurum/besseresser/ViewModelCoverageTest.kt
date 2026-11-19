@@ -462,4 +462,31 @@ class ViewModelCoverageTest {
 
         assertFalse("onDuplicated must not fire when entry is null", callbackFired)
     }
+
+    @Test
+    fun `thumbnail returns null when entry is null or has no decoded thumbnail`() = runTest(testDispatcher) {
+        val histRepo = FakeHistoryRepository()
+        val vm = HistoryDetailViewModel(99L, histRepo, FakeSettingsRepository(), FakeApiService(), FakeImagePreprocessor(), testDispatchers)
+        advanceUntilIdle()
+
+        val thumb = vm.thumbnail(1280)
+        assertNull("thumbnail must be null when entry is null", thumb)
+
+        val entry = histRepo.add(null, Evaluation(recognizedMeal = "Salat"), dateOverride = 1_000L)
+        val vmWithEntry = HistoryDetailViewModel(entry.id, histRepo, FakeSettingsRepository(), FakeApiService(), FakeImagePreprocessor(), testDispatchers)
+        advanceUntilIdle()
+
+        val thumbWithEntry = vmWithEntry.thumbnail(1280)
+        assertNull("FakeHistoryRepository returns null for thumbnail", thumbWithEntry)
+    }
+
+    @Test
+    fun `HistoryViewModel decodeThumbnail calls repository asynchronously`() = runTest(testDispatcher) {
+        val histRepo = FakeHistoryRepository()
+        val vm = HistoryViewModel(FakeApiService(), histRepo, FakeSettingsRepository(), FakeImagePreprocessor(), testDispatchers)
+        val entry = histRepo.add(null, Evaluation(recognizedMeal = "Suppe"), dateOverride = 1_000L)
+
+        val thumb = vm.decodeThumbnail(entry, 128)
+        assertNull("FakeHistoryRepository returns null", thumb)
+    }
 }

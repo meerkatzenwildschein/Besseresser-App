@@ -63,8 +63,13 @@ class PhotoStorage(
         dir().listFiles()?.forEach { runCatching { it.delete() } }
     }
 
-    /** Kleines Thumbnail decodieren (inSampleSize, damit die Liste flink bleibt). */
-    fun decodeThumb(file: File, target: Int = 200): Bitmap? {
+    /** Kleines Thumbnail decodieren (inSampleSize, damit die Liste flink bleibt). Läuft auf [dispatchers.io]. */
+    suspend fun decodeThumb(file: File, target: Int = 200): Bitmap? = withContext(dispatchers.io) {
+        decodeThumbSync(file, target)
+    }
+
+    /** Synchrone Decodierung eines Thumbnails. */
+    fun decodeThumbSync(file: File, target: Int = 200): Bitmap? {
         return try {
             val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(file.absolutePath, opts)

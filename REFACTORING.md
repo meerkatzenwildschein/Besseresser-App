@@ -41,17 +41,18 @@ Die Findings sind nach Schweregrad klassifiziert:
 
 ### A. Threading & Performance
 
-#### 🔴 Finding A.1: Schwere Bildverarbeitung und EXIF-Korrektur auf dem Main-Thread
+#### 🔴 Finding A.1: Schwere Bildverarbeitung und EXIF-Korrektur auf dem Main-Thread (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum\besseresser/ui/CameraScreen.kt` (Zeilen 69–96, 161–180)
 * **Problem:** Nach dem Auslösen der Kamera wird `correctOrientation(outputFile)` im Callback `onImageSaved` aufgerufen, der über `ContextCompat.getMainExecutor(context)` auf dem UI-Thread läuft. `correctOrientation` decodiert ein volles Kamera-JPEG (`BitmapFactory.decodeFile`), erzeugt ein neues Bitmap via Matrix-Rotation und komprimiert es wieder als JPEG auf die Festplatte.
 * **Auswirkung:** Blockiert den UI-Thread bei modernen Smartphone-Kameras für 200–800 ms. Führt zu sichtbaren Rucklern, Frame-Drops und potenziellen ANRs.
 * **Empfehlung:** Bildrotation und I/O konsequent in `Dispatchers.IO` auslagern (`withContext(dispatchers.io)`), idealerweise gekapselt im `ImagePreprocessor` oder `PhotoStorage`.
 
-#### 🔴 Finding A.2: Synchrone Bitmap-Decodierung im ViewModel-Call
+#### 🔴 Finding A.2: Synchrone Bitmap-Decodierung im ViewModel-Call (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryDetailViewModel.kt` (Zeile 60–61)
 * **Problem:** Die Methode `fun thumbnail(target: Int = 1280): Bitmap?` führt `photoStorage.decodeThumb(...)` synchron aus, wenn sie von der UI aufgerufen wird.
 * **Auswirkung:** Synchrone Festplatten-I/O und Bitmap-Decodierung auf dem Thread des Aufrufers.
 * **Empfehlung:** Bilder in Compose ausschließlich asynchron über Coil (`AsyncImage`) laden oder einen asynchronen State/Flow bereitstellen.
+* **Status:** ✅ Erledigt – `HistoryDetailViewModel.thumbnail()`, `HistoryViewModel.decodeThumbnail()`, `HistoryRepository.decodeThumbnail()` und `PhotoStorage.decodeThumb()` wurden auf asynchrone Coroutine-Ausführung (`suspend fun` mit `Dispatchers.IO`) umgestellt.
 
 #### 🟡 Finding A.3: Blockierendes `runBlocking` in Repositories
 * **Ort:** `app/src/main/java/de/gurum/besseresser/data/Repositories.kt` (Zeilen 50–60, 230–240)
@@ -205,7 +206,7 @@ Die Findings sind nach Schweregrad klassifiziert:
 
 | Phase | Handlungsfeld | Konkrete Maßnahmen | Aufwand |
 |---|---|---|---|
-| **Phase 1: Performance & Stabilität** | Threading & I/O | • `correctOrientation` in `Dispatchers.IO` verschieben.<br>• `groupByDay` und `SimpleDateFormat` in Listen eliminieren.<br>• `HistoryDetailViewModel.thumbnail()` auf asynchrones Laden umstellen. | Gering |
+| **Phase 1: Performance & Stabilität** | Threading & I/O | • `correctOrientation` in `Dispatchers.IO` verschieben.<br>• `groupByDay` und `SimpleDateFormat` in Listen eliminieren.<br>• `HistoryDetailViewModel.thumbnail()` auf asynchrones Laden umstellen. (✅ Erledigt) | Gering |
 | **Phase 2: Sicherheit & Datenintegrität** | Security & DB | • API-Key mit Android Security Crypto verschlüsseln.<br>• DB-Indizes für `dateMillis` anlegen.<br>• `getByIdFlow` in Room-DAO implementieren. | Mittel |
 | **Phase 3: Architektur & Reaktivität** | State & ViewModels | • `RecentNotesViewModel` auf echten Flow umstellen.<br>• Flache UI-Modelle (`HistoryUiItem`) für `LazyColumn` einführen.<br>• `HistoryRepository` aus ViewModel-Signaturen entfernen. | Mittel |
 | **Phase 4: Testbarkeit & Clean Code** | Testing & Modularisierung | • Unit-Tests für ViewModels (`MainViewModelTest`, `HistoryViewModelTest`) schreiben.<br>• Große Dateien (`Repositories.kt`, `HistoryListScreen.kt`) in fokussierte Module zerlegen. | Mittel |

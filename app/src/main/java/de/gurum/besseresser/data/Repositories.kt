@@ -115,7 +115,7 @@ interface HistoryRepository {
      *  Schützt vor verwaisten Dateien nach Abstürzen oder fehlgeschlagenen Migrationen. */
     suspend fun purgeOrphanedPhotos(): Int
     fun photoFileOf(entry: HistoryEntry): File?
-    fun decodeThumbnail(entry: HistoryEntry, target: Int = 200): Bitmap?
+    suspend fun decodeThumbnail(entry: HistoryEntry, target: Int = 200): Bitmap?
 }
 
 // ----------------------------------------------------------------- Settings (DataStore + KeyVault)
@@ -573,6 +573,8 @@ class DefaultHistoryRepository(
     override fun photoFileOf(entry: HistoryEntry): File? =
         photoStorage.photoFileOf(entry)
 
-    override fun decodeThumbnail(entry: HistoryEntry, target: Int): Bitmap? =
-        photoFileOf(entry)?.let { photoStorage.decodeThumb(it, target) }
+    override suspend fun decodeThumbnail(entry: HistoryEntry, target: Int): Bitmap? =
+        withContext(dispatchers.io) {
+            photoFileOf(entry)?.let { photoStorage.decodeThumb(it, target) }
+        }
 }
