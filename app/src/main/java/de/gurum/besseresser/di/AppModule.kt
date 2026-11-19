@@ -12,6 +12,7 @@ import de.gurum.besseresser.data.DefaultSettingsRepository
 import de.gurum.besseresser.data.DefaultUiPrefsRepository
 import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.data.AndroidImagePreprocessor
+import de.gurum.besseresser.data.DefaultPhotoCaptureManager
 import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.PhotoStorage
@@ -43,7 +44,7 @@ val appModule = module {
 
     single { androidContext().appDataStore }
     single { PhotoStorage(androidContext()) }
-    single { PhotoCaptureManager(androidContext()) }
+    single<PhotoCaptureManager> { DefaultPhotoCaptureManager(androidContext()) }
     single<ImagePreprocessor> { AndroidImagePreprocessor(androidContext()) }
 
     single<BesseresserApiService> { ApiClient() }
@@ -56,8 +57,8 @@ val appModule = module {
     single<BackupService> { BackupManager(androidContext(), get(), get(), get(), get(), get()) }
 
     viewModel { AppStateViewModel(get(), get(), get(), get()) }
-    viewModel { MainViewModel(get(), get(), get(), get(), savedStateHandle = get()) }
-    viewModel { HistoryViewModel(get(), get(), get(), get(), savedStateHandle = get()) }
+    viewModel { MainViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get()) }
+    viewModel { HistoryViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get()) }
     viewModel { SetupViewModel(get(), get(), get(), savedStateHandle = get()) }
     viewModel { ProfileViewModel(get()) }
     viewModel { ConfigViewModel(get(), get()) }

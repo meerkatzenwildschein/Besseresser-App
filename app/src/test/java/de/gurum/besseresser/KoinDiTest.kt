@@ -10,6 +10,7 @@ import de.gurum.besseresser.data.DayFazitDao
 import de.gurum.besseresser.data.HistoryDao
 import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.PhotoStorage
 import de.gurum.besseresser.data.ProfileRepository
 import de.gurum.besseresser.data.SettingsRepository
@@ -65,10 +66,12 @@ class KoinDiTest : KoinTest {
             single<BackupService> { FakeBackupService() }
             single<BesseresserApiService> { FakeApiService() }
             single<ImagePreprocessor> { FakeImagePreprocessor() }
+            single<PhotoCaptureManager> { FakePhotoCaptureManager() }
+            single { de.gurum.besseresser.data.AppDispatchers() }
 
             factory { AppStateViewModel(get(), get(), get(), get()) }
-            factory { MainViewModel(get(), get(), get(), get()) }
-            factory { HistoryViewModel(get(), get(), get(), get()) }
+            factory { MainViewModel(get(), get(), get(), get(), get(), get()) }
+            factory { HistoryViewModel(get(), get(), get(), get(), get(), get()) }
             factory { SetupViewModel(get(), get(), get()) }
             factory { ProfileViewModel(get()) }
             factory { ConfigViewModel(get(), get()) }
@@ -87,6 +90,7 @@ class KoinDiTest : KoinTest {
         assertNotNull(get<BackupService>())
         assertNotNull(get<BesseresserApiService>())
         assertNotNull(get<ImagePreprocessor>())
+        assertNotNull(get<PhotoCaptureManager>())
 
         assertNotNull(get<AppStateViewModel>())
         assertNotNull(get<MainViewModel>())

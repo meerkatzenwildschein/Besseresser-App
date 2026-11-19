@@ -2,6 +2,7 @@ package de.gurum.besseresser
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.net.TestUri
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -34,6 +35,7 @@ import de.gurum.besseresser.data.BackupSummary
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.DayFazitResult
 import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.UiPrefsRepository
 import de.gurum.besseresser.model.AppLanguage
 import de.gurum.besseresser.model.AppThemeMode
@@ -352,6 +354,17 @@ class FakeBackupService(
 
 class FakeImagePreprocessor : ImagePreprocessor {
     override fun prepareImageDataUri(photoUri: Uri, maxSide: Int): String = "data:image/jpeg;base64,fake"
+}
+
+class FakePhotoCaptureManager(
+    var file: File = File("fake.jpg"),
+    var uri: Uri = TestUri()
+) : PhotoCaptureManager {
+    var callCount = 0
+    override fun createCaptureFile(): Pair<File, Uri> {
+        callCount++
+        return file to uri
+    }
 }
 
 
@@ -922,5 +935,42 @@ class RepositoriesAndFakesTest {
         val savedFazit = histRepo.loadDayFazit(dayKeyOf(pastDay))
         assertNotNull(savedFazit)
         assertEquals(TrafficLight.GREEN, savedFazit?.rating)
+    }
+
+    @Test
+    fun testPhotoCaptureManagerIntegrationInViewModels() = runTest(testDispatcher) {
+        val fakeManager = FakePhotoCaptureManager(
+            file = File("custom_photo.jpg"),
+            uri = TestUri("content://de.gurum.besseresser.fileprovider/photos/custom_photo.jpg")
+        )
+        val api = FakeApiService()
+        val histRepo = FakeHistoryRepository()
+        val setRepo = FakeSettingsRepository()
+        val imagePreprocessor = FakeImagePreprocessor()
+
+        val mainVm = MainViewModel(
+            apiService = api,
+            historyRepository = histRepo,
+            settingsRepository = setRepo,
+            imagePreprocessor = imagePreprocessor,
+            photoCaptureManager = fakeManager
+        )
+
+        val historyVm = HistoryViewModel(
+            apiService = api,
+            historyRepository = histRepo,
+            settingsRepository = setRepo,
+            imagePreprocessor = imagePreprocessor,
+            photoCaptureManager = fakeManager
+        )
+
+        val (mainFile, mainUri) = mainVm.createCaptureFile()
+        assertEquals("custom_photo.jpg", mainFile.name)
+        assertEquals("content://de.gurum.besseresser.fileprovider/photos/custom_photo.jpg", mainUri.toString())
+
+        val (histFile, histUri) = historyVm.createCaptureFile()
+        assertEquals("custom_photo.jpg", histFile.name)
+        assertEquals("content://de.gurum.besseresser.fileprovider/photos/custom_photo.jpg", histUri.toString())
+        assertEquals(2, fakeManager.callCount)
     }
 }
