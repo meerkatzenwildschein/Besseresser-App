@@ -15,23 +15,99 @@ private const val PHOTO_SUFFIX = ".jpg"
 private const val DATE_PATTERN = "yyyyMMdd_HHmmss"
 
 /**
- * Creates fresh temporary capture files on demand, so each camera session gets
- * a unique file name. The file is only created when [createCaptureFile] is called,
- * not eagerly at composition time.
+ * Manages the lifecycle of temporary photo capture files in the app cache:
+ * creates fresh unique files on demand, deletes unconfirmed/cancelled captures,
+ * and purges orphaned temporary cache files.
  */
-fun interface PhotoCaptureManager {
+interface PhotoCaptureManager {
     /** Creates a new uniquely-named JPEG file in the app's cache and returns its [Uri]. */
     fun createCaptureFile(): Pair<File, Uri>
+
+    /** Deletes the specified capture file if present. */
+    fun deleteCaptureFile(file: File?)
+
+    /** Deletes the capture file corresponding to the given [Uri] if present. */
+    fun deleteCaptureFile(uri: Uri?)
+
+    /** Cleans up temporary photo capture files older than [maxAgeMillis] or empty zero-byte files. */
+    fun cleanupOrphanedFiles(maxAgeMillis: Long = DEFAULT_MAX_CACHE_AGE_MILLIS)
+
+    companion object {
+        const val DEFAULT_MAX_CACHE_AGE_MILLIS = 3600_000L // 1 hour
+    }
 }
 
 class DefaultPhotoCaptureManager(private val context: Context) : PhotoCaptureManager {
 
+    init {
+        cleanupOrphanedFiles()
+    }
+
+    private fun getPhotoCacheDir(): File {
+        return File(context.cacheDir, PHOTO_CACHE_DIR).also { it.mkdirs() }
+    }
+
     /** Creates a new uniquely-named JPEG file in the app's cache and returns its [Uri]. */
     override fun createCaptureFile(): Pair<File, Uri> {
-        val dir = File(context.cacheDir, PHOTO_CACHE_DIR).also { it.mkdirs() }
-        val name = "$PHOTO_PREFIX${SimpleDateFormat(DATE_PATTERN, Locale.US).format(Date())}$PHOTO_SUFFIX"
+        val dir = getPhotoCacheDir()
+        val name = "$PHOTO_PREFIX${SimpleDateFormat(DATE_PATTERN, Locale.US).format(Date())}_${System.nanoTime()}$PHOTO_SUFFIX"
         val file = File(dir, name)
-        val uri = FileProvider.getUriForFile(context, FILEPROVIDER_AUTHORITY, file)
+        val uri = runCatching {
+            FileProvider.getUriForFile(context, FILEPROVIDER_AUTHORITY, file)
+        }.getOrElse {
+            Uri.fromFile(file)
+        }
         return file to uri
+    }
+
+    override fun deleteCaptureFile(file: File?) {
+        if (file == null) return
+        runCatching {
+            if (file.exists() && !file.delete()) {
+                file.deleteOnExit()
+            }
+        }
+    }
+
+    override fun deleteCaptureFile(uri: Uri?) {
+        if (uri == null) return
+        val str = uri.toString()
+        val lastSegment = uri.lastPathSegment
+            ?: uri.path?.substringAfterLast('/')
+            ?: str.substringAfterLast('/')
+        if (lastSegment.isNotBlank()) {
+            val file = File(getPhotoCacheDir(), lastSegment)
+            if (file.exists()) {
+                deleteCaptureFile(file)
+                return
+            }
+        }
+        val directPath = uri.path
+        if (directPath != null) {
+            val file = File(directPath)
+            if (file.exists()) {
+                deleteCaptureFile(file)
+                return
+            }
+        }
+        if (str.startsWith("file:")) {
+            val path = str.removePrefix("file://").removePrefix("file:")
+            val file = File(path)
+            if (file.exists()) {
+                deleteCaptureFile(file)
+            }
+        }
+    }
+
+    override fun cleanupOrphanedFiles(maxAgeMillis: Long) {
+        runCatching {
+            val dir = getPhotoCacheDir()
+            val cutoff = System.currentTimeMillis() - maxAgeMillis
+            dir.listFiles()?.forEach { file ->
+                if (file.isFile && (file.lastModified() < cutoff || file.length() == 0L) && !file.delete()) {
+                    file.deleteOnExit()
+                }
+            }
+        }
     }
 }

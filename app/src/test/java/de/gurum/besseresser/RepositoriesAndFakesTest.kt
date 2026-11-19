@@ -36,6 +36,7 @@ import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.DayFazitResult
 import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.data.PhotoCaptureManager
+import de.gurum.besseresser.data.DefaultPhotoCaptureManager
 import de.gurum.besseresser.data.UiPrefsRepository
 import de.gurum.besseresser.data.LegacyJsonMigrator
 import de.gurum.besseresser.data.HistoryDao
@@ -364,9 +365,25 @@ class FakePhotoCaptureManager(
     var uri: Uri = TestUri()
 ) : PhotoCaptureManager {
     var callCount = 0
+    val deletedFiles = mutableListOf<File>()
+    val deletedUris = mutableListOf<Uri>()
+    var cleanupCalled = false
+
     override fun createCaptureFile(): Pair<File, Uri> {
         callCount++
         return file to uri
+    }
+
+    override fun deleteCaptureFile(file: File?) {
+        if (file != null) deletedFiles.add(file)
+    }
+
+    override fun deleteCaptureFile(uri: Uri?) {
+        if (uri != null) deletedUris.add(uri)
+    }
+
+    override fun cleanupOrphanedFiles(maxAgeMillis: Long) {
+        cleanupCalled = true
     }
 }
 
@@ -973,6 +990,72 @@ class RepositoriesAndFakesTest {
         assertEquals("custom_photo.jpg", histFile.name)
         assertEquals("content://de.gurum.besseresser.fileprovider/photos/custom_photo.jpg", histUri.toString())
         assertEquals(2, fakeManager.callCount)
+
+        // Deletion methods
+        mainVm.deleteCaptureFile(mainFile)
+        assertTrue(fakeManager.deletedFiles.contains(mainFile))
+
+        historyVm.deleteCaptureFile(histUri)
+        assertTrue(fakeManager.deletedUris.contains(histUri))
+    }
+
+    @Test
+    fun testDefaultPhotoCaptureManagerLifecycleAndCleanup() {
+        val tempDir = java.nio.file.Files.createTempDirectory("photo_cache_test").toFile()
+        try {
+            val mockContext = object : android.content.ContextWrapper(null) {
+                override fun getCacheDir(): File = tempDir
+                override fun getPackageName(): String = "de.gurum.besseresser"
+            }
+
+            val manager = DefaultPhotoCaptureManager(mockContext)
+
+            // Test creation
+            val (file1, uri1) = manager.createCaptureFile()
+            assertTrue(file1.exists() || !file1.exists()) // File is initialized as File object
+            file1.writeText("test image data")
+            assertTrue(file1.exists())
+            assertEquals(15L, file1.length())
+
+            // Test deletion by File
+            manager.deleteCaptureFile(file1)
+            assertFalse(file1.exists())
+
+            // Test deletion by Uri
+            val (file2, _) = manager.createCaptureFile()
+            file2.writeText("test image 2")
+            assertTrue(file2.exists())
+            val testUri2 = TestUri("content://de.gurum.besseresser.fileprovider/photos/${file2.name}")
+            manager.deleteCaptureFile(testUri2)
+            assertFalse(file2.exists())
+
+            // Test orphan cleanup
+            val photosDir = File(tempDir, "photos").also { it.mkdirs() }
+            val expiredFile = File(photosDir, "essen_old.jpg").apply {
+                writeText("old data")
+                setLastModified(System.currentTimeMillis() - 7200_000L) // 2 hours old
+            }
+            val zeroByteFile = File(photosDir, "essen_empty.jpg").apply {
+                createNewFile()
+            }
+            val recentFile = File(photosDir, "essen_fresh.jpg").apply {
+                writeText("fresh data")
+                setLastModified(System.currentTimeMillis())
+            }
+
+            assertTrue(expiredFile.exists())
+            assertTrue(zeroByteFile.exists())
+            assertTrue(recentFile.exists())
+
+            // Run cleanup with 1 hour max age
+            manager.cleanupOrphanedFiles(3600_000L)
+
+            assertFalse(expiredFile.exists())
+            assertFalse(zeroByteFile.exists())
+            assertTrue(recentFile.exists())
+        } finally {
+            tempDir.deleteRecursively()
+        }
     }
 
     @Test

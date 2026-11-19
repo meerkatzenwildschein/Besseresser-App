@@ -1,5 +1,6 @@
 package de.gurum.besseresser
 
+import android.net.TestUri
 import android.net.Uri
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -25,6 +26,7 @@ import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.model.TrafficLight
 import de.gurum.besseresser.ui.HistoryDetailViewModel
 import de.gurum.besseresser.ui.HistoryViewModel
+import de.gurum.besseresser.ui.MainViewModel
 import de.gurum.besseresser.ui.SetupViewModel
 import kotlinx.coroutines.Dispatchers
 
@@ -254,5 +256,84 @@ class UserFlowsTest {
         advanceUntilIdle()
 
         assertEquals("Veggie-Burger", histRepo.getAll().first { it.id == entry.id }.recognizedMeal)
+    }
+
+    // ----------------------------------------------------------------- 4. Photo capture file lifecycle cleanup
+
+    @Test
+    fun `main flow - reset cleans up unsaved photo capture file`() = runTest(testDispatcher) {
+        val fakeCaptureManager = FakePhotoCaptureManager()
+        val vm = MainViewModel(
+            apiService = FakeApiService(),
+            historyRepository = FakeHistoryRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            photoCaptureManager = fakeCaptureManager
+        )
+
+        val testUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/temp1.jpg")
+        vm.onPhotoTaken(testUri)
+        assertEquals(testUri, vm.uiState.value.photoPreviewUri)
+
+        vm.reset()
+        advanceUntilIdle()
+
+        assertTrue(fakeCaptureManager.deletedUris.contains(testUri))
+    }
+
+    @Test
+    fun `main flow - saveToHistory cleans up temporary capture file`() = runTest(testDispatcher) {
+        val fakeCaptureManager = FakePhotoCaptureManager()
+        val histRepo = FakeHistoryRepository()
+        val vm = MainViewModel(
+            apiService = FakeApiService(),
+            historyRepository = histRepo,
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            photoCaptureManager = fakeCaptureManager
+        )
+
+        val testUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/temp2.jpg")
+        vm.onPhotoTaken(testUri)
+        vm.analyze(
+            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            PromptBundle("", "", "", "", "", "", "", "")
+        )
+        advanceUntilIdle()
+        assertNotNull(vm.uiState.value.evaluation)
+
+        vm.saveToHistory()
+        advanceUntilIdle()
+
+        assertTrue(fakeCaptureManager.deletedUris.contains(testUri))
+        assertEquals(1, histRepo.getAll().size)
+    }
+
+    @Test
+    fun `history flow - saveBackdatedEntry cleans up temporary capture file`() = runTest(testDispatcher) {
+        val fakeCaptureManager = FakePhotoCaptureManager()
+        val histRepo = FakeHistoryRepository()
+        val vm = HistoryViewModel(
+            apiService = FakeApiService(),
+            historyRepository = histRepo,
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            photoCaptureManager = fakeCaptureManager
+        )
+
+        val testUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/temp3.jpg")
+        vm.setAddTargetDay(LocalDate.now())
+        vm.setAddTargetTime(LocalTime.now())
+        vm.saveBackdatedEntry(
+            photoUriIn = testUri,
+            ev = Evaluation(recognizedMeal = "Suppe")
+        )
+        advanceUntilIdle()
+
+        assertTrue(fakeCaptureManager.deletedUris.contains(testUri))
+        assertEquals(1, histRepo.getAll().size)
     }
 }

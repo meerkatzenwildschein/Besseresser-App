@@ -73,6 +73,14 @@ class HistoryViewModel(
             ?: error("PhotoCaptureManager is not configured")
     }
 
+    fun deleteCaptureFile(file: File?) {
+        photoCaptureManager?.deleteCaptureFile(file)
+    }
+
+    fun deleteCaptureFile(uri: Uri?) {
+        photoCaptureManager?.deleteCaptureFile(uri)
+    }
+
     companion object {
         private const val KEY_ADD_NOTE = "history_add_note"
         private const val KEY_ADD_TARGET_DAY = "history_add_target_day"
@@ -335,6 +343,7 @@ class HistoryViewModel(
                 photoUri = photoUriIn, ev = ev,
                 note = note, dateOverride = millis, backdated = false
             )
+            photoUriIn?.let { photoCaptureManager?.deleteCaptureFile(it) }
             historyRepository.deleteDayFazitForEntry(entry)
             historyRepository.deleteWeekFazitForEntry(entry)
             settingsRepository.pushRecentNote(note, ev)

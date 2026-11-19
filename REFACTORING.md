@@ -172,11 +172,12 @@ Die Findings sind nach Schweregrad klassifiziert:
   ```
 * **Status:** ✅ Erledigt – `PreviewView` wird nun idiomatisch innerhalb der `AndroidView`-Factory mit `implementationMode = PreviewView.ImplementationMode.COMPATIBLE` erzeugt. Die Lifecycle-Bindung von CameraX sowie das saubere Ressourcen-Management bei Lifecycle-/Recomposition-Wechseln sind direkt an die View gekoppelt.
 
-#### 🟡 Finding E.2: Verwaiste temporäre Fotodateien im Cache
+#### 🟡 Finding E.2: Verwaiste temporäre Fotodateien im Cache (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum/besseresser/data/PhotoCaptureManager.kt`
-* **Problem:** Beim Öffnen der Kamera erzeugte Zwischendateien (`photos/photo_*.jpg`) werden bei Abbruch der Aufnahme nicht automatisch gelöscht.
+* **Problem:** Beim Öffnen der Kamera erzeugte Zwischendateien (`photos/photo_*.jpg`) wurden bei Abbruch der Aufnahme nicht automatisch gelöscht.
 * **Auswirkung:** Unnötiges Anwachsen des Cache-Speichers auf Nutzergeräten.
 * **Empfehlung:** Lifecycle-gebundene Bereinigung nicht bestätigter Aufnahme-Dateien einführen.
+* **Status:** ✅ Erledigt – `PhotoCaptureManager` wurde um Lifecycle-Methoden (`deleteCaptureFile(file)`, `deleteCaptureFile(uri)`, `cleanupOrphanedFiles(maxAgeMillis)`) erweitert. Bei Kamera-Abbrüchen (`onCancel`, `onBack`, `onRetake`, `onDismissCamera`, `onDismissReview`, Abbruch des System-Kamera-Intents) sowie beim `reset()` in `MainViewModel` und nach dem Speichern in Room werden temporäre Cache-Dateien sofort gelöscht. Zusätzlich bereinigt `DefaultPhotoCaptureManager` beim Start automatisch verwaiste und leere Cache-Dateien. Durch Unit-Tests in `RepositoriesAndFakesTest` und `UserFlowsTest` abgesichert.
 
 ---
 
