@@ -1,5 +1,23 @@
 package de.gurum.besseresser
 
+import android.net.TestUri
+import android.net.Uri
+import de.gurum.besseresser.data.AppDispatchers
+import de.gurum.besseresser.data.BackupSummary
+import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.PromptBundle
+import de.gurum.besseresser.model.DayFazit
+import de.gurum.besseresser.model.Evaluation
+import de.gurum.besseresser.model.GoalResult
+import de.gurum.besseresser.model.HistoryEntry
+import de.gurum.besseresser.model.RecentNote
+import de.gurum.besseresser.model.Settings
+import de.gurum.besseresser.model.TrafficLight
+import de.gurum.besseresser.ui.ConfigViewModel
+import de.gurum.besseresser.ui.HistoryDetailViewModel
+import de.gurum.besseresser.ui.HistoryViewModel
+import de.gurum.besseresser.ui.MainViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -16,18 +34,6 @@ import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalTime
-import de.gurum.besseresser.data.AppDispatchers
-import de.gurum.besseresser.data.ImagePreprocessor
-import de.gurum.besseresser.model.DayFazit
-import de.gurum.besseresser.model.Evaluation
-import de.gurum.besseresser.model.GoalResult
-import de.gurum.besseresser.model.HistoryEntry
-import de.gurum.besseresser.model.Settings
-import de.gurum.besseresser.model.TrafficLight
-import de.gurum.besseresser.ui.HistoryDetailViewModel
-import de.gurum.besseresser.ui.HistoryViewModel
-import de.gurum.besseresser.ui.MainViewModel
-import kotlinx.coroutines.Dispatchers
 
 /**
  * ViewModel coverage tests for branches that were previously untested.
@@ -60,30 +66,86 @@ class ViewModelCoverageTest {
     fun `analyze returns early when no photoUri set`() = runTest(testDispatcher) {
         val vm = MainViewModel(FakeApiService(), FakeHistoryRepository(), FakeSettingsRepository(), FakeImagePreprocessor(), testDispatchers)
         // photoPreviewUri is null → analyze() returns immediately without touching isBusy
-        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), de.gurum.besseresser.data.PromptBundle("", "", "", "", "", "", "", ""))
+        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), PromptBundle("", "", "", "", "", "", "", ""))
         advanceUntilIdle()
         assertFalse("isBusy must stay false when no photo was taken", vm.uiState.value.isBusy)
         assertNull("error must stay null when no photo was taken", vm.uiState.value.error)
     }
 
     @Test
-    fun `analyze sets error when imagePreprocessor throws`() = runTest(testDispatcher) {
+    fun `analyze sets error when imagePreprocessor throws with photoUri`() = runTest(testDispatcher) {
         val failPreprocessor = object : ImagePreprocessor {
-            override fun prepareImageDataUri(photoUri: android.net.Uri, maxSide: Int): String =
+            override fun prepareImageDataUri(photoUri: Uri, maxSide: Int): String =
                 throw RuntimeException("Foto konnte nicht gelesen werden")
         }
         val vm = MainViewModel(FakeApiService(), FakeHistoryRepository(), FakeSettingsRepository(), failPreprocessor, testDispatchers)
-        // Set a non-null URI by calling onPhotoTaken with a mock URI
-        // We can't use real Uri on JVM, so we set the internal state via onSystemCameraResult
-        // which is only triggered by a real camera result. Instead, test the error path indirectly:
-        // the preprocessor throws → error is set, isBusy reset.
-        // We verify the guard: if no photoUri, analyze returns early.
-        // The preprocessor-throws path requires a real Uri which needs Robolectric.
-        // This test documents the expected behavior.
-        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), de.gurum.besseresser.data.PromptBundle("", "", "", "", "", "", "", ""))
+        vm.onPhotoTaken(TestUri("content://media/photo.jpg"))
+        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), PromptBundle("", "", "", "", "", "", "", ""))
         advanceUntilIdle()
-        // No URI → early return, preprocessor never called
+
         assertFalse(vm.uiState.value.isBusy)
+        assertNotNull(vm.uiState.value.error)
+        assertTrue(vm.uiState.value.error!!.contains("Foto konnte nicht gelesen werden"))
+    }
+
+    @Test
+    fun `analyze success with photoUri updates evaluation and pushes recent note`() = runTest(testDispatcher) {
+        val expectedEv = Evaluation(
+            goalResults = listOf(GoalResult(goal = "Z", rating = TrafficLight.GREEN, reason = "Top")),
+            summary = "Gesund",
+            recognizedMeal = "Salat"
+        )
+        val apiService = FakeApiService(analyzeResult = Result.success(expectedEv))
+        val setRepo = FakeSettingsRepository()
+        val vm = MainViewModel(apiService, FakeHistoryRepository(), setRepo, FakeImagePreprocessor(), testDispatchers)
+        vm.onPhotoTaken(TestUri("content://media/photo.jpg"))
+        vm.setNote("Mittags-Salat")
+        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), PromptBundle("", "", "", "", "", "", "", ""))
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isBusy)
+        assertNull(vm.uiState.value.error)
+        assertEquals(expectedEv, vm.uiState.value.evaluation)
+        assertTrue(setRepo.loadRecentNotes().any { it.text == "Mittags-Salat" })
+    }
+
+    @Test
+    fun `analyze failure with photoUri sets error on API failure`() = runTest(testDispatcher) {
+        val apiService = FakeApiService(analyzeResult = Result.failure(RuntimeException("Timeout bei KI-Anfrage")))
+        val vm = MainViewModel(apiService, FakeHistoryRepository(), FakeSettingsRepository(), FakeImagePreprocessor(), testDispatchers)
+        vm.onPhotoTaken(TestUri("content://media/photo.jpg"))
+        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), PromptBundle("", "", "", "", "", "", "", ""))
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isBusy)
+        assertNotNull(vm.uiState.value.error)
+        assertTrue(vm.uiState.value.error!!.contains("Timeout bei KI-Anfrage"))
+    }
+
+    @Test
+    fun `analyze uses cached evaluation when note matches goals in repository`() = runTest(testDispatcher) {
+        val cachedEv = Evaluation(
+            goalResults = listOf(GoalResult(goal = "Gesund", rating = TrafficLight.GREEN, reason = "Viel Gemüse")),
+            summary = "Sehr gut",
+            recognizedMeal = "Gemüsepfanne"
+        )
+        val setRepo = FakeSettingsRepository(initialRecentNotes = listOf(
+            RecentNote(
+                text = "Gemüse",
+                starred = false,
+                evaluation = cachedEv
+            )
+        ))
+        val apiService = FakeApiService(analyzeResult = Result.failure(RuntimeException("Should not be called")))
+        val vm = MainViewModel(apiService, FakeHistoryRepository(), setRepo, FakeImagePreprocessor(), testDispatchers)
+        vm.onPhotoTaken(TestUri("content://media/photo.jpg"))
+        vm.setNote("Gemüse")
+        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Gesund")), PromptBundle("", "", "", "", "", "", "", ""))
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.isBusy)
+        assertNull(vm.uiState.value.error)
+        assertEquals(cachedEv, vm.uiState.value.evaluation)
     }
 
     @Test
@@ -133,13 +195,24 @@ class ViewModelCoverageTest {
     }
 
     @Test
-    fun `saveToHistory saves entry and invalidates day and week fazits`() = runTest(testDispatcher) {
+    fun `updateRecognizedMeal with savedEntryId updates history and settings repository`() = runTest(testDispatcher) {
         val histRepo = FakeHistoryRepository()
-        val vm = MainViewModel(FakeApiService(), histRepo, FakeSettingsRepository(), FakeImagePreprocessor(), testDispatchers)
-        // No evaluation set yet → saveToHistory should return early
-        vm.saveToHistory()
+        val setRepo = FakeSettingsRepository()
+        val entry = histRepo.add(null, Evaluation(recognizedMeal = "Alt"), note = "Notiz 1")
+        val vm = MainViewModel(
+            apiService = FakeApiService(),
+            historyRepository = histRepo,
+            settingsRepository = setRepo,
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            savedStateHandle = androidx.lifecycle.SavedStateHandle(mapOf(
+                "main_saved_entry_id" to entry.id,
+                "main_note" to "Notiz 1"
+            ))
+        )
+        vm.updateRecognizedMeal("Neu erkannt")
         advanceUntilIdle()
-        assertEquals(0, histRepo.getAll().size)
+        assertEquals("Neu erkannt", histRepo.getAll().find { it.id == entry.id }?.recognizedMeal)
     }
 
     @Test
@@ -488,5 +561,93 @@ class ViewModelCoverageTest {
 
         val thumb = vm.decodeThumbnail(entry, 128)
         assertNull("FakeHistoryRepository returns null", thumb)
+    }
+
+    // ----------------------------------------------------------------- ConfigViewModel
+
+    @Test
+    fun `ConfigViewModel exportBackup success updates uiState`() = runTest(testDispatcher) {
+        val summary = BackupSummary(fileName = "backup.json", entriesCount = 5, hasProfile = true, recentNotesCount = 2, hasApiKey = true)
+        val backupService = FakeBackupService(exportResult = Result.success(summary))
+        val vm = ConfigViewModel(backupService, FakeHistoryRepository(), testDispatchers)
+
+        vm.exportBackup()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.busy)
+        assertNull(vm.uiState.value.error)
+        assertEquals(summary, vm.uiState.value.exportSummary)
+    }
+
+    @Test
+    fun `ConfigViewModel exportBackup failure sets error`() = runTest(testDispatcher) {
+        val backupService = FakeBackupService(exportResult = Result.failure(RuntimeException("Export fehlgeschlagen")))
+        val vm = ConfigViewModel(backupService, FakeHistoryRepository(), testDispatchers)
+
+        vm.exportBackup()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.busy)
+        assertEquals("Export fehlgeschlagen", vm.uiState.value.error)
+        assertNull(vm.uiState.value.exportSummary)
+    }
+
+    @Test
+    fun `ConfigViewModel importBackup success updates uiState`() = runTest(testDispatcher) {
+        val summary = BackupSummary(fileName = "backup.json", entriesCount = 3, hasProfile = false, recentNotesCount = 1, hasApiKey = true)
+        val backupService = FakeBackupService(importResult = Result.success(summary))
+        val vm = ConfigViewModel(backupService, FakeHistoryRepository(), testDispatchers)
+
+        vm.importBackup(TestUri("content://backup.json"))
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.busy)
+        assertNull(vm.uiState.value.error)
+        assertEquals(summary, vm.uiState.value.importSummary)
+    }
+
+    @Test
+    fun `ConfigViewModel importBackup failure sets error`() = runTest(testDispatcher) {
+        val backupService = FakeBackupService(importResult = Result.failure(RuntimeException("Ungültiges JSON")))
+        val vm = ConfigViewModel(backupService, FakeHistoryRepository(), testDispatchers)
+
+        vm.importBackup(TestUri("content://invalid.json"))
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.busy)
+        assertEquals("Ungültiges JSON", vm.uiState.value.error)
+        assertNull(vm.uiState.value.importSummary)
+    }
+
+    @Test
+    fun `ConfigViewModel clearHistory success clears repository and sets cleared flag`() = runTest(testDispatcher) {
+        val histRepo = FakeHistoryRepository()
+        histRepo.add(null, Evaluation(recognizedMeal = "A"), dateOverride = 1000L)
+        histRepo.add(null, Evaluation(recognizedMeal = "B"), dateOverride = 2000L)
+        assertEquals(2, histRepo.getAll().size)
+
+        val vm = ConfigViewModel(FakeBackupService(), histRepo, testDispatchers)
+        vm.clearHistory()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.busy)
+        assertTrue(vm.uiState.value.cleared)
+        assertEquals(0, histRepo.getAll().size)
+    }
+
+    @Test
+    fun `ConfigViewModel clearHistory failure sets error`() = runTest(testDispatcher) {
+        val failRepo = object : de.gurum.besseresser.data.HistoryRepository by FakeHistoryRepository() {
+            override suspend fun clearAll() {
+                throw RuntimeException("Datenbank gesperrt")
+            }
+        }
+        val vm = ConfigViewModel(FakeBackupService(), failRepo, testDispatchers)
+        vm.clearHistory()
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.busy)
+        assertFalse(vm.uiState.value.cleared)
+        assertEquals("Datenbank gesperrt", vm.uiState.value.error)
     }
 }

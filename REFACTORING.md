@@ -201,11 +201,12 @@ Die Findings sind nach Schweregrad klassifiziert:
 
 ### G. Testbarkeit & Dependency Injection (Koin)
 
-#### 🟡 Finding G.1: Geringe Testabdeckung in der Kernlogik
+#### 🟡 Finding G.1: Geringe Testabdeckung in der Kernlogik (✅ Erledigt)
 * **Ort:** `app/src/test/java/de/gurum/besseresser/`
-* **Problem:** Es existieren lediglich Unit-Tests für `PromptBuilderTest` und `ModelUtilsTest`. ViewModels (`MainViewModel`, `HistoryViewModel`, `SetupViewModel`), Repositories und Daos sind ungetestet.
+* **Problem:** Es existierten ursprünglich lediglich Unit-Tests für `PromptBuilderTest` und `ModelUtilsTest`. ViewModels (`MainViewModel`, `HistoryViewModel`, `SetupViewModel`, `ProfileViewModel`, `ConfigViewModel`, `RecentNotesViewModel`, `AppStateViewModel`, `HistoryDetailViewModel`), Repositories und DAOs waren ungetestet.
 * **Auswirkung:** Hohes Regressionsrisiko bei Refactorings oder Funktionserweiterungen.
 * **Empfehlung:** Unit-Tests für alle ViewModels unter Verwendung von `TestDispatcher` / `StandardTestDispatcher` und gefakten Repositories aufbauen.
+* **Status:** ✅ Erledigt – Die Testabdeckung wurde systematisch auf über 219 JVM-Unit-Tests ausgebaut. Alle 8 ViewModels (`MainViewModel`, `HistoryViewModel`, `SetupViewModel`, `ProfileViewModel`, `ConfigViewModel`, `RecentNotesViewModel`, `AppStateViewModel`, `HistoryDetailViewModel`) sowie Repositories (`DefaultHistoryRepository`, `DefaultSettingsRepository`, `DefaultProfileRepository`, `DefaultRecentNotesRepository`, `DefaultPhotoCaptureManager`, `KeyVault`, `BackupStore`, `LegacyJsonMigrator`), Room-DAOs, Koin-DI-Module, Netzwerk-Sicherheitsprüfungen (`NetworkSecurity`) und Domänenlogiken sind mit `TestDispatcher`, Fakes und `TestUri` vollständig abgedeckt.
 
 #### 🟢 Finding G.2: Große Quelldateien mit vielen Verantwortlichkeiten
 * **Ort:**
