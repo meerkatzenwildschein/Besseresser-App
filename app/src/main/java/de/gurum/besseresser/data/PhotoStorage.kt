@@ -2,7 +2,11 @@ package de.gurum.besseresser.data
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import de.gurum.besseresser.model.HistoryEntry
@@ -95,7 +99,56 @@ class PhotoStorage(
         bmp.recycle()
     }
 
+    /**
+     * EXIF-Rotation auslesen und in das Pixelbild drehen; Datei wird überschrieben (JPEG q90).
+     * Läuft asynchron auf [dispatchers.io], um den UI-Thread freizuhalten.
+     */
+    suspend fun correctOrientation(file: File) = withContext(dispatchers.io) {
+        correctOrientationSync(file)
+    }
+
     companion object {
         private const val HISTORY_DIR = "history"
+
+        /**
+         * Asynchrone EXIF-Korrektur auf dem angegebenen CoroutineDispatcher (Standard: Dispatchers.IO).
+         */
+        suspend fun correctOrientation(file: File, dispatcher: CoroutineDispatcher = Dispatchers.IO) =
+            withContext(dispatcher) {
+                correctOrientationSync(file)
+            }
+
+        /**
+         * EXIF-Rotation synchron auslesen und in das Pixelbild drehen (I/O & Bitmap-Transformation).
+         * Sollte im Hintergrund aufgerufen werden (z. B. via [correctOrientation]).
+         */
+        fun correctOrientationSync(file: File) {
+            try {
+                val exif = ExifInterface(file.absolutePath)
+                val orientation = exif.getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL
+                )
+                val degrees = when (orientation) {
+                    ExifInterface.ORIENTATION_ROTATE_90 -> 90
+                    ExifInterface.ORIENTATION_ROTATE_180 -> 180
+                    ExifInterface.ORIENTATION_ROTATE_270 -> 270
+                    else -> 0
+                }
+                if (degrees == 0) return
+                val bmp = BitmapFactory.decodeFile(file.absolutePath) ?: return
+                val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+                val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
+                file.outputStream().use { out -> rotated.compress(Bitmap.CompressFormat.JPEG, 90, out) }
+                if (rotated !== bmp) bmp.recycle()
+                // EXIF auf "normal" zurücksetzen (Pixelsize ist jetzt richtig dargestellt)
+                ExifInterface(file.absolutePath).apply {
+                    setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
+                    saveAttributes()
+                }
+            } catch (e: Exception) {
+                // Im Fehlerfall bleibt die Datei unverändert (schlimmstenfalls gedreht, nicht lost)
+            }
+        }
     }
 }

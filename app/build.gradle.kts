@@ -106,6 +106,9 @@ android {
             "**/libsurface_util_jni.so"
         )
     }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
     bundle {
         language {
             enableSplit = false
