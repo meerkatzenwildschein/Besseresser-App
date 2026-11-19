@@ -52,6 +52,14 @@ class MainViewModel(
             ?: error("PhotoCaptureManager is not configured")
     }
 
+    fun deleteCaptureFile(file: File?) {
+        photoCaptureManager?.deleteCaptureFile(file)
+    }
+
+    fun deleteCaptureFile(uri: Uri?) {
+        photoCaptureManager?.deleteCaptureFile(uri)
+    }
+
     companion object {
         private const val KEY_NOTE = "main_note"
         private const val KEY_PHOTO_URI = "main_photo_uri"
@@ -192,6 +200,7 @@ class MainViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(savingHistory = true) }
             val entry = historyRepository.add(uri, ev, note = note)
+            uri?.let { photoCaptureManager?.deleteCaptureFile(it) }
             historyRepository.deleteDayFazitForEntry(entry)
             historyRepository.deleteWeekFazitForEntry(entry)
             settingsRepository.pushRecentNote(note, ev)
@@ -233,6 +242,12 @@ class MainViewModel(
 
     fun reset() {
         analyzeJob?.cancel()
+        val currentUri = savedStateHandle.get<String>(KEY_PHOTO_URI)?.let { Uri.parse(it) }
+            ?: _uiState.value.photoPreviewUri
+        val wasSaved = savedStateHandle.get<Boolean>(KEY_SAVED_TO_HISTORY) ?: _uiState.value.savedToHistory
+        if (!wasSaved && currentUri != null) {
+            photoCaptureManager?.deleteCaptureFile(currentUri)
+        }
         savedStateHandle.remove<String>(KEY_NOTE)
         savedStateHandle.remove<String>(KEY_PHOTO_URI)
         savedStateHandle.remove<Boolean>(KEY_SHOW_REVIEW)

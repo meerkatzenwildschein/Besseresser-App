@@ -62,6 +62,7 @@ fun HistoryScreen(
         if (ok) {
             viewModel.setShowAddReview(true)
         } else {
+            addCaptureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
             addCaptureState.value = null
         }
     }
@@ -71,8 +72,16 @@ fun HistoryScreen(
             viewModel.flushPendingDeletes()
         }
     }
-    BackHandler(enabled = uiState.showAddCamera) { viewModel.setShowAddCamera(false) }
-    BackHandler(enabled = uiState.showAddReview) { viewModel.setShowAddReview(false) }
+    BackHandler(enabled = uiState.showAddCamera) {
+        viewModel.setShowAddCamera(false)
+        addCaptureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+        addCaptureState.value = null
+    }
+    BackHandler(enabled = uiState.showAddReview) {
+        viewModel.setShowAddReview(false)
+        addCaptureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+        addCaptureState.value = null
+    }
     BackHandler(enabled = uiState.showAddText) { viewModel.setShowAddText(false) }
 
     LaunchedEffect(uiState.entries, uiState.fazitMap, uiState.weekFazitMap, settings, profile) {
@@ -183,10 +192,12 @@ fun HistoryScreen(
             onNoteChange = { viewModel.setAddNote(it) },
             onDismissCamera = {
                 viewModel.setShowAddCamera(false)
+                addCaptureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
                 addCaptureState.value = null
             },
             onDismissReview = {
                 viewModel.setShowAddReview(false)
+                addCaptureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
                 addCaptureState.value = null
             },
             onDismissText = { viewModel.setShowAddText(false) },

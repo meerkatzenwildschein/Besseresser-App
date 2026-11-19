@@ -56,12 +56,17 @@ fun MainScreen(
         if (ok) {
             viewModel.setShowReview(true)
         } else {
+            captureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
             captureState.value = null
         }
     }
 
     // Android-Zurück-Button: Overlay-Ebenen der Aufnahme schließen, statt die App zu beenden.
-    BackHandler(enabled = uiState.showCamera) { viewModel.setShowCamera(false) }
+    BackHandler(enabled = uiState.showCamera) {
+        viewModel.setShowCamera(false)
+        captureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+        captureState.value = null
+    }
 
     val triggerAnalyze: (String, Uri) -> Unit = { trimmedNote, targetUri ->
         val prompts = createAnalyzePrompts(ctx, trimmedNote)
@@ -91,6 +96,7 @@ fun MainScreen(
                 onNoteChange = { viewModel.setNote(it) },
                 onCancel = {
                     viewModel.setShowCamera(false)
+                    captureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
                     captureState.value = null
                 },
                 onFallbackSystemCamera = {
@@ -115,6 +121,7 @@ fun MainScreen(
                 onNoteChange = { viewModel.setNote(it) },
                 onBack = {
                     viewModel.setShowReview(false)
+                    captureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
                     viewModel.reset()
                     captureState.value = null
                 },
@@ -126,6 +133,7 @@ fun MainScreen(
                 },
                 onRetake = {
                     viewModel.setShowReview(false)
+                    captureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
                     viewModel.reset()
                     captureState.value = null
                     val (_, freshUri) = ensureCaptureFile()
