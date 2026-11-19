@@ -1,10 +1,6 @@
 package de.gurum.besseresser.ui
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
-import androidx.exifinterface.media.ExifInterface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -33,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,38 +60,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
+import kotlinx.coroutines.launch
 import java.io.File
 import de.gurum.besseresser.R
-
-/** EXIF-Rotation auslesen und in das Pixelbild drehen; Datei wird überschrieben (JPEG q90). */
-private fun correctOrientation(file: File) {
-    try {
-        val exif = ExifInterface(file.absolutePath)
-        val orientation = exif.getAttributeInt(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.ORIENTATION_NORMAL
-        )
-        val degrees = when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> 90
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270
-            else -> 0
-        }
-        if (degrees == 0) return
-        val bmp = BitmapFactory.decodeFile(file.absolutePath) ?: return
-        val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
-        val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
-        file.outputStream().use { out -> rotated.compress(Bitmap.CompressFormat.JPEG, 90, out) }
-        if (rotated !== bmp) bmp.recycle()
-        // EXIF auf "normal" zurücksetzen (Pixelsize ist jetzt richtig dargestellt)
-        ExifInterface(file.absolutePath).apply {
-            setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
-            saveAttributes()
-        }
-    } catch (e: Exception) {
-        // Im Fehlerfall bleibt die Datei unverändert (schlimmstenfalls gedreht, nicht lost)
-    }
-}
+import de.gurum.besseresser.data.PhotoStorage
 
 /**
  * Eigene Kamera (CameraX): Live-Vorschau → Verschluss → Foto + Anmerkung in EINEM Schritt
@@ -129,6 +99,8 @@ fun CameraCaptureScreen(
     val previewView = remember { PreviewView(context) }
     val imageCapture = remember { ImageCapture.Builder().build() }
     var hasCaptured by remember { mutableStateOf(false) }
+    var isCapturing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     // Bindet die (neu gebaute) Vorschau an den Lifecycle
     val bindCamera: () -> Unit = {
@@ -159,6 +131,8 @@ fun CameraCaptureScreen(
     }
 
     fun capture() {
+        if (isCapturing) return
+        isCapturing = true
         // Kritisch: ImageCapture kennt die Display-Rotation sonst nicht → schiefes EXIF
         previewView.display?.let { imageCapture.targetRotation = it.rotation }
         imageCapture.takePicture(
@@ -166,13 +140,17 @@ fun CameraCaptureScreen(
             ContextCompat.getMainExecutor(context),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(results: ImageCapture.OutputFileResults) {
-                    // EXIF-Rotation in das Pixelbild übernehmen, damit alle Konsumenten
-                    // (Review, Ergebnis, Historie, KI) das Foto aufrecht sehen
-                    correctOrientation(outputFile)
-                    hasCaptured = true
+                    // EXIF-Rotation im Hintergrund (Dispatchers.IO) in das Pixelbild übernehmen,
+                    // damit der UI-Thread nicht blockiert wird (Finding A.1)
+                    scope.launch {
+                        PhotoStorage.correctOrientation(outputFile)
+                        isCapturing = false
+                        hasCaptured = true
+                    }
                 }
 
                 override fun onError(exception: ImageCaptureException) {
+                    isCapturing = false
                     // Aufnahme fehlgeschlagen → Vorschau bleibt, Nutzer kann erneut drücken
                 }
             }
@@ -272,15 +250,23 @@ fun CameraCaptureScreen(
                         .clip(CircleShape)
                         .background(Color.Black.copy(alpha = 0.25f))
                         .border(4.dp, Color.White, CircleShape)
-                        .clickable { capture() },
+                        .clickable(enabled = !isCapturing) { capture() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(Color.White)
-                    )
+                    if (isCapturing) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(40.dp),
+                            strokeWidth = 3.dp
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                        )
+                    }
                 }
             }
 
