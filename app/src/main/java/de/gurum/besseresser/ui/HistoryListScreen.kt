@@ -68,13 +68,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
-import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import java.util.Date
-import java.util.Locale
 import kotlin.math.roundToInt
 import de.gurum.besseresser.R
 import de.gurum.besseresser.model.calendarWeekOfKey
@@ -134,12 +131,14 @@ fun HistoryListContent(
     val weeksWithEntries = remember(entries) {
         entries.map { weekKeyOf(it.dateMillis) }.toSet()
     }
-    val rawGroups = groupByDay(entries)
-    val displayGroups = if (rawGroups.any { it.day == today }) {
-        rawGroups
-    } else {
-        (listOf(DayGroup(day = today, entries = emptyList())) + rawGroups)
-            .sortedByDescending { it.day }
+    val displayGroups = remember(entries, today) {
+        val rawGroups = groupByDay(entries)
+        if (rawGroups.any { it.day == today }) {
+            rawGroups
+        } else {
+            (listOf(DayGroup(day = today, entries = emptyList())) + rawGroups)
+                .sortedByDescending { it.day }
+        }
     }
 
     if (entries.isNotEmpty()) {
@@ -373,8 +372,7 @@ fun HistoryItem(
                         if (entry.backdated)
                             stringResource(R.string.nacherfassen_label)
                         else
-                            SimpleDateFormat("HH:mm", Locale.getDefault())
-                                .format(Date(entry.dateMillis)),
+                            formatTime(entry.dateMillis),
                         fontSize = if (entry.backdated) 12.sp else 14.sp,
                         fontWeight = FontWeight.Bold,
                         fontStyle = if (entry.backdated) FontStyle.Italic else FontStyle.Normal,
@@ -690,7 +688,7 @@ fun PendingDeleteHistoryItem(
                             if (entry.backdated)
                                 stringResource(R.string.nacherfassen_label)
                             else
-                                SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(entry.dateMillis)),
+                                formatTime(entry.dateMillis),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error

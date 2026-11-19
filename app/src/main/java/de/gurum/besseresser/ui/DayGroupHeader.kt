@@ -40,7 +40,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import de.gurum.besseresser.R
 import de.gurum.besseresser.model.DayFazit
@@ -48,7 +50,21 @@ import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.TrafficLight
 
 const val DATE_FORMAT_PATTERN = "dd.MM.yyyy"
+const val TIME_FORMAT_PATTERN = "HH:mm"
+const val DATE_TIME_FORMAT_PATTERN = "$DATE_FORMAT_PATTERN $TIME_FORMAT_PATTERN"
+
 val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern(DATE_FORMAT_PATTERN)
+val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern(TIME_FORMAT_PATTERN)
+val DATE_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern(DATE_TIME_FORMAT_PATTERN)
+
+fun formatTime(dateMillis: Long): String =
+    Instant.ofEpochMilli(dateMillis).atZone(ZoneId.systemDefault()).format(TIME_FORMATTER)
+
+fun formatDate(dateMillis: Long): String =
+    Instant.ofEpochMilli(dateMillis).atZone(ZoneId.systemDefault()).format(DATE_FORMATTER)
+
+fun formatDateTime(dateMillis: Long): String =
+    Instant.ofEpochMilli(dateMillis).atZone(ZoneId.systemDefault()).format(DATE_TIME_FORMATTER)
 
 /**
  * Kopfzeile einer Tagesgruppe: Datum links, Tagesfazit-Chip rechts (Zustandsmaschine);

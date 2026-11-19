@@ -37,13 +37,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
-import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import java.util.Date
-import java.util.Locale
 import de.gurum.besseresser.R
 import de.gurum.besseresser.model.calendarWeekOf
 import de.gurum.besseresser.model.DayFazit
@@ -249,7 +246,7 @@ fun dayFazitmealDescriptions(ctx: Context, entriesOfDay: List<HistoryEntry>): Li
         val time = if (e.backdated)
             ctx.getString(R.string.nacherfassen_label)
         else
-            SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(e.dateMillis))
+            formatTime(e.dateMillis)
         val recog = e.recognizedMeal.ifBlank { ctx.getString(R.string.dayfazit_line_none) }
         var line = "$time · $recog"
         e.note.takeIf { it.isNotBlank() }
