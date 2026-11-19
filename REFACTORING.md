@@ -108,7 +108,7 @@ Die Findings sind nach Schweregrad klassifiziert:
 
 ### C. Jetpack Compose & UI-Performance
 
-#### 🔴 Finding C.1: Teure Berechnungen und Allokationen im Composable-Body
+#### 🔴 Finding C.1: Teure Berechnungen und Allokationen im Composable-Body (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryListScreen.kt` (Zeilen 137–143, 376–377)
 * **Problem:**
   1. `val rawGroups = groupByDay(entries)` und `val displayGroups = ...` werden bei jedem Recompose direkt im Funktionskörper ohne `remember(entries)` ausgeführt.
@@ -117,6 +117,7 @@ Die Findings sind nach Schweregrad klassifiziert:
 * **Empfehlung:**
   - Gruppierung im ViewModel vorbereiten oder in `remember(entries) { ... }` kapseln.
   - Vorkonfigurierte, statische `DateTimeFormatter` (aus `java.time`) wiederverwenden.
+* **Status:** ✅ Erledigt – `displayGroups` und `weeksWithEntries` werden per `remember(entries, today)` stabil gecacht. `SimpleDateFormat` und flüchtige `Date`-Allokationen wurden projektweit in den UI-Screens und Cards durch wiederverwendbare, thread-sichere `DateTimeFormatter`-Helfer (`formatTime`, `formatDate`, `formatDateTime`, `DATE_FORMATTER`, `TIME_FORMATTER`, `DATE_TIME_FORMATTER`) ersetzt. Durch Unit-Tests abgesichert.
 
 #### 🟡 Finding C.2: Nebeneffekte in der LazyColumn-Konstruktion
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryListScreen.kt` (Zeilen 158–178)

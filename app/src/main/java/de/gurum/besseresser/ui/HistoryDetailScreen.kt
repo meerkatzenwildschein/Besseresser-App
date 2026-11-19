@@ -58,12 +58,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import java.text.SimpleDateFormat
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Date
-import java.util.Locale
 import de.gurum.besseresser.R
 import de.gurum.besseresser.model.Evaluation
 import de.gurum.besseresser.model.HistoryEntry
@@ -199,10 +195,9 @@ fun HistoryDetailScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         TopBarRow(
             title = if (entry.backdated)
-                SimpleDateFormat(DATE_FORMAT_PATTERN, Locale.getDefault()).format(Date(entry.dateMillis)) +
-                    " · " + stringResource(R.string.nacherfassen_label)
+                formatDate(entry.dateMillis) + " · " + stringResource(R.string.nacherfassen_label)
             else
-                SimpleDateFormat("$DATE_FORMAT_PATTERN HH:mm", Locale.getDefault()).format(Date(entry.dateMillis)),
+                formatDateTime(entry.dateMillis),
             onBack = onBack,
             trailing = {
                 Row(
@@ -475,7 +470,7 @@ fun HistoryDetailScreen(
                         val targetTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
                         viewModel.duplicateToDate(targetDay, targetTime) {
                             duplicateTargetDate = null
-                            val formattedDateTime = "${targetDay.format(DATE_FORMATTER)}, ${targetTime.format(DateTimeFormatter.ofPattern("HH:mm"))}"
+                            val formattedDateTime = "${targetDay.format(DATE_FORMATTER)}, ${targetTime.format(TIME_FORMATTER)}"
                             Toast.makeText(
                                 ctx,
                                 ctx.getString(R.string.history_duplicate_done, formattedDateTime),

@@ -10,6 +10,9 @@ import java.time.LocalDate
 import java.time.ZoneId
 import de.gurum.besseresser.ui.buildShareText
 import de.gurum.besseresser.ui.color
+import de.gurum.besseresser.ui.formatDate
+import de.gurum.besseresser.ui.formatDateTime
+import de.gurum.besseresser.ui.formatTime
 import de.gurum.besseresser.model.calendarWeekOf
 import de.gurum.besseresser.model.calendarWeekOfKey
 import de.gurum.besseresser.model.DayFazit
@@ -501,5 +504,15 @@ class DomainLogicAndFingerprintTest {
             onGenerateWeekFazit = { generatedKeys.add(it) }
         )
         assertEquals(listOf(lastWeekKey), generatedKeys)
+    }
+
+    @Test
+    fun testDateTimeFormattingHelpers() {
+        val dt = LocalDate.of(2026, 11, 19).atTime(14, 30)
+        val millis = dt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+        assertEquals("14:30", formatTime(millis))
+        assertEquals("19.11.2026", formatDate(millis))
+        assertEquals("19.11.2026 14:30", formatDateTime(millis))
     }
 }
