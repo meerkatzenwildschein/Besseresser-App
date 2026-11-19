@@ -65,7 +65,7 @@ Die Findings sind nach Schweregrad klassifiziert:
 
 ### B. Architektur, State-Management & Navigation
 
-#### 🟡 Finding B.1: Fehlende State-Reaktivität in `RecentNotesViewModel`
+#### 🟡 Finding B.1: Fehlende State-Reaktivität in `RecentNotesViewModel` (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/RecentNotesViewModel.kt` (Zeilen 15–40)
 * **Problem:** `RecentNotesViewModel` lädt Notizen im `init`-Block einmalig via `loadRecentNotes(...)` in ein `MutableStateFlow` und mutiert dieses lokal. Der vorhandene `recentNotesFlow()` des Repositories wird nicht beobachtet.
 * **Auswirkung:** Wenn Notizen an anderer Stelle (z. B. im `MainViewModel` oder `HistoryViewModel`) hinzugefügt oder modifiziert werden, bleibt der State in `RecentNotesViewModel` veraltet.
@@ -74,6 +74,7 @@ Die Findings sind nach Schweregrad klassifiziert:
   val notes: StateFlow<List<RecentNote>> = settingsRepository.recentNotesFlow(sortStarredFirst = true)
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
   ```
+* **Status:** ✅ Erledigt – `RecentNotesViewModel` leitet `notes` nun reaktiv über `settingsRepository.recentNotesFlow(sortStarredFirst = true).stateIn(...)` ab; Notiz-Aktionen (`toggleStar`, `push`) delegieren direkt an das Repository und der Zustand wird durch Unit-Tests verifiziert.
 
 #### 🟡 Finding B.2: Unnötige Vollabfrage aller Historien-Einträge für Detailansicht
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryDetailViewModel.kt` (Zeilen 47–55)
