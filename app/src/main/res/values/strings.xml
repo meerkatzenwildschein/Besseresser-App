@@ -97,6 +97,9 @@
     <string name="setup_edit_title">Change settings</string>
     <string name="setup_edit_text">Here you can change URL, key, model and goals at any time. Saved ratings and your last photo remain untouched.</string>
     <string name="setup_url_label">API URL (OpenAI compatible)</string>
+    <string name="setup_url_error_insecure_http">Unencrypted HTTP is not permitted for external APIs (HTTPS required).</string>
+    <string name="setup_url_error_invalid">Invalid URL (e.g. https://api.openai.com/v1)</string>
+    <string name="setup_url_hint_local_http">Local development server (HTTP allowed)</string>
     <string name="setup_key_label">API key</string>
     <string name="setup_key_placeholder">sk-…</string>
     <string name="setup_model_label">Model (with image understanding, e.g. gpt-4o-mini)</string>

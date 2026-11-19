@@ -190,11 +190,12 @@ Die Findings sind nach Schweregrad klassifiziert:
 * **Empfehlung:** Sensible Zugangsdaten über `EncryptedSharedPreferences` oder den Android Keystore (z. B. via `KeyVault` mit AES-GCM / 256-Bit KeyGenParameterSpec) sichern.
 * **Status:** ✅ Erledigt – Der API-Key wird hardwaregestützt über `KeyVault` mit AES-GCM (256-Bit-Schlüssel im Android Keystore) verschlüsselt und sicher in den Preferences persistiert. Die Ver- und Entschlüsselung wurde gehärtet (Thread-Sicherheit via `@Synchronized`, sichere Puffer- und Header-Validierung, Null-Handling bei ungültigem Chiffrat, Rückwärtskompatibilität für Klartext-Migration). Durch Unit-Tests in `RepositoriesAndFakesTest` abgesichert.
 
-#### 🟡 Finding F.2: Fehlende TLS/HTTPS-Erzwingung bei benutzerdefinierten Endpunkten
-* **Ort:** `app/src/main/java/de/gurum/besseresser/data/ApiClient.kt`
-* **Problem:** `baseUrl` kann vom Nutzer frei eingegeben werden. Es findet keine Prüfung statt, ob unverschlüsseltes HTTP verwendet wird.
+#### 🟡 Finding F.2: Fehlende TLS/HTTPS-Erzwingung bei benutzerdefinierten Endpunkten (✅ Erledigt)
+* **Ort:** `app/src/main/java/de/gurum/besseresser/data/ApiClient.kt`, `NetworkSecurity.kt`, `SetupScreen.kt`, `SetupViewModel.kt`
+* **Problem:** `baseUrl` kann vom Nutzer frei eingegeben werden. Es fand keine Prüfung statt, ob unverschlüsseltes HTTP verwendet wird.
 * **Auswirkung:** Gefahr von Man-in-the-Middle-Angriffen (Abfangen von Essensfotos und API-Keys).
 * **Empfehlung:** HTTPS für externe API-Endpunkte vorschreiben bzw. Warnung anzeigen, wenn Cleartext-Traffic konfiguriert wird.
+* **Status:** ✅ Erledigt – `NetworkSecurity` erzwingt TLS/HTTPS für alle externen KI- und API-Endpunkte und wirft bei unverschlüsseltem Remote-HTTP eine `InsecureEndpointException`. Lokale Entwicklungs- und Test-Hosts (`localhost`, `127.0.0.1`, `10.0.2.2`, `[::1]`) sind analog zur `network_security_config.xml` weiterhin per Cleartext-HTTP zulässig. In `SetupScreen` und `SetupViewModel` wird der Sicherheitsstatus direkt validiert, mit Fehlermeldungen bzw. Hinweisen versehen und das Speichern unsicherer Endpunkte unterbunden. Umfassende Unit-Tests in `NetworkSecurityTest` sichern alle Pfade ab.
 
 ---
 

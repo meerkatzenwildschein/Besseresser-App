@@ -577,6 +577,7 @@ class ApiClient(
         var httpCode = -1
         var body = ""
         try {
+            NetworkSecurity.requirePermittedEndpoint(requestUrl)
             val conn = (URI.create(requestUrl).toURL().openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
                 connectTimeout = 15000
