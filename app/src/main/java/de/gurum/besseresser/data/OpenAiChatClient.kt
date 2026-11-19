@@ -47,6 +47,7 @@ object OpenAiChatClient {
      * Führt einen synchronen POST-Request an den angegebenen Chat-Completions-Endpunkt aus.
      */
     fun postChat(url: String, apiKey: String, body: JsonObject): String {
+        NetworkSecurity.requirePermittedEndpoint(url)
         val conn = (URI.create(url).toURL().openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 15000

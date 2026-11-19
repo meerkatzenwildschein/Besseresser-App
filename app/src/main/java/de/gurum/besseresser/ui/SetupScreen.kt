@@ -62,6 +62,8 @@ import de.gurum.besseresser.BuildConfig
 import de.gurum.besseresser.data.ApiClient
 import de.gurum.besseresser.data.ApiClient.ModelsResult
 import de.gurum.besseresser.data.ApiException
+import de.gurum.besseresser.data.NetworkSecurity
+import de.gurum.besseresser.data.UrlSecurityStatus
 import de.gurum.besseresser.model.Settings
 
 // ----------------------------------------------------------------- Gängige Anbieter
@@ -145,7 +147,7 @@ fun SetupScreen(
         return
     }
 
-    val valid = uiState.url.trim().startsWith("http") && uiState.key.isNotBlank() && uiState.model.isNotBlank() && !uiState.splitting
+    val valid = NetworkSecurity.isPermittedUrl(uiState.url) && uiState.key.isNotBlank() && uiState.model.isNotBlank() && !uiState.splitting
 
     val doSave: (List<String>, Boolean) -> Unit = { liste, wasSplit ->
         onDone(Settings(uiState.url.trim(), uiState.key.trim(), uiState.model.trim(), liste.ifEmpty { defaultGoals }, wasSplit, uiState.retentionWeeks.trim().toIntOrNull() ?: Settings.DEFAULT_RETENTION_WEEKS))
@@ -361,12 +363,41 @@ private fun SetupApiSection(
     onShowProviders: () -> Unit,
     onShowModels: () -> Unit
 ) {
+    val urlStatus = remember(url) { NetworkSecurity.assessUrl(url) }
+    val isUrlError = url.isNotBlank() && (urlStatus == UrlSecurityStatus.INSECURE_REMOTE_HTTP || urlStatus == UrlSecurityStatus.INVALID)
+
     SectionCard(title = stringResource(R.string.setup_section_api)) {
         LabelledField(stringResource(R.string.setup_url_label)) {
             OutlinedTextField(
                 value = url,
                 onValueChange = onUrlChange,
                 placeholder = { Text("https://api.openai.com/v1") },
+                isError = isUrlError,
+                supportingText = {
+                    when (urlStatus) {
+                        UrlSecurityStatus.INSECURE_REMOTE_HTTP -> {
+                            Text(
+                                stringResource(R.string.setup_url_error_insecure_http),
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        UrlSecurityStatus.INVALID -> {
+                            if (url.isNotBlank()) {
+                                Text(
+                                    stringResource(R.string.setup_url_error_invalid),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                        UrlSecurityStatus.LOCAL_CLEARTEXT_HTTP -> {
+                            Text(
+                                stringResource(R.string.setup_url_hint_local_http),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        UrlSecurityStatus.SECURE_HTTPS -> null
+                    }
+                },
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
@@ -403,7 +434,7 @@ private fun SetupApiSection(
         }
         FilledTonalButton(
             onClick = onShowModels,
-            enabled = url.trim().startsWith("http"),
+            enabled = NetworkSecurity.isPermittedUrl(url),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth()
         ) {

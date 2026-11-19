@@ -97,6 +97,9 @@
     <string name="setup_edit_title">Einstellungen ändern</string>
     <string name="setup_edit_text">Hier kannst du URL, Key, Modell und Ziele neu einstellen. Gespeicherte Bewertungen und dein letztes Foto bleiben unberührt.</string>
     <string name="setup_url_label">API-URL (OpenAI-kompatibel)</string>
+    <string name="setup_url_error_insecure_http">Unverschlüsseltes HTTP ist für externe APIs nicht zulässig (HTTPS erforderlich).</string>
+    <string name="setup_url_error_invalid">Ungültige URL (z. B. https://api.openai.com/v1)</string>
+    <string name="setup_url_hint_local_http">Lokaler Entwicklungs-Server (HTTP erlaubt)</string>
     <string name="setup_key_label">API-Key</string>
     <string name="setup_key_placeholder">sk-…</string>
     <string name="setup_model_label">Modell (mit Bildverstehen, z. B. gpt-4o-mini)</string>

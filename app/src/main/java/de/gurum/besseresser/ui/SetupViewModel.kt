@@ -14,7 +14,9 @@ import de.gurum.besseresser.data.ApiException
 import de.gurum.besseresser.data.BackupService
 import de.gurum.besseresser.data.BackupSummary
 import de.gurum.besseresser.data.BesseresserApiService
+import de.gurum.besseresser.data.NetworkSecurity
 import de.gurum.besseresser.data.SettingsRepository
+import de.gurum.besseresser.data.UrlSecurityStatus
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.data.SplitGoalsRequest
 
@@ -74,6 +76,12 @@ class SetupViewModel(
         )
     )
     val uiState: StateFlow<SetupUiState> = _uiState.asStateFlow()
+
+    val isUrlPermitted: Boolean
+        get() = NetworkSecurity.isPermittedUrl(_uiState.value.url)
+
+    val urlSecurityStatus: UrlSecurityStatus
+        get() = NetworkSecurity.assessUrl(_uiState.value.url)
 
     fun init(initial: Settings, defaultGoals: List<String>, force: Boolean = false) {
         val alreadyInitialized = savedStateHandle.get<Boolean>(KEY_SETUP_INITIALIZED) ?: false
