@@ -80,7 +80,6 @@ val Context.appDataStore: DataStore<Preferences> by preferencesDataStore(
 )
 
 interface HistoryRepository {
-    suspend fun ensureMigrated()
     fun getAllFlow(): Flow<List<HistoryEntry>>
     fun getByIdFlow(id: Long): Flow<HistoryEntry?>
     fun getDayFazitsFlow(): Flow<Map<String, DayFazit>>
@@ -300,46 +299,13 @@ class DefaultHistoryRepository(
     private val historyDao: HistoryDao,
     private val dayFazitDao: DayFazitDao,
     private val weekFazitDao: WeekFazitDao,
-    private val dispatchers: AppDispatchers = AppDispatchers()
+    private val dispatchers: AppDispatchers = AppDispatchers(),
+    autoMigrateLegacyData: Boolean = true
 ) : HistoryRepository {
 
-    @Volatile
-    private var migrationChecked = false
-
-    /** Einmalige Migration historischer JSON-Dateien (filesDir/history) nach Room. */
-    override suspend fun ensureMigrated() {
-        if (migrationChecked) return
-        withContext(dispatchers.io) {
-            synchronized(this@DefaultHistoryRepository) {
-                if (migrationChecked) return@withContext
-                migrationChecked = true
-            }
-            val d = photoStorage.dir()
-
-            d.listFiles { f ->
-                f.extension == "json" && !f.name.startsWith("day_") && !f.name.startsWith("week_")
-            }?.forEach { f ->
-                runCatching {
-                    val entry = AppJson.decodeFromString<HistoryEntry>(f.readText())
-                    val e = if (entry.id == 0L) entry.copy(id = f.nameWithoutExtension.toLongOrNull() ?: 0L) else entry
-                    historyDao.insert(e.toEntity())
-                    f.delete()
-                }
-            }
-            d.listFiles { f -> f.name.startsWith("day_") && f.extension == "json" }?.forEach { f ->
-                runCatching {
-                    val fazit = AppJson.decodeFromString<DayFazit>(f.readText())
-                    dayFazitDao.insert(fazit.toEntity())
-                    f.delete()
-                }
-            }
-            d.listFiles { f -> f.name.startsWith("week_") && f.extension == "json" }?.forEach { f ->
-                runCatching {
-                    val fazit = AppJson.decodeFromString<DayFazit>(f.readText())
-                    weekFazitDao.insert(fazit.toWeekEntity())
-                    f.delete()
-                }
-            }
+    init {
+        if (autoMigrateLegacyData) {
+            LegacyJsonMigrator.migrateSync(photoStorage.dir(), historyDao, dayFazitDao, weekFazitDao)
         }
     }
 
@@ -368,7 +334,6 @@ class DefaultHistoryRepository(
         dateOverride: Long?,
         backdated: Boolean
     ): HistoryEntry {
-        ensureMigrated()
         val id = System.currentTimeMillis()
         val date = dateOverride ?: id
         val photoFile = if (photoUri != null) {
@@ -413,14 +378,12 @@ class DefaultHistoryRepository(
      *  Bestehende Tages- und Wochenfazits bleiben unverändert gültig (keine Neuberechnung nötig). */
     override suspend fun reorderEntries(reordered: List<HistoryEntry>) {
         if (reordered.isEmpty()) return
-        ensureMigrated()
         historyDao.insertAll(reordered.map { it.toEntity() })
     }
 
     /** Speichert/überschreibt mehrere Verlaufseinträge (z. B. beim Backup-Import). */
     override suspend fun saveAll(entries: List<HistoryEntry>) {
         if (entries.isEmpty()) return
-        ensureMigrated()
         historyDao.insertAll(entries.map { it.toEntity() })
     }
 
@@ -433,7 +396,6 @@ class DefaultHistoryRepository(
         targetDay: LocalDate,
         targetTime: java.time.LocalTime
     ): HistoryEntry {
-        ensureMigrated()
         val id = System.currentTimeMillis()
         val existingPhoto = photoStorage.photoFileOf(source)
         val copiedPhotoName = if (existingPhoto != null) {
@@ -461,7 +423,6 @@ class DefaultHistoryRepository(
 
     /** Löscht alle Verlaufsdaten (Einträge, Fotos, Tages- und Wochenfazits) komplett. */
     override suspend fun clearAll() {
-        ensureMigrated()
         photoStorage.deleteAll()
         historyDao.deleteAll()
         dayFazitDao.deleteAll()
@@ -474,7 +435,6 @@ class DefaultHistoryRepository(
      *  volle Wochen sind. 0/negativ = nichts löschen. Liefert die Anzahl gelöschter Einträge. */
     override suspend fun purgeOlderThanWeeks(weeks: Int): Int {
         if (weeks <= 0) return 0
-        ensureMigrated()
         val cutoffMillis = retentionCutoffMillis(weeks)
         val cutoffWeekKey = weekKeyOf(cutoffMillis)
         val cutoffDayKey = dayKeyOf(cutoffMillis)
@@ -503,7 +463,6 @@ class DefaultHistoryRepository(
     }
 
     override suspend fun purgeOrphanedPhotos(): Int {
-        ensureMigrated()
         val knownFileNames = historyDao.getAll()
             .map { it.photoFile }
             .filter { it.isNotBlank() }
@@ -518,23 +477,19 @@ class DefaultHistoryRepository(
     }
 
     override suspend fun saveDayFazit(fazit: DayFazit) {
-        ensureMigrated()
         dayFazitDao.insert(fazit.toEntity())
     }
 
     override suspend fun loadDayFazit(dayKey: String): DayFazit? {
-        ensureMigrated()
         return dayFazitDao.getByKey(dayKey)?.toDomain()
     }
 
     override suspend fun loadAllDayFazits(): List<DayFazit> {
-        ensureMigrated()
         return dayFazitDao.getAll().map { it.toDomain() }
     }
 
     override suspend fun saveAllDayFazits(fazits: List<DayFazit>) {
         if (fazits.isEmpty()) return
-        ensureMigrated()
         dayFazitDao.insertAll(fazits.map { it.toEntity() })
     }
 
@@ -544,23 +499,19 @@ class DefaultHistoryRepository(
     }
 
     override suspend fun saveWeekFazit(fazit: DayFazit) {
-        ensureMigrated()
         weekFazitDao.insert(fazit.toWeekEntity())
     }
 
     override suspend fun loadWeekFazit(weekKey: String): DayFazit? {
-        ensureMigrated()
         return weekFazitDao.getByKey(weekKey)?.toDomain()
     }
 
     override suspend fun loadAllWeekFazits(): List<DayFazit> {
-        ensureMigrated()
         return weekFazitDao.getAll().map { it.toDomain() }
     }
 
     override suspend fun saveAllWeekFazits(fazits: List<DayFazit>) {
         if (fazits.isEmpty()) return
-        ensureMigrated()
         weekFazitDao.insertAll(fazits.map { it.toWeekEntity() })
     }
 

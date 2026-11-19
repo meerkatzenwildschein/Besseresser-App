@@ -144,11 +144,12 @@ Die Findings sind nach Schweregrad klassifiziert:
 * **Empfehlung:** Index auf `dateMillis` und `sortOrder` in `HistoryEntryEntity` hinzufügen und DB-Version migrieren.
 * **Status:** ✅ Erledigt – `HistoryEntryEntity` deklariert nun Indizes auf `dateMillis` und `sortOrder`. Die Room-Datenbank wurde auf Version 3 angehoben und die Migration `MIGRATION_2_3` (`CREATE INDEX IF NOT EXISTS ...`) implementiert und in `AppDatabase.getInstance` eingebunden. Durch Unit-Tests in `RoomDatabaseAndViewModelTest` verifiziert.
 
-#### 🟡 Finding D.2: Datenbank-Migrationen mit synchroner Dateibereinigung
+#### 🟡 Finding D.2: Datenbank-Migrationen mit synchroner Dateibereinigung (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum/besseresser/data/Repositories.kt` (Zeilen 390–440)
-* **Problem:** Die Methode `ensureMigrated()` wird in `HistoryViewModel.init` per `viewModelScope.launch` aufgerufen. Wenn gleichzeitig andere Operationen starten, ist die Migration eventuell noch nicht abgeschlossen.
-* **Auswirkung:** Potenzielle Race Conditions beim App-Start.
-* **Empfehlung:** Migrationen strukturiert über Room `Migration`-Objekte oder einen dedizierten App-Startup-Initializer (`androidx.startup`) vor der Bereitstellung der Repositories abschließen.
+* **Problem:** Die Methode `ensureMigrated()` wurde in `HistoryViewModel.init` per `viewModelScope.launch` aufgerufen. Wenn gleichzeitig andere Operationen starteten, war die Migration eventuell noch nicht abgeschlossen.
+* **Auswirkung:** Potenzielle Race Conditions beim App-Start und unsaubere Vermischung von Migrationslogik in allen Repository-Methoden.
+* **Empfehlung:** Migrationen strukturiert über Room `Migration`-Objekte oder einen dedizierten Migrator vor der Bereitstellung der Repositories abschließen.
+* **Status:** ✅ Erledigt – Die JSON-Alt-Migration wurde in das eigenständige `LegacyJsonMigrator`-Objekt ausgelagert. `DefaultHistoryRepository` führt die Migration deterministisch und thread-sicher beim Erstellen aus, bevor DAOs angesprochen werden. `HistoryRepository` und `HistoryViewModel.init` wurden von `ensureMigrated()` befreit, und alle redundanten Aufrufe aus den Repository-Methoden wurden entfernt. Umfassende Unit-Tests in `RepositoriesAndFakesTest` sichern das Verhalten ab.
 
 ---
 

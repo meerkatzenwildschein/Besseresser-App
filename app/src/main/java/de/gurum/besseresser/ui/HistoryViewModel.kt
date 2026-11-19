@@ -106,7 +106,6 @@ class HistoryViewModel(
     private val pendingDeleteEntries = mutableMapOf<Long, HistoryEntry>()
 
     init {
-        viewModelScope.launch { historyRepository.ensureMigrated() }
         observeEntries(historyRepository)
         observeDayFazits(historyRepository)
         observeWeekFazits(historyRepository)
