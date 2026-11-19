@@ -83,10 +83,12 @@ class HistoryViewModel(
             repo.getAllFlow().collect { list ->
                 val validWeekMap = validateAllWeekFazits(list, latestRawWeekMap)
                 val targetWk = latestDueWeekKey(list) ?: weekKeyOf(System.currentTimeMillis())
-                val validWf = validWeekMap[targetWk] ?: repo.loadWeekFazit(targetWk)?.let { wf ->
-                    val wkEntries = list.filter { weekKeyOf(it.dateMillis) == targetWk }
-                    validateWeekFazit(targetWk, wf, wkEntries)
-                }
+                val wkEntries = list.filter { weekKeyOf(it.dateMillis) == targetWk }
+                val validWf: DayFazit? = validWeekMap[targetWk] ?: validateWeekFazit(
+                    targetWk,
+                    repo.loadWeekFazit(targetWk),
+                    wkEntries
+                )
                 val mergedWeekMap = if (validWf != null) validWeekMap + (targetWk to validWf) else validWeekMap
                 _uiState.update { current ->
                     current.copy(

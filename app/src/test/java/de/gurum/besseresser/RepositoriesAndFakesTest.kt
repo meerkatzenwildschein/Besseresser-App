@@ -877,7 +877,7 @@ class RepositoriesAndFakesTest {
 
         val pastDay = LocalDate.now().minusDays(1)
         val pastDayMillis = pastDay.atTime(12, 0).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val entry = histRepo.add(null, Evaluation(recognizedMeal = "Salat"), dateOverride = pastDayMillis)
+        histRepo.add(null, Evaluation(recognizedMeal = "Salat"), dateOverride = pastDayMillis)
         advanceUntilIdle()
 
         DayFazitSession.attempted.clear()
