@@ -282,6 +282,43 @@ class RoomDatabaseAndViewModelTest {
     }
 
     @Test
+    fun testHistoryDetailViewModelLoadsViaGetByIdFlow() = runTest(testDispatcher) {
+        val historyRepo = FakeHistoryRepository()
+        val settingsRepo = FakeSettingsRepository()
+        val apiService = FakeApiService()
+        val imagePreprocessor = FakeImagePreprocessor()
+
+        val ev = Evaluation(recognizedMeal = "Pasta", goalResults = listOf(GoalResult("Z1", TrafficLight.GREEN, "Super")))
+        val entry = historyRepo.add(null, ev, note = "Mittag", dateOverride = 500L)
+
+        val viewModel = HistoryDetailViewModel(
+            entryId = entry.id,
+            historyRepository = historyRepo,
+            settingsRepository = settingsRepo,
+            apiService = apiService,
+            imagePreprocessor = imagePreprocessor,
+            dispatchers = de.gurum.besseresser.data.AppDispatchers(io = testDispatcher)
+        )
+
+        val collectJob = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.loaded)
+        assertNotNull(viewModel.uiState.value.entry)
+        assertEquals(entry.id, viewModel.uiState.value.entry?.id)
+        assertEquals("Pasta", viewModel.uiState.value.entry?.recognizedMeal)
+
+        historyRepo.updateRecognizedMeal(entry.id, "Vollkorn-Pasta")
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Vollkorn-Pasta", viewModel.uiState.value.entry?.recognizedMeal)
+
+        collectJob.cancel()
+    }
+
+    @Test
     fun testConfigViewModelUiStateTransitions() {
         val backupService = FakeBackupService()
         val historyRepo = FakeHistoryRepository()

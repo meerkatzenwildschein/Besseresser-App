@@ -76,11 +76,12 @@ Die Findings sind nach Schweregrad klassifiziert:
   ```
 * **Status:** ✅ Erledigt – `RecentNotesViewModel` leitet `notes` nun reaktiv über `settingsRepository.recentNotesFlow(sortStarredFirst = true).stateIn(...)` ab; Notiz-Aktionen (`toggleStar`, `push`) delegieren direkt an das Repository und der Zustand wird durch Unit-Tests verifiziert.
 
-#### 🟡 Finding B.2: Unnötige Vollabfrage aller Historien-Einträge für Detailansicht
+#### 🟡 Finding B.2: Unnötige Vollabfrage aller Historien-Einträge für Detailansicht (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryDetailViewModel.kt` (Zeilen 47–55)
 * **Problem:** Um einen einzelnen Eintrag anzuzeigen, sammelt das ViewModel `historyRepository.getAllFlow()` (alle Einträge der Datenbank) und filtert im Speicher mit `list.find { it.id == entryId }`.
 * **Auswirkung:** Unnötige Reaktivierung und Speicherallokation bei jeder Änderung an beliebigen Historien-Einträgen.
 * **Empfehlung:** In `HistoryDao` und `HistoryRepository` eine Methode `fun getByIdFlow(id: Long): Flow<HistoryEntryEntity?>` ergänzen und direkt beobachten.
+* **Status:** ✅ Erledigt – `HistoryDao` und `HistoryRepository` stellen nun `getByIdFlow(id)` bereit; `HistoryDetailViewModel` beobachtet gezielt nur den angefragten Eintrag reaktiv, wodurch unnötige Vollabfragen und Reaktivierungen vermieden werden. Abgedeckt durch entsprechende Unit-Tests.
 
 #### 🟡 Finding B.3: Exponierung von Repositories über ViewModels
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryDetailViewModel.kt` (Zeile 29)

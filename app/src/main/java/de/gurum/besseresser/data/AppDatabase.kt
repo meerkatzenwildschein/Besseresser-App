@@ -162,6 +162,9 @@ interface HistoryDao {
     suspend fun getAll(): List<HistoryEntryEntity>
 
     @Query("SELECT * FROM history_entries WHERE id = :id")
+    fun getByIdFlow(id: Long): Flow<HistoryEntryEntity?>
+
+    @Query("SELECT * FROM history_entries WHERE id = :id")
     suspend fun getById(id: Long): HistoryEntryEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
