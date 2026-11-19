@@ -126,11 +126,12 @@ Die Findings sind nach Schweregrad klassifiziert:
 * **Empfehlung:** Die Liste der anzuzeigenden Elemente vorab im ViewModel als flache `List<HistoryUiItem>` (mit Subtypen `DayHeader`, `WeekFazitItem`, `MealEntryItem`) modellieren und als stabilen State an die `LazyColumn` übergeben.
 * **Status:** ✅ Erledigt – Die Verlaufsliste wurde auf das flache, funktionale Modell `HistoryUiItem` (`WeekFazitItem`, `DayHeaderItem`, `MealEntryItem`) und die reine Konstruktionsfunktion `buildHistoryUiItems` umgestellt. `LazyColumn` iteriert nun seiteneffektfrei über stabile Items mit eindeutigen Schlüsseln. Durch Unit-Tests in `DomainLogicAndFingerprintTest` abgesichert.
 
-#### 🟡 Finding C.3: Direkte Injektion von Domänenkomponenten in UI-Screens
-* **Ort:** `app/src/main/java/de/gurum/besseresser/ui/MainScreen.kt` (Zeile 42)
-* **Problem:** `val captureManager: PhotoCaptureManager = koinInject()` wird direkt innerhalb der Composable-Funktion injiziert, um temporäre Kamera-Dateien zu erzeugen.
+#### 🟡 Finding C.3: Direkte Injektion von Domänenkomponenten in UI-Screens (✅ Erledigt)
+* **Ort:** `app/src/main/java/de/gurum/besseresser/ui/MainScreen.kt` (Zeile 42), `HistoryScreen.kt` (Zeile 50)
+* **Problem:** `val captureManager: PhotoCaptureManager = koinInject()` wurde direkt innerhalb der Composable-Funktionen injiziert, um temporäre Kamera-Dateien zu erzeugen.
 * **Auswirkung:** Erschwert UI-Vorschauen (`@Preview`), erhöht die Kopplung der UI an Koin und umgeht das ViewModel.
-* **Empfehlung:** Datei-Initialisierung und Kamera-Zustände über das `MainViewModel` oder einen standardisierten `ActivityResultContract` steuern.
+* **Empfehlung:** Datei-Initialisierung und Kamera-Zustände über das `MainViewModel` bzw. `HistoryViewModel` steuern.
+* **Status:** ✅ Erledigt – `PhotoCaptureManager` wurde als Interface mit `DefaultPhotoCaptureManager` abstrahiert und in `MainViewModel` sowie `HistoryViewModel` über Dependency Injection bereitgestellt. `MainScreen` und `HistoryScreen` beziehen Capture-Dateien nun direkt über `viewModel.createCaptureFile()`. Alle `koinInject()`-Aufrufe wurden aus der UI entfernt. Durch Unit-Tests in `RepositoriesAndFakesTest` und `KoinDiTest` verifiziert.
 
 ---
 

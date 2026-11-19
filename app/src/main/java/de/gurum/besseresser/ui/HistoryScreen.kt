@@ -20,11 +20,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.koin.compose.koinInject
 import org.koin.androidx.compose.koinViewModel
 import java.io.File
 import de.gurum.besseresser.R
-import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.Profile
 import de.gurum.besseresser.model.Settings
@@ -47,14 +45,13 @@ fun HistoryScreen(
     BackHandler(onBack = handleBack)
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val captureManager: PhotoCaptureManager = koinInject()
 
     // Capture file is created fresh on demand, not at composition time.
     val addCaptureState = remember { mutableStateOf<Pair<File, Uri>?>(null) }
     fun ensureAddCaptureFile(): Pair<File, Uri> {
         val existing = addCaptureState.value
         if (existing != null) return existing
-        val fresh = captureManager.createCaptureFile()
+        val fresh = viewModel.createCaptureFile()
         addCaptureState.value = fresh
         return fresh
     }

@@ -14,9 +14,11 @@ import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.io.File
 import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.model.calendarWeekOfKey
 import de.gurum.besseresser.model.DayFazit
 import de.gurum.besseresser.model.DayFazitSession
@@ -62,8 +64,14 @@ class HistoryViewModel(
     private val settingsRepository: SettingsRepository,
     private val imagePreprocessor: ImagePreprocessor,
     private val dispatchers: AppDispatchers = AppDispatchers(),
+    private val photoCaptureManager: PhotoCaptureManager? = null,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle()
 ) : ViewModel() {
+
+    fun createCaptureFile(): Pair<File, Uri> {
+        return photoCaptureManager?.createCaptureFile()
+            ?: error("PhotoCaptureManager is not configured")
+    }
 
     companion object {
         private const val KEY_ADD_NOTE = "history_add_note"

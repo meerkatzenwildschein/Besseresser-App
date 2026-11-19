@@ -19,10 +19,15 @@ private const val DATE_PATTERN = "yyyyMMdd_HHmmss"
  * a unique file name. The file is only created when [createCaptureFile] is called,
  * not eagerly at composition time.
  */
-class PhotoCaptureManager(private val context: Context) {
+fun interface PhotoCaptureManager {
+    /** Creates a new uniquely-named JPEG file in the app's cache and returns its [Uri]. */
+    fun createCaptureFile(): Pair<File, Uri>
+}
+
+class DefaultPhotoCaptureManager(private val context: Context) : PhotoCaptureManager {
 
     /** Creates a new uniquely-named JPEG file in the app's cache and returns its [Uri]. */
-    fun createCaptureFile(): Pair<File, Uri> {
+    override fun createCaptureFile(): Pair<File, Uri> {
         val dir = File(context.cacheDir, PHOTO_CACHE_DIR).also { it.mkdirs() }
         val name = "$PHOTO_PREFIX${SimpleDateFormat(DATE_PATTERN, Locale.US).format(Date())}$PHOTO_SUFFIX"
         val file = File(dir, name)

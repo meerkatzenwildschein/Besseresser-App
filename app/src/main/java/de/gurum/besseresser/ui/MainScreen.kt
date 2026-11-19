@@ -18,11 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.koin.compose.koinInject
 import org.koin.androidx.compose.koinViewModel
 import java.io.File
 import de.gurum.besseresser.R
-import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.model.Settings
 
@@ -39,14 +37,13 @@ fun MainScreen(
 ) {
     val ctx = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val captureManager: PhotoCaptureManager = koinInject()
 
     // Capture file is created fresh each time the camera is launched (not at composition time).
     val captureState = remember { mutableStateOf<Pair<File, Uri>?>(null) }
     fun ensureCaptureFile(): Pair<File, Uri> {
         val existing = captureState.value
         if (existing != null) return existing
-        val fresh = captureManager.createCaptureFile()
+        val fresh = viewModel.createCaptureFile()
         captureState.value = fresh
         return fresh
     }

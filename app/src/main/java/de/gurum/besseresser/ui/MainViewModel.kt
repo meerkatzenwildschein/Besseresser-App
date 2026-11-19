@@ -13,12 +13,14 @@ import kotlinx.coroutines.withContext
 import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.model.Evaluation
+import java.io.File
 
 data class MainUiState(
     val evaluation: Evaluation? = null,
@@ -41,8 +43,14 @@ class MainViewModel(
     private val settingsRepository: SettingsRepository,
     private val imagePreprocessor: ImagePreprocessor,
     private val dispatchers: AppDispatchers = AppDispatchers(),
+    private val photoCaptureManager: PhotoCaptureManager? = null,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle()
 ) : ViewModel() {
+
+    fun createCaptureFile(): Pair<File, Uri> {
+        return photoCaptureManager?.createCaptureFile()
+            ?: error("PhotoCaptureManager is not configured")
+    }
 
     companion object {
         private const val KEY_NOTE = "main_note"
