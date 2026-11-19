@@ -26,7 +26,7 @@ import de.gurum.besseresser.model.Settings
  *  synchron und kapselt Re-Evaluation, recognizedMeal-Korrektur, Löschen und Duplizieren. */
 class HistoryDetailViewModel(
     private val entryId: Long,
-    val historyRepository: HistoryRepository,
+    private val historyRepository: HistoryRepository,
     private val settingsRepository: SettingsRepository,
     private val apiService: BesseresserApiService,
     private val imagePreprocessor: ImagePreprocessor,

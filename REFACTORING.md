@@ -83,11 +83,12 @@ Die Findings sind nach Schweregrad klassifiziert:
 * **Empfehlung:** In `HistoryDao` und `HistoryRepository` eine Methode `fun getByIdFlow(id: Long): Flow<HistoryEntryEntity?>` ergänzen und direkt beobachten.
 * **Status:** ✅ Erledigt – `HistoryDao` und `HistoryRepository` stellen nun `getByIdFlow(id)` bereit; `HistoryDetailViewModel` beobachtet gezielt nur den angefragten Eintrag reaktiv, wodurch unnötige Vollabfragen und Reaktivierungen vermieden werden. Abgedeckt durch entsprechende Unit-Tests.
 
-#### 🟡 Finding B.3: Exponierung von Repositories über ViewModels
+#### 🟡 Finding B.3: Exponierung von Repositories über ViewModels (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryDetailViewModel.kt` (Zeile 29)
 * **Problem:** `val historyRepository: HistoryRepository` ist als öffentliche Eigenschaft deklariert.
 * **Auswirkung:** UI-Schichten können an der ViewModel-Kapselung vorbei direkt auf das Repository zugreifen (Verletzung des Schichtenmodells / Separation of Concerns).
 * **Empfehlung:** Repository als `private val` deklarieren; nur benötigte Aktionen als ViewModel-Methoden anbieten.
+* **Status:** ✅ Erledigt – `HistoryDetailViewModel` deklariert `historyRepository` nun als `private val`. Sämtliche UI-Interaktionen sind über ViewModel-Methoden gekapselt.
 
 #### 🟡 Finding B.4: Doppelte und unkoordinierte Zustandsspeicherung
 * **Ort:** `app/src/main/java/de/gurum/besseresser/ui/ProfileViewModel.kt` (Zeilen 70–96) und `MainActivity.kt`
