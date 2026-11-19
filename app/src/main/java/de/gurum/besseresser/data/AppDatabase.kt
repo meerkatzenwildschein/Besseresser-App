@@ -3,6 +3,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
@@ -24,7 +25,13 @@ import de.gurum.besseresser.model.TrafficLight
 
 // ----------------------------------------------------------------- Room Entities
 
-@Entity(tableName = "history_entries")
+@Entity(
+    tableName = "history_entries",
+    indices = [
+        Index(value = ["dateMillis"]),
+        Index(value = ["sortOrder"])
+    ]
+)
 data class HistoryEntryEntity(
     @PrimaryKey
     val id: Long,
@@ -238,7 +245,7 @@ interface WeekFazitDao {
 
 @Database(
     entities = [HistoryEntryEntity::class, DayFazitEntity::class, WeekFazitEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
@@ -258,6 +265,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_history_entries_dateMillis ON history_entries(dateMillis)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_history_entries_sortOrder ON history_entries(sortOrder)")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -265,7 +279,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "besseresser.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { INSTANCE = it }
             }

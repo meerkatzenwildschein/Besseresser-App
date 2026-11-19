@@ -137,11 +137,12 @@ Die Findings sind nach Schweregrad klassifiziert:
 
 ### D. Datenhaltung & Offline-First (Room, DataStore)
 
-#### 🟡 Finding D.1: Fehlende Indizes auf Fremdschlüssel- und Datumsspalten in Room
-* **Ort:** `app/src/main/java/de/gurum/besseresser/data/HistoryEntity.kt`
-* **Problem:** Die Tabelle `history` führt Abfragen wie `SELECT * FROM history WHERE dateMillis >= :cutoff` oder `dateMillis BETWEEN :start AND :end` aus, es ist jedoch kein Index auf `dateMillis` definiert (`@Entity(indices = [Index("dateMillis")])`).
+#### 🟡 Finding D.1: Fehlende Indizes auf Fremdschlüssel- und Datumsspalten in Room (✅ Erledigt)
+* **Ort:** `app/src/main/java/de/gurum/besseresser/data/AppDatabase.kt`
+* **Problem:** Die Tabelle `history_entries` führt Abfragen wie zeitbasierte Sortierungen und Filterungen aus, es war jedoch kein Index auf `dateMillis` bzw. `sortOrder` definiert.
 * **Auswirkung:** Full Table Scans bei zeitbasierten Filterungen und bei der Retention-Bereinigung (`purgeOldEntries`).
-* **Empfehlung:** Index auf `dateMillis` in `HistoryEntity` hinzufügen und DB-Version migrieren.
+* **Empfehlung:** Index auf `dateMillis` und `sortOrder` in `HistoryEntryEntity` hinzufügen und DB-Version migrieren.
+* **Status:** ✅ Erledigt – `HistoryEntryEntity` deklariert nun Indizes auf `dateMillis` und `sortOrder`. Die Room-Datenbank wurde auf Version 3 angehoben und die Migration `MIGRATION_2_3` (`CREATE INDEX IF NOT EXISTS ...`) implementiert und in `AppDatabase.getInstance` eingebunden. Durch Unit-Tests in `RoomDatabaseAndViewModelTest` verifiziert.
 
 #### 🟡 Finding D.2: Datenbank-Migrationen mit synchroner Dateibereinigung
 * **Ort:** `app/src/main/java/de/gurum/besseresser/data/Repositories.kt` (Zeilen 390–440)
