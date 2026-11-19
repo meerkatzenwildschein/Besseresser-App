@@ -54,11 +54,12 @@ Die Findings sind nach Schweregrad klassifiziert:
 * **Empfehlung:** Bilder in Compose ausschließlich asynchron über Coil (`AsyncImage`) laden oder einen asynchronen State/Flow bereitstellen.
 * **Status:** ✅ Erledigt – `HistoryDetailViewModel.thumbnail()`, `HistoryViewModel.decodeThumbnail()`, `HistoryRepository.decodeThumbnail()` und `PhotoStorage.decodeThumb()` wurden auf asynchrone Coroutine-Ausführung (`suspend fun` mit `Dispatchers.IO`) umgestellt.
 
-#### 🟡 Finding A.3: Blockierendes `runBlocking` in Repositories
+#### 🟡 Finding A.3: Blockierendes `runBlocking` in Repositories (✅ Erledigt)
 * **Ort:** `app/src/main/java/de/gurum/besseresser/data/Repositories.kt` (Zeilen 50–60, 230–240)
 * **Problem:** In `SettingsRepositoryImpl` und `HistoryRepositoryImpl` wird `runBlocking` in synchronen Fallback-Methoden genutzt (z. B. `currentSettings()`), obwohl suspendierende Alternativen existieren.
 * **Auswirkung:** Risiko von Deadlocks und UI-Blockaden beim Zugriff von außerhalb von Coroutinen.
 * **Empfehlung:** `runBlocking` vollständig aus der Datenschicht entfernen. Aufrufer müssen Coroutinen (`viewModelScope`) oder reaktive Streams (`StateFlow`/`Flow`) nutzen.
+* **Status:** ✅ Erledigt – Alle Repositories (`DefaultSettingsRepository`, `DefaultProfileRepository`, `DefaultUiPrefsRepository`, `DefaultHistoryRepository`) wurden vollständig auf nicht-blockierende Coroutinen (`suspend fun` und reaktive `Flow`s) umgestellt; `runBlocking` wurde restlos aus der Datenschicht entfernt und durch entsprechende Unit-Tests verifiziert.
 
 ---
 

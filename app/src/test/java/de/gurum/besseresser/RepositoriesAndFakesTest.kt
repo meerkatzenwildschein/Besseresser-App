@@ -406,6 +406,18 @@ class RepositoriesAndFakesTest {
     }
 
     @Test
+    fun testFakeUiPrefsRepository() = runTest(testDispatcher) {
+        val repo = FakeUiPrefsRepository()
+        assertEquals(AppThemeMode.SYSTEM, repo.currentThemeMode())
+        assertEquals(AppLanguage.DE, repo.currentLanguage())
+
+        repo.saveThemeMode(AppThemeMode.DARK)
+        repo.saveLanguage(AppLanguage.EN)
+        assertEquals(AppThemeMode.DARK, repo.currentThemeMode())
+        assertEquals(AppLanguage.EN, repo.currentLanguage())
+    }
+
+    @Test
     fun testFakeHistoryRepository() = runTest(testDispatcher) {
         val repo = FakeHistoryRepository()
         repo.ensureMigrated()
