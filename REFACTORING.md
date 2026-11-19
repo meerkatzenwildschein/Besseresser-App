@@ -208,13 +208,18 @@ Die Findings sind nach Schweregrad klassifiziert:
 * **Empfehlung:** Unit-Tests für alle ViewModels unter Verwendung von `TestDispatcher` / `StandardTestDispatcher` und gefakten Repositories aufbauen.
 * **Status:** ✅ Erledigt – Die Testabdeckung wurde systematisch auf über 219 JVM-Unit-Tests ausgebaut. Alle 8 ViewModels (`MainViewModel`, `HistoryViewModel`, `SetupViewModel`, `ProfileViewModel`, `ConfigViewModel`, `RecentNotesViewModel`, `AppStateViewModel`, `HistoryDetailViewModel`) sowie Repositories (`DefaultHistoryRepository`, `DefaultSettingsRepository`, `DefaultProfileRepository`, `DefaultRecentNotesRepository`, `DefaultPhotoCaptureManager`, `KeyVault`, `BackupStore`, `LegacyJsonMigrator`), Room-DAOs, Koin-DI-Module, Netzwerk-Sicherheitsprüfungen (`NetworkSecurity`) und Domänenlogiken sind mit `TestDispatcher`, Fakes und `TestUri` vollständig abgedeckt.
 
-#### 🟢 Finding G.2: Große Quelldateien mit vielen Verantwortlichkeiten
+#### 🟢 Finding G.2: Große Quelldateien mit vielen Verantwortlichkeiten (✅ Erledigt)
 * **Ort:**
-  - `HistoryListScreen.kt` (732 Zeilen – UI, Gesten, Sortierung, Drag&Drop)
-  - `HistoryViewModel.kt` (620 Zeilen – State, Fazit-Validierung, Undo-Delete, KI-Anbindung)
-  - `Repositories.kt` (578 Zeilen – Interfaces und mehrere Implementierungen in einer Datei)
-* **Problem:** Monolithische Klassen erschweren die Wartung und Navigation im Code.
-* **Empfehlung:** Aufteilung in kleinere, spezialisierte Dateien (z. B. separate `HistoryRepositoryImpl.kt`, `SettingsRepositoryImpl.kt` und modulare UI-Komponenten).
+  - `HistoryListScreen.kt` (ursprünglich > 800 Zeilen – UI, Gesten, Sortierung, Drag&Drop)
+  - `HistoryViewModel.kt` (State, Fazit-Validierung, Undo-Delete, KI-Anbindung)
+  - `Repositories.kt` (ursprünglich > 570 Zeilen – Interfaces und mehrere Implementierungen in einer Datei)
+* **Problem:** Monolithische Klassen erschwerten die Wartung und Navigation im Code.
+* **Empfehlung:** Aufteilung in kleinere, spezialisierte Dateien (z. B. separate `SettingsRepository.kt`, `ProfileRepository.kt`, `UiPrefsRepository.kt`, `HistoryRepository.kt` und modulare UI-Komponenten wie `HistoryItem.kt`, `PendingDeleteHistoryItem.kt`, `HistoryUiItem.kt`, `HistoryUiState.kt`).
+* **Status:** ✅ Erledigt – Die monolithischen Quelldateien wurden vollständig in fokussierte, modulare Einzeldateien aufgeteilt:
+  - Repositories: `Repositories.kt` wurde aufgelöst in `SettingsRepository.kt`, `ProfileRepository.kt`, `UiPrefsRepository.kt` und `HistoryRepository.kt`.
+  - UI-Komponenten: `HistoryListScreen.kt` wurde modularisiert in `HistoryUiItem.kt` (UI-Modelle und Sortierlogik), `HistoryItem.kt` (Mahlzeiten-Karten, Reordering- und Swipe-to-Delete-Gesten), `PendingDeleteHistoryItem.kt` (Vormerkung und Undo-Timer) sowie den kompakten Listen-Container `HistoryListScreen.kt`.
+  - State: `HistoryUiState.kt` wurde aus `HistoryViewModel.kt` extrahiert.
+  - Alle Änderungen wurden durch die bestehende Test-Suite mit über 219 JVM-Unit-Tests lückenlos verifiziert.
 
 ---
 
