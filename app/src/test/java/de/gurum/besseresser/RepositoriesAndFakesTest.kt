@@ -37,6 +37,15 @@ import de.gurum.besseresser.data.DayFazitResult
 import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.UiPrefsRepository
+import de.gurum.besseresser.data.LegacyJsonMigrator
+import de.gurum.besseresser.data.HistoryDao
+import de.gurum.besseresser.data.DayFazitDao
+import de.gurum.besseresser.data.WeekFazitDao
+import de.gurum.besseresser.data.HistoryEntryEntity
+import de.gurum.besseresser.data.DayFazitEntity
+import de.gurum.besseresser.data.WeekFazitEntity
+import de.gurum.besseresser.model.AppJson
+import kotlinx.serialization.encodeToString
 import de.gurum.besseresser.model.AppLanguage
 import de.gurum.besseresser.model.AppThemeMode
 import de.gurum.besseresser.model.dayFingerprint
@@ -145,12 +154,6 @@ class FakeHistoryRepository : HistoryRepository {
     private val entriesFlow = MutableStateFlow<List<HistoryEntry>>(emptyList())
     private val dayFazitsFlow = MutableStateFlow<Map<String, DayFazit>>(emptyMap())
     private val weekFazitsFlow = MutableStateFlow<Map<String, DayFazit>>(emptyMap())
-
-    var migrationChecked = false
-
-    override suspend fun ensureMigrated() {
-        migrationChecked = true
-    }
 
     override fun getAllFlow(): Flow<List<HistoryEntry>> = entriesFlow.asStateFlow()
     override fun getByIdFlow(id: Long): Flow<HistoryEntry?> =
@@ -436,8 +439,6 @@ class RepositoriesAndFakesTest {
     @Test
     fun testFakeHistoryRepository() = runTest(testDispatcher) {
         val repo = FakeHistoryRepository()
-        repo.ensureMigrated()
-        assertTrue(repo.migrationChecked)
 
         val ev = Evaluation(goalResults = listOf(GoalResult("Z1", TrafficLight.GREEN, "Frisch")), summary = "Toll", recognizedMeal = "Salat")
         val entry = repo.add(null, ev, note = "Mittagessen")
@@ -972,5 +973,199 @@ class RepositoriesAndFakesTest {
         assertEquals("custom_photo.jpg", histFile.name)
         assertEquals("content://de.gurum.besseresser.fileprovider/photos/custom_photo.jpg", histUri.toString())
         assertEquals(2, fakeManager.callCount)
+    }
+
+    @Test
+    fun testLegacyJsonMigratorWithValidFiles() = runTest(testDispatcher) {
+        val tempDir = java.nio.file.Files.createTempDirectory("legacy_migrator_test").toFile()
+        try {
+            val entry = HistoryEntry(
+                id = 555L,
+                dateMillis = 1000L,
+                photoFile = "555.jpg",
+                goalResults = listOf(GoalResult("Z1", TrafficLight.GREEN, "Gut")),
+                summary = "Lecker",
+                note = "Mittags",
+                recognizedMeal = "Pasta",
+                backdated = false,
+                sortOrder = 1000L
+            )
+            val entryFile = File(tempDir, "555.json")
+            entryFile.writeText(AppJson.encodeToString(entry))
+
+            val dayFazit = DayFazit(
+                dayKey = "2026-11-19",
+                rating = TrafficLight.GREEN,
+                text = "Super Tag",
+                entryIds = listOf(555L),
+                createdAt = 2000L,
+                fingerprint = "fp1"
+            )
+            val dayFazitFile = File(tempDir, "day_2026-11-19.json")
+            dayFazitFile.writeText(AppJson.encodeToString(dayFazit))
+
+            val weekFazit = DayFazit(
+                dayKey = "2026-W47",
+                rating = TrafficLight.YELLOW,
+                text = "Gute Woche",
+                entryIds = listOf(555L),
+                createdAt = 3000L,
+                fingerprint = "fp2"
+            )
+            val weekFazitFile = File(tempDir, "week_2026-W47.json")
+            weekFazitFile.writeText(AppJson.encodeToString(weekFazit))
+
+            val fakeHistoryDao = FakeHistoryDao()
+            val fakeDayFazitDao = FakeDayFazitDao()
+            val fakeWeekFazitDao = FakeWeekFazitDao()
+
+            LegacyJsonMigrator.migrate(tempDir, fakeHistoryDao, fakeDayFazitDao, fakeWeekFazitDao, testDispatcher)
+
+            // Assert DB insertions
+            assertEquals(1, fakeHistoryDao.items.size)
+            assertEquals(555L, fakeHistoryDao.items.first().id)
+            assertEquals("Pasta", fakeHistoryDao.items.first().recognizedMeal)
+
+            assertEquals(1, fakeDayFazitDao.items.size)
+            assertEquals("2026-11-19", fakeDayFazitDao.items.first().dayKey)
+            assertEquals("Super Tag", fakeDayFazitDao.items.first().text)
+
+            assertEquals(1, fakeWeekFazitDao.items.size)
+            assertEquals("2026-W47", fakeWeekFazitDao.items.first().weekKey)
+            assertEquals("Gute Woche", fakeWeekFazitDao.items.first().text)
+
+            // Assert JSON files were cleaned up
+            assertFalse(entryFile.exists())
+            assertFalse(dayFazitFile.exists())
+            assertFalse(weekFazitFile.exists())
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun testLegacyJsonMigratorFallbackIdFromFilename() = runTest(testDispatcher) {
+        val tempDir = java.nio.file.Files.createTempDirectory("legacy_migrator_id_test").toFile()
+        try {
+            val entryWithoutId = HistoryEntry(
+                id = 0L,
+                dateMillis = 1000L,
+                photoFile = "888.jpg",
+                goalResults = emptyList(),
+                summary = "Snack",
+                note = "",
+                recognizedMeal = "Banane",
+                backdated = false,
+                sortOrder = 1000L
+            )
+            val file = File(tempDir, "888.json")
+            file.writeText(AppJson.encodeToString(entryWithoutId))
+
+            val fakeHistoryDao = FakeHistoryDao()
+            val fakeDayFazitDao = FakeDayFazitDao()
+            val fakeWeekFazitDao = FakeWeekFazitDao()
+
+            LegacyJsonMigrator.migrateSync(tempDir, fakeHistoryDao, fakeDayFazitDao, fakeWeekFazitDao)
+
+            assertEquals(1, fakeHistoryDao.items.size)
+            assertEquals(888L, fakeHistoryDao.items.first().id)
+            assertEquals("Banane", fakeHistoryDao.items.first().recognizedMeal)
+            assertFalse(file.exists())
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun testLegacyJsonMigratorEmptyAndCorruptedFiles() = runTest(testDispatcher) {
+        val tempDir = java.nio.file.Files.createTempDirectory("legacy_migrator_corrupt_test").toFile()
+        try {
+            val corruptFile = File(tempDir, "corrupted.json")
+            corruptFile.writeText("THIS IS NOT VALID JSON")
+
+            val fakeHistoryDao = FakeHistoryDao()
+            val fakeDayFazitDao = FakeDayFazitDao()
+            val fakeWeekFazitDao = FakeWeekFazitDao()
+
+            LegacyJsonMigrator.migrate(tempDir, fakeHistoryDao, fakeDayFazitDao, fakeWeekFazitDao, testDispatcher)
+
+            // Should not crash, and should not insert corrupt item
+            assertEquals(0, fakeHistoryDao.items.size)
+            assertTrue(corruptFile.exists()) // Failed file is kept intact
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+}
+
+class FakeHistoryDao : HistoryDao {
+    val items = mutableListOf<HistoryEntryEntity>()
+
+    override fun getAllFlow(): Flow<List<HistoryEntryEntity>> = MutableStateFlow(items)
+    override suspend fun getAll(): List<HistoryEntryEntity> = items.toList()
+    override fun getByIdFlow(id: Long): Flow<HistoryEntryEntity?> = MutableStateFlow(items.find { it.id == id })
+    override suspend fun getById(id: Long): HistoryEntryEntity? = items.find { it.id == id }
+    override suspend fun insert(entry: HistoryEntryEntity) {
+        items.removeAll { it.id == entry.id }
+        items.add(entry)
+    }
+    override suspend fun insertAll(entries: List<HistoryEntryEntity>) {
+        entries.forEach { insert(it) }
+    }
+    override suspend fun deleteById(id: Long) {
+        items.removeAll { it.id == id }
+    }
+    override suspend fun deleteAll() {
+        items.clear()
+    }
+    override suspend fun updateRecognizedMeal(id: Long, recognizedMeal: String) {
+        val index = items.indexOfFirst { it.id == id }
+        if (index >= 0) items[index] = items[index].copy(recognizedMeal = recognizedMeal)
+    }
+    override suspend fun updateEvaluation(id: Long, goalResults: List<GoalResult>, summary: String) {
+        val index = items.indexOfFirst { it.id == id }
+        if (index >= 0) items[index] = items[index].copy(goalResults = goalResults, summary = summary)
+    }
+}
+
+class FakeDayFazitDao : DayFazitDao {
+    val items = mutableListOf<DayFazitEntity>()
+
+    override fun getAllFlow(): Flow<List<DayFazitEntity>> = MutableStateFlow(items)
+    override suspend fun getAll(): List<DayFazitEntity> = items.toList()
+    override suspend fun getByKey(dayKey: String): DayFazitEntity? = items.find { it.dayKey == dayKey }
+    override suspend fun insert(entity: DayFazitEntity) {
+        items.removeAll { it.dayKey == entity.dayKey }
+        items.add(entity)
+    }
+    override suspend fun insertAll(entities: List<DayFazitEntity>) {
+        entities.forEach { insert(it) }
+    }
+    override suspend fun delete(dayKey: String) {
+        items.removeAll { it.dayKey == dayKey }
+    }
+    override suspend fun deleteAll() {
+        items.clear()
+    }
+}
+
+class FakeWeekFazitDao : WeekFazitDao {
+    val items = mutableListOf<WeekFazitEntity>()
+
+    override fun getAllFlow(): Flow<List<WeekFazitEntity>> = MutableStateFlow(items)
+    override suspend fun getAll(): List<WeekFazitEntity> = items.toList()
+    override suspend fun getByKey(weekKey: String): WeekFazitEntity? = items.find { it.weekKey == weekKey }
+    override suspend fun insert(entity: WeekFazitEntity) {
+        items.removeAll { it.weekKey == entity.weekKey }
+        items.add(entity)
+    }
+    override suspend fun insertAll(entities: List<WeekFazitEntity>) {
+        entities.forEach { insert(it) }
+    }
+    override suspend fun delete(weekKey: String) {
+        items.removeAll { it.weekKey == weekKey }
+    }
+    override suspend fun deleteAll() {
+        items.clear()
     }
 }
