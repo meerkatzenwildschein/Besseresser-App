@@ -171,7 +171,7 @@ enum class AppLanguage(val rawValue: String) {
 data class Settings(
     val baseUrl: String = "",
     val apiKey: String = "",
-    val model: String = "gpt-4o-mini",
+    val model: String = DEFAULT_MODEL,
     val goals: List<String> = emptyList(),
     // true = Ziele sind bereits als saubere Ein-Zeile-ein-Ziel-Liste gespeichert (KI-Aufteilung bestätigt)
     val goalsWereSplit: Boolean = false,
@@ -183,6 +183,7 @@ data class Settings(
         get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && model.isNotBlank() && goals.isNotEmpty()
 
     companion object {
+        const val DEFAULT_MODEL = "gpt-4o-mini"
         const val DEFAULT_RETENTION_WEEKS = 8
     }
 }

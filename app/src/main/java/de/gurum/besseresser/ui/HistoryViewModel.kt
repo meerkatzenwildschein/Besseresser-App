@@ -1,5 +1,6 @@
 package de.gurum.besseresser.ui
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
@@ -60,10 +61,37 @@ class HistoryViewModel(
     private val historyRepository: HistoryRepository,
     private val settingsRepository: SettingsRepository,
     private val imagePreprocessor: ImagePreprocessor,
-    private val dispatchers: AppDispatchers = AppDispatchers()
+    private val dispatchers: AppDispatchers = AppDispatchers(),
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle()
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(HistoryUiState())
+    companion object {
+        private const val KEY_ADD_NOTE = "history_add_note"
+        private const val KEY_ADD_TARGET_DAY = "history_add_target_day"
+        private const val KEY_ADD_TARGET_TIME = "history_add_target_time"
+        private const val KEY_ADD_DIALOG_FOR_DAY = "history_add_dialog_for_day"
+        private const val KEY_SHOW_ADD_CAMERA = "history_show_add_camera"
+        private const val KEY_SHOW_ADD_REVIEW = "history_show_add_review"
+        private const val KEY_SHOW_ADD_TEXT = "history_show_add_text"
+        private const val KEY_EXPANDED_FAZITS = "history_expanded_fazits"
+        private const val KEY_EXPANDED_WEEKS = "history_expanded_weeks"
+        private const val KEY_EXPANDED_WEEK = "history_expanded_week"
+    }
+
+    private val _uiState = MutableStateFlow(
+        HistoryUiState(
+            addNote = savedStateHandle[KEY_ADD_NOTE] ?: "",
+            addTargetDay = savedStateHandle.get<String>(KEY_ADD_TARGET_DAY)?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
+            addTargetTime = savedStateHandle.get<String>(KEY_ADD_TARGET_TIME)?.let { runCatching { LocalTime.parse(it) }.getOrNull() },
+            addDialogForDay = savedStateHandle.get<String>(KEY_ADD_DIALOG_FOR_DAY)?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
+            showAddCamera = savedStateHandle[KEY_SHOW_ADD_CAMERA] ?: false,
+            showAddReview = savedStateHandle[KEY_SHOW_ADD_REVIEW] ?: false,
+            showAddText = savedStateHandle[KEY_SHOW_ADD_TEXT] ?: false,
+            expandedFazits = (savedStateHandle.get<ArrayList<String>>(KEY_EXPANDED_FAZITS) ?: emptyList()).toSet(),
+            expandedWeeks = (savedStateHandle.get<ArrayList<String>>(KEY_EXPANDED_WEEKS) ?: emptyList()).toSet(),
+            expandedWeek = savedStateHandle[KEY_EXPANDED_WEEK] ?: false
+        )
+    )
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
 
     private val pendingDeleteJobs = mutableMapOf<Long, Job>()
@@ -160,6 +188,7 @@ class HistoryViewModel(
         _uiState.update { current ->
             val set = current.expandedFazits.toMutableSet()
             if (dayKey in set) set.remove(dayKey) else set.add(dayKey)
+            savedStateHandle[KEY_EXPANDED_FAZITS] = ArrayList(set)
             current.copy(expandedFazits = set)
         }
     }
@@ -167,10 +196,14 @@ class HistoryViewModel(
     fun toggleWeekExpanded(weekKey: String? = null) {
         _uiState.update { current ->
             if (weekKey == null) {
-                current.copy(expandedWeek = !current.expandedWeek)
+                val exp = !current.expandedWeek
+                savedStateHandle[KEY_EXPANDED_WEEK] = exp
+                current.copy(expandedWeek = exp)
             } else {
                 val set = current.expandedWeeks.toMutableSet()
                 if (weekKey in set) set.remove(weekKey) else set.add(weekKey)
+                savedStateHandle[KEY_EXPANDED_WEEKS] = ArrayList(set)
+                savedStateHandle[KEY_EXPANDED_WEEK] = weekKey in set
                 current.copy(
                     expandedWeek = weekKey in set,
                     expandedWeeks = set
@@ -180,18 +213,22 @@ class HistoryViewModel(
     }
 
     fun setAddDialogForDay(day: LocalDate?) {
+        if (day != null) savedStateHandle[KEY_ADD_DIALOG_FOR_DAY] = day.toString() else savedStateHandle.remove<String>(KEY_ADD_DIALOG_FOR_DAY)
         _uiState.update { it.copy(addDialogForDay = day) }
     }
 
     fun setShowAddCamera(show: Boolean) {
+        savedStateHandle[KEY_SHOW_ADD_CAMERA] = show
         _uiState.update { it.copy(showAddCamera = show) }
     }
 
     fun setShowAddReview(show: Boolean) {
+        savedStateHandle[KEY_SHOW_ADD_REVIEW] = show
         _uiState.update { it.copy(showAddReview = show) }
     }
 
     fun setShowAddText(show: Boolean) {
+        savedStateHandle[KEY_SHOW_ADD_TEXT] = show
         _uiState.update { it.copy(showAddText = show) }
     }
 
@@ -200,14 +237,17 @@ class HistoryViewModel(
     }
 
     fun setAddNote(note: String) {
+        savedStateHandle[KEY_ADD_NOTE] = note
         _uiState.update { it.copy(addNote = note) }
     }
 
     fun setAddTargetDay(day: LocalDate?) {
+        if (day != null) savedStateHandle[KEY_ADD_TARGET_DAY] = day.toString() else savedStateHandle.remove<String>(KEY_ADD_TARGET_DAY)
         _uiState.update { it.copy(addTargetDay = day) }
     }
 
     fun setAddTargetTime(time: LocalTime?) {
+        if (time != null) savedStateHandle[KEY_ADD_TARGET_TIME] = time.toString() else savedStateHandle.remove<String>(KEY_ADD_TARGET_TIME)
         _uiState.update { it.copy(addTargetTime = time) }
     }
 
@@ -291,6 +331,12 @@ class HistoryViewModel(
             historyRepository.deleteDayFazitForEntry(entry)
             historyRepository.deleteWeekFazitForEntry(entry)
             settingsRepository.pushRecentNote(note, ev)
+            savedStateHandle[KEY_SHOW_ADD_CAMERA] = false
+            savedStateHandle[KEY_SHOW_ADD_REVIEW] = false
+            savedStateHandle[KEY_SHOW_ADD_TEXT] = false
+            savedStateHandle[KEY_ADD_NOTE] = ""
+            savedStateHandle.remove<String>(KEY_ADD_TARGET_DAY)
+            savedStateHandle.remove<String>(KEY_ADD_TARGET_TIME)
             _uiState.update {
                 it.copy(
                     showAddCamera = false,

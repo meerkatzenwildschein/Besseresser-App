@@ -1,5 +1,6 @@
 package de.gurum.besseresser.ui
 import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
@@ -39,10 +40,33 @@ class MainViewModel(
     private val historyRepository: HistoryRepository,
     private val settingsRepository: SettingsRepository,
     private val imagePreprocessor: ImagePreprocessor,
-    private val dispatchers: AppDispatchers = AppDispatchers()
+    private val dispatchers: AppDispatchers = AppDispatchers(),
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle()
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(MainUiState())
+    companion object {
+        private const val KEY_NOTE = "main_note"
+        private const val KEY_PHOTO_URI = "main_photo_uri"
+        private const val KEY_SHOW_REVIEW = "main_show_review"
+        private const val KEY_SHOW_CAMERA = "main_show_camera"
+        private const val KEY_SHOW_RECOGNIZED_EDIT = "main_show_recognized_edit"
+        private const val KEY_SAVED_ENTRY_ID = "main_saved_entry_id"
+        private const val KEY_SAVED_TO_HISTORY = "main_saved_to_history"
+        private const val KEY_MENU_OPEN = "main_menu_open"
+    }
+
+    private val _uiState = MutableStateFlow(
+        MainUiState(
+            note = savedStateHandle[KEY_NOTE] ?: "",
+            photoPreviewUri = savedStateHandle.get<String>(KEY_PHOTO_URI)?.let { Uri.parse(it) },
+            showReview = savedStateHandle[KEY_SHOW_REVIEW] ?: false,
+            showCamera = savedStateHandle[KEY_SHOW_CAMERA] ?: false,
+            showRecognizedEdit = savedStateHandle[KEY_SHOW_RECOGNIZED_EDIT] ?: false,
+            savedToHistory = savedStateHandle[KEY_SAVED_TO_HISTORY] ?: false,
+            savedEntryId = savedStateHandle[KEY_SAVED_ENTRY_ID],
+            menuOpen = savedStateHandle[KEY_MENU_OPEN] ?: false
+        )
+    )
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
     private var analyzeJob: Job? = null
@@ -54,27 +78,37 @@ class MainViewModel(
     }
 
     fun setNote(note: String) {
+        savedStateHandle[KEY_NOTE] = note
         _uiState.update { it.copy(note = note) }
     }
 
     fun setMenuOpen(open: Boolean) {
+        savedStateHandle[KEY_MENU_OPEN] = open
         _uiState.update { it.copy(menuOpen = open) }
     }
 
     fun setShowCamera(show: Boolean) {
+        savedStateHandle[KEY_SHOW_CAMERA] = show
         _uiState.update { it.copy(showCamera = show) }
     }
 
     fun setShowReview(show: Boolean) {
+        savedStateHandle[KEY_SHOW_REVIEW] = show
         _uiState.update { it.copy(showReview = show) }
     }
 
     fun setshowRecognizedEdit(show: Boolean) {
+        savedStateHandle[KEY_SHOW_RECOGNIZED_EDIT] = show
         _uiState.update { it.copy(showRecognizedEdit = show) }
     }
 
     fun onPhotoTaken(uri: Uri) {
         analyzeJob?.cancel()
+        savedStateHandle[KEY_PHOTO_URI] = uri.toString()
+        savedStateHandle[KEY_SHOW_CAMERA] = false
+        savedStateHandle[KEY_SHOW_REVIEW] = false
+        savedStateHandle[KEY_SAVED_TO_HISTORY] = false
+        savedStateHandle.remove<Long>(KEY_SAVED_ENTRY_ID)
         _uiState.update {
             it.copy(
                 photoPreviewUri = uri,
@@ -91,6 +125,7 @@ class MainViewModel(
 
     fun onSystemCameraResult(ok: Boolean, photoUri: Uri) {
         if (ok) {
+            savedStateHandle[KEY_SHOW_REVIEW] = true
             _uiState.update { it.copy(error = null, showReview = true) }
         }
     }
@@ -152,6 +187,8 @@ class MainViewModel(
             historyRepository.deleteDayFazitForEntry(entry)
             historyRepository.deleteWeekFazitForEntry(entry)
             settingsRepository.pushRecentNote(note, ev)
+            savedStateHandle[KEY_SAVED_TO_HISTORY] = true
+            savedStateHandle[KEY_SAVED_ENTRY_ID] = entry.id
             _uiState.update {
                 it.copy(
                     savingHistory = false,
@@ -168,6 +205,7 @@ class MainViewModel(
         val entryId = _uiState.value.savedEntryId
         val currentNote = _uiState.value.note.trim()
         var updatedEv: Evaluation? = null
+        savedStateHandle[KEY_SHOW_RECOGNIZED_EDIT] = false
         _uiState.update { state ->
             updatedEv = state.evaluation?.copy(recognizedMeal = trimmed)
             state.copy(evaluation = updatedEv, showRecognizedEdit = false)
@@ -187,6 +225,14 @@ class MainViewModel(
 
     fun reset() {
         analyzeJob?.cancel()
+        savedStateHandle.remove<String>(KEY_NOTE)
+        savedStateHandle.remove<String>(KEY_PHOTO_URI)
+        savedStateHandle.remove<Boolean>(KEY_SHOW_REVIEW)
+        savedStateHandle.remove<Boolean>(KEY_SHOW_CAMERA)
+        savedStateHandle.remove<Boolean>(KEY_SHOW_RECOGNIZED_EDIT)
+        savedStateHandle.remove<Boolean>(KEY_SAVED_TO_HISTORY)
+        savedStateHandle.remove<Long>(KEY_SAVED_ENTRY_ID)
+        savedStateHandle.remove<Boolean>(KEY_MENU_OPEN)
         _uiState.update { MainUiState() }
     }
 }
