@@ -1,4 +1,5 @@
 package de.gurum.besseresser.model
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -167,6 +168,7 @@ enum class AppLanguage(val rawValue: String) {
 // ----------------------------------------------------------------- Einstellungen & Bewertungen
 
 /** Einstellungen (Setup): URL/Key/Modell + Ziele. */
+@Immutable
 @Serializable
 data class Settings(
     val baseUrl: String = "",
@@ -189,6 +191,7 @@ data class Settings(
 }
 
 /** Bewertung fuer EIN Ziel: Ampel + reason. */
+@Immutable
 @Serializable
 data class GoalResult(
     @SerialName("ziel")
@@ -200,6 +203,7 @@ data class GoalResult(
 )
 
 /** Ergebnis einer Foto-Bewertung durch die KI. */
+@Immutable
 @Serializable
 data class Evaluation(
     val goalResults: List<GoalResult> = emptyList(),

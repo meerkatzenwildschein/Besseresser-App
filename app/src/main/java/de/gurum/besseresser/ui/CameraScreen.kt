@@ -225,11 +225,11 @@ fun CameraCaptureScreen(
                     Surface(
                         shape = CircleShape,
                         color = Color.Black.copy(alpha = 0.50f),
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         IconButton(
                             onClick = onCancel,
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
@@ -252,7 +252,7 @@ fun CameraCaptureScreen(
                         )
                     }
 
-                    Spacer(Modifier.size(44.dp))
+                    Spacer(Modifier.size(48.dp))
                 }
 
                 // Verschlussknopf: Außen-Ring mit ausgefülltem Innenkreis

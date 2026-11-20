@@ -207,34 +207,34 @@ fun HistoryDetailScreen(
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         IconButton(
                             onClick = { showDuplicateDatePicker = true },
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 DuplicateCopyIcon,
                                 contentDescription = stringResource(R.string.history_entry_duplicate),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         IconButton(
                             onClick = { confirmDelete = true },
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 Icons.Filled.Delete,
                                 contentDescription = stringResource(R.string.history_entry_delete),
                                 tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(19.dp)
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }

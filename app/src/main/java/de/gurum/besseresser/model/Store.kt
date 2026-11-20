@@ -1,4 +1,5 @@
 package de.gurum.besseresser.model
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
@@ -12,6 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
 // ----------------------------------------------------------------- Profil
 
 /** Nutzerprofil: alles optional. Geburtsdatum (ISO yyyy-MM-dd, veraltet nicht) statt Alter. */
+@Immutable
 @Serializable
 data class Profile(
     val birthDate: String? = null,  // ISO yyyy-MM-dd
@@ -41,6 +43,7 @@ const val BETTERESSER_PREFS = "besseresser_prefs"
 /** Eintrag der Schnellauswahl-Liste: Text + Favoriten-Sternchen + optional gecachtes KI-Ergebnis.
  *  Sternchen = dauerhaft in der Liste (bis abgewählt); ohne Stern rotieren max. 5 nach MRU.
  *  Fällt ein unmarkierter Eintrag aus den Top 5 heraus, wird auch sein persistiertes KI-Ergebnis entfernt. */
+@Immutable
 @Serializable
 data class RecentNote(
     @SerialName("t")
