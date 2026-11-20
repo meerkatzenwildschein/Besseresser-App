@@ -45,7 +45,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Geschäftslogik gehört in den ViewModel- oder Domain-/UseCase-Layer. Das `HistoryViewModel` sollte reaktiv auf Änderungen aus den Repositories lauschen (z. B. via Flows) und Fazit-Prüfungen selbstständig koordinieren, ohne dass die UI dies per `LaunchedEffect` anstoßen muss.
 
-#### [MEDIUM] A.2: Getrennte Coroutine-Collections für UI-State in ViewModels
+#### [MEDIUM] [ERLEDIGT] A.2: Getrennte Coroutine-Collections für UI-State in ViewModels
 - **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryViewModel.kt` (Zeilen 91–115)
 - **Problem:**
   Im `init`-Block von `HistoryViewModel` werden drei separate Coroutines gestartet, die unabhängig voneinander `repo.getAllFlow()`, `repo.getDayFazitsFlow()` und `repo.getWeekFazitsFlow()` sammeln und `_uiState` aktualisieren.
