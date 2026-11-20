@@ -103,30 +103,32 @@ fun CameraCaptureScreen(
     val scope = rememberCoroutineScope()
 
     // Bindet die (neu gebaute) Vorschau an den Lifecycle
-    val bindCamera: (PreviewView) -> Unit = { view ->
-        try {
-            val future = ProcessCameraProvider.getInstance(context)
-            future.addListener({
-                try {
-                    val provider = future.get()
-                    providerHolder.value = provider
-                    provider.unbindAll()
-                    val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(view.surfaceProvider)
+    val bindCamera: (PreviewView) -> Unit = remember(lifecycleOwner, context, imageCapture) {
+        { view ->
+            try {
+                val future = ProcessCameraProvider.getInstance(context)
+                future.addListener({
+                    try {
+                        val provider = future.get()
+                        providerHolder.value = provider
+                        provider.unbindAll()
+                        val preview = Preview.Builder().build().also {
+                            it.setSurfaceProvider(view.surfaceProvider)
+                        }
+                        provider.bindToLifecycle(
+                            lifecycleOwner,
+                            CameraSelector.DEFAULT_BACK_CAMERA,
+                            preview,
+                            imageCapture
+                        )
+                    } catch (e: Exception) {
+                        // Vorschau nicht möglich → Fallback-Angebot bleibt sichtbar
+                        onFallbackSystemCamera()
                     }
-                    provider.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.DEFAULT_BACK_CAMERA,
-                        preview,
-                        imageCapture
-                    )
-                } catch (e: Exception) {
-                    // Vorschau nicht möglich → Fallback-Angebot bleibt sichtbar
-                    onFallbackSystemCamera()
-                }
-            }, ContextCompat.getMainExecutor(context))
-        } catch (e: Exception) {
-            onFallbackSystemCamera()
+                }, ContextCompat.getMainExecutor(context))
+            } catch (e: Exception) {
+                onFallbackSystemCamera()
+            }
         }
     }
 

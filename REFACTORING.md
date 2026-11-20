@@ -100,7 +100,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 
 ### B. UI & Jetpack Compose
 
-#### [HIGH] B.1: Unremembered Lambda in CameraCaptureScreen führt zu Re-Bind-Risiko
+#### [HIGH] [ERLEDIGT] B.1: Unremembered Lambda in CameraCaptureScreen führt zu Re-Bind-Risiko
 - **Ort:** `app/src/main/java/de/gurum/besseresser/ui/CameraScreen.kt` (Zeilen 106–131)
 - **Problem:**
   In `CameraCaptureScreen` wird `val bindCamera: (PreviewView) -> Unit = { ... }` bei jeder Rekomposition neu instanziiert, da sie nicht mit `remember` umschlossen ist.
