@@ -116,9 +116,13 @@ class HistoryViewModel(
                 val mergedWeekMap = if (validWf != null) validWeekMap + (targetWk to validWf) else validWeekMap
                 HistoryDataUpdate(entries, dayFazits, validWf, mergedWeekMap)
             }.collect { data ->
+                val nowDate = LocalDate.now()
+                val nowHour = LocalTime.now().hour
+                val items = buildHistoryUiItems(data.entries, nowDate, nowHour)
                 _uiState.update { current ->
                     current.copy(
                         entries = data.entries,
+                        uiItems = items,
                         fazitMap = data.dayFazits,
                         weekFazit = data.weekFazit,
                         weekFazitMap = data.weekFazitMap
@@ -441,7 +445,10 @@ class HistoryViewModel(
         val updatedAllEntries = currentEntries.map { reorderedMap[it.id] ?: it }
             .sortedByDescending { it.effectiveSortOrder }
 
-        _uiState.update { it.copy(entries = updatedAllEntries) }
+        val nowDate = LocalDate.now()
+        val nowHour = LocalTime.now().hour
+        val items = buildHistoryUiItems(updatedAllEntries, nowDate, nowHour)
+        _uiState.update { it.copy(entries = updatedAllEntries, uiItems = items) }
 
         viewModelScope.launch {
             historyRepository.reorderEntries(reorderedDayEntries)
