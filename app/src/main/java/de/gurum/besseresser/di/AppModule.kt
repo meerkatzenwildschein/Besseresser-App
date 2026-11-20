@@ -17,6 +17,8 @@ import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.PhotoStorage
 import de.gurum.besseresser.data.ProfileRepository
+import de.gurum.besseresser.data.PromptRepository
+import de.gurum.besseresser.data.DefaultPromptRepository
 import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.data.UiPrefsRepository
 import de.gurum.besseresser.data.appDataStore
@@ -51,6 +53,7 @@ val appModule = module {
 
     single<SettingsRepository> { DefaultSettingsRepository(get()) }
     single<ProfileRepository> { DefaultProfileRepository(get()) }
+    single<PromptRepository> { DefaultPromptRepository(androidContext()) }
     single<UiPrefsRepository> { DefaultUiPrefsRepository(get()) }
     single<HistoryRepository> { DefaultHistoryRepository(get(), get(), get(), get()) }
 
@@ -58,7 +61,7 @@ val appModule = module {
 
     viewModel { AppStateViewModel(get(), get(), get(), get()) }
     viewModel { MainViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get()) }
-    viewModel { HistoryViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get()) }
+    viewModel { HistoryViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get(), profileRepository = get(), promptRepository = get()) }
     viewModel { SetupViewModel(get(), get(), get(), savedStateHandle = get()) }
     viewModel { ProfileViewModel(get()) }
     viewModel { ConfigViewModel(get(), get()) }

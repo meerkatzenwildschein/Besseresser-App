@@ -36,7 +36,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 
 ### A. Architektur & State Management
 
-#### [HIGH] A.1: Nebeneffekt-gesteuerte Geschäftslogik in Composables (`LaunchedEffect` in `HistoryScreen`)
+#### [HIGH] [ERLEDIGT] A.1: Nebeneffekt-gesteuerte Geschäftslogik in Composables (`LaunchedEffect` in `HistoryScreen`)
 - **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryScreen.kt` (Zeilen 87–96)
 - **Problem:**
   In `HistoryScreen` wird über einen `LaunchedEffect`, der auf mehrere State-Eigenschaften (`uiState.entries`, `uiState.fazitMap`, `uiState.weekFazitMap`, `settings`, `profile`) hört, automatisiert die KI-Fazit-Generierung (`viewModel.checkAndTriggerAutoFazits`) angestoßen.

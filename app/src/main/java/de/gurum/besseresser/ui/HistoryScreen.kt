@@ -84,17 +84,6 @@ fun HistoryScreen(
     }
     BackHandler(enabled = uiState.showAddText) { viewModel.setShowAddText(false) }
 
-    LaunchedEffect(uiState.entries, uiState.fazitMap, uiState.weekFazitMap, settings, profile) {
-        viewModel.checkAndTriggerAutoFazits(
-            settings = settings,
-            promptContext = profileContextLine(ctx, profile),
-            dayPrompts = createDayFazitPrompts(ctx),
-            weekPromptsProvider = { calWeek -> createWeekFazitPrompts(ctx, calWeek) },
-            daymealDescriptionsProvider = { list -> dayFazitmealDescriptions(ctx, list) },
-            weekmealDescriptionsProvider = { list -> weekFazitmealDescriptions(ctx, list) }
-        )
-    }
-
     val anyOverlayOpen = uiState.showAddCamera || uiState.showAddReview || uiState.showAddText || uiState.addDialogForDay != null || uiState.showAddBusyCard
 
     Box(
