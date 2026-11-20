@@ -16,11 +16,11 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 | **[x] ARCH-01** | Architektur & Threading | Synchrone Altdaten-Migration im `init`-Block von `DefaultHistoryRepository` | **Hoch** | Verhindert UI-Freezes / ANR (Application Not Responding) beim App-Start | Erledigt |
 | **[x] SEC-01** | Sicherheit & Robustheit | Stiller Klartext-Fallback bei Verschlüsselungsfehlern in `KeyVault` | **Mittel** | Schützt sensible API-Keys und verhindert inkonsistente Entschlüsselungszustände | Erledigt |
 | **[x] NET-01** | Netzwerk & Resilienz | Veraltetes `HttpURLConnection` statt modernem HTTP-Client (Ktor / OkHttp) | **Mittel** | Ermöglicht Connection Pooling, HTTP/2, sauberes Coroutine-Cancellation & Logging | Erledigt |
-| **ARCH-02** | Architektur & Wartbarkeit | Monolithisches `HistoryViewModel` (>750 Zeilen) verletzt Single Responsibility | **Mittel** | Steigert Entwicklerproduktivität, Modularität und isolierte Testbarkeit |
-| **CONC-01** | Nebenläufigkeit | Thread-unsichere `mutableMapOf` für anstehende Löschaufträge in `HistoryViewModel` | **Mittel** | Beseitigt potenzielle Race Conditions und State Inconsistencies |
-| **UI-01** | Compose & UI-Performance | Fehlende `@Immutable` / `@Stable`-Stabilität auf Domänenmodellen | **Niedrig** | Reduziert unnötige Recompositions und schont CPU/Akku |
-| **DATA-01** | Datenbank & Persistenz | JSON-Serialisierung von Domänenlisten in Room Entity-Spalten | **Niedrig** | Verbessert relationale Abfragefähigkeit und Datenintegrität |
-| **A11Y-01** | Barrierefreiheit & UX | Fehlende `contentDescription`-Attribute und Touch-Target-Größen | **Niedrig** | Verbessert Accessibility für Screenreader und Bedienbarkeit |
+| **[x] ARCH-02** | Architektur & Wartbarkeit | Monolithisches `HistoryViewModel` (>750 Zeilen) verletzt Single Responsibility | **Mittel** | Steigert Entwicklerproduktivität, Modularität und isolierte Testbarkeit | Erledigt |
+| **[x] CONC-01** | Nebenläufigkeit | Thread-unsichere `mutableMapOf` für anstehende Löschaufträge in `HistoryViewModel` | **Mittel** | Beseitigt potenzielle Race Conditions und State Inconsistencies | Erledigt |
+| **[x] UI-01** | Compose & UI-Performance | Fehlende `@Immutable` / `@Stable`-Stabilität auf Domänenmodellen | **Niedrig** | Reduziert unnötige Recompositions und schont CPU/Akku | Erledigt |
+| **[x] DATA-01** | Datenbank & Persistenz | JSON-Serialisierung von Domänenlisten in Room Entity-Spalten | **Niedrig** | Verbessert relationale Abfragefähigkeit und Datenintegrität | Erledigt (Evaluiert) |
+| **[x] A11Y-01** | Barrierefreiheit & UX | Fehlende `contentDescription`-Attribute und Touch-Target-Größen | **Niedrig** | Verbessert Accessibility für Screenreader und Bedienbarkeit | Erledigt |
 
 ---
 
@@ -106,7 +106,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 
 ---
 
-### ARCH-02: Dekomposition des monolithischen `HistoryViewModel`
+### [x] ARCH-02: Dekomposition des monolithischen `HistoryViewModel` [ERLEDIGT]
 * **Datei:** `app/src/main/java/de/gurum/besseresser/ui/HistoryViewModel.kt` (>750 Zeilen)
 * **Problem:**
   Das `HistoryViewModel` bündelt zu viele Verantwortlichkeiten:
@@ -125,7 +125,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 
 ---
 
-### CONC-01: Thread-Sicherheit bei verzögerten Löschvorgängen
+### [x] CONC-01: Thread-Sicherheit bei verzögerten Löschvorgängen [ERLEDIGT]
 * **Datei:** `app/src/main/java/de/gurum/besseresser/ui/HistoryViewModel.kt` (Zeilen 94–95, 150–190)
 * **Problem:**
   `pendingDeleteJobs` und `pendingDeleteEntries` sind einfache `mutableMapOf()`, auf die aus mehreren Coroutines (z. B. UI-Klicks, Timer-Delays, `flushPendingDeletes`) zeitgleich ohne Synchronisationsmechanismus (z. B. `Mutex` oder `ConcurrentHashMap`) zugegriffen wird.
@@ -140,7 +140,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 
 ---
 
-### UI-01: Recomposition-Optimierung in Jetpack Compose
+### [x] UI-01: Recomposition-Optimierung in Jetpack Compose [ERLEDIGT]
 * **Dateien:** `app/src/main/java/de/gurum/besseresser/model/Data.kt`, `HistoryUiState.kt`
 * **Problem:**
   Klassen, die nicht explizit als `@Immutable` oder `@Stable` annotiert sind und Standard-Listen (`List<T>`) enthalten, werden vom Compose-Compiler oft als instabil (unstable) eingestuft. Dies führt dazu, dass Composables wie `HistoryItem` oder `FazitCard` bei jeder Zustandsänderung des Screens neu berechnet werden, selbst wenn sich ihre eigenen Daten nicht geändert haben.
@@ -153,7 +153,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 
 ---
 
-### DATA-01: Normalisierung komplexer Room-Entities
+### [x] DATA-01: Normalisierung komplexer Room-Entities [ERLEDIGT / EVALUIERT]
 * **Datei:** `app/src/main/java/de/gurum/besseresser/data/AppDatabase.kt`
 * **Problem:**
   `HistoryEntryEntity` speichert `goalResults: List<GoalResult>` als serialisierten JSON-String in einer Tabellenspalte ab.
@@ -164,14 +164,14 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 
 ---
 
-### A11Y-01: Barrierefreiheit & Touch-Target-Optimierung
+### [x] A11Y-01: Barrierefreiheit & Touch-Target-Optimierung [ERLEDIGT]
 * **Dateien:** `CameraScreen.kt`, `HistoryDetailScreen.kt`, `MainTopBar.kt`
 * **Problem:**
   Einige Icons besitzen hardcodierte oder unvollständige `contentDescription`-Werte. Einzelne Klickflächen sind kleiner als die von Material Design empfohlenen 48x48 dp.
 * **Nutzen / Auswirkung:**
   Bessere Zugänglichkeit für motorisch oder visuell eingeschränkte Nutzer (TalkBack-Unterstützung).
 * **Empfohlene Lösung:**
-  Lokalisierte `contentDescription`-Strings hinterlegen und bei kleinen Symbolen `Modifier.minimumInteractiveComponentSize()` nutzen.
+  Lokalisierte `contentDescription`-Strings hinterlegen und bei kleinen Symbolen `Modifier.minimumInteractiveComponentSize()` bzw. 48x48 dp Touch-Targets nutzen.
 
 ---
 
@@ -179,15 +179,15 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 
 1. **Phase 1: Sofortmaßnahmen (Stabilität & Crash-Prävention / Quick Wins)**
    - [x] Behebung des OOM-Risikos in `AndroidImagePreprocessor` (`inSampleSize` & explizites `recycle()`). [ERLEDIGT]
-   - Absicherung der `pendingDeleteJobs`-Maps in `HistoryViewModel` via `Mutex`.
+   - [x] Absicherung der `pendingDeleteJobs`-Maps in `HistoryViewModel` via `Mutex`. [ERLEDIGT]
    - [x] Asynchrone Kapselung der Migration in `DefaultHistoryRepository`. [ERLEDIGT]
 
 2. **Phase 2: Struktur & Resilienz (Architektur & Sicherheit)**
    - [x] Klare Fehlerbehandlung für den Android Keystore in `KeyVault`. [ERLEDIGT]
-   - Entflechtung des `HistoryViewModel` in Use-Cases (`FazitCalculator`, `HistoryListViewModel`).
+   - [x] Entflechtung des `HistoryViewModel` in Use-Cases (`FazitCalculator`, `HistoryListViewModel`). [ERLEDIGT]
    - [x] Umstellung des HTTP-Stacks von `HttpURLConnection` auf `Ktor` oder `OkHttp`. [ERLEDIGT]
 
 3. **Phase 3: Feinpolitur & Performance (UI & Polish)**
-   - Hinzufügen von `@Immutable`-Annotationen und `ImmutableList` für Compose-Stabilität.
-   - Audit von `contentDescription` und Touch-Targets für Barrierefreiheit.
-   - Ergänzung von Screenshot-/Compose-UI-Tests zur Absicherung von Regressionen.
+   - [x] Hinzufügen von `@Immutable`-Annotationen und `ImmutableList` für Compose-Stabilität. [ERLEDIGT]
+   - [x] Audit von `contentDescription` und Touch-Targets für Barrierefreiheit. [ERLEDIGT]
+   - [x] Ergänzung von Screenshot-/Compose-UI-Tests zur Absicherung von Regressionen. [ERLEDIGT]

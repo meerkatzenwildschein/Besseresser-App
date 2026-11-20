@@ -18,6 +18,7 @@ import java.time.ZoneId
 import java.io.File
 import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.BesseresserApiService
+import de.gurum.besseresser.data.FazitManager
 import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.model.calendarWeekOfKey
@@ -46,7 +47,15 @@ class HistoryViewModel(
     private val photoCaptureManager: PhotoCaptureManager? = null,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
     private val profileRepository: ProfileRepository? = null,
-    private val promptRepository: PromptRepository? = null
+    private val promptRepository: PromptRepository? = null,
+    private val fazitManager: FazitManager = FazitManager(
+        apiService = apiService,
+        historyRepository = historyRepository,
+        settingsRepository = settingsRepository,
+        profileRepository = profileRepository,
+        promptRepository = promptRepository,
+        dispatchers = dispatchers
+    )
 ) : ViewModel() {
 
     fun createCaptureFile(): Pair<File, Uri> {
@@ -143,32 +152,13 @@ class HistoryViewModel(
     private suspend fun validateAllWeekFazits(
         entries: List<HistoryEntry>,
         rawMap: Map<String, DayFazit>
-    ): Map<String, DayFazit> {
-        if (entries.isEmpty()) return emptyMap()
-        val result = mutableMapOf<String, DayFazit>()
-        for ((wk, wf) in rawMap) {
-            val wkEntries = entries.filter { weekKeyOf(it.dateMillis) == wk }
-            val validated = validateWeekFazit(wk, wf, wkEntries)
-            if (validated != null) {
-                result[wk] = validated
-            }
-        }
-        return result
-    }
+    ): Map<String, DayFazit> = fazitManager.validateAllWeekFazits(entries, rawMap)
 
     private suspend fun validateWeekFazit(
         weekKey: String,
         fazit: DayFazit?,
         entries: List<HistoryEntry>
-    ): DayFazit? {
-        if (fazit == null) return null
-        return if (entries.isNotEmpty() && fazit.fingerprint == dayFingerprint(entries)) {
-            fazit
-        } else {
-            historyRepository.deleteWeekFazit(weekKey)
-            null
-        }
-    }
+    ): DayFazit? = fazitManager.validateWeekFazit(weekKey, fazit, entries)
 
     fun toggleFazitExpanded(dayKey: String) {
         _uiState.update { current ->
@@ -356,8 +346,11 @@ class HistoryViewModel(
     }
 
     fun deleteEntry(entry: HistoryEntry) {
-        pendingDeleteJobs.remove(entry.id)?.cancel()
-        pendingDeleteEntries.remove(entry.id)
+        val job = synchronized(pendingDeleteJobs) {
+            pendingDeleteEntries.remove(entry.id)
+            pendingDeleteJobs.remove(entry.id)
+        }
+        job?.cancel()
         _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds - entry.id) }
         viewModelScope.launch {
             historyRepository.delete(entry)
@@ -372,34 +365,52 @@ class HistoryViewModel(
         entry: HistoryEntry,
         delayMs: Long = UNDO_DELETE_DELAY_MS
     ) {
-        pendingDeleteJobs.remove(entry.id)?.cancel()
-        pendingDeleteEntries[entry.id] = entry
-        _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds + entry.id) }
-        pendingDeleteJobs[entry.id] = viewModelScope.launch {
-            if (delayMs > 0L) delay(delayMs)
+        val existingJob = synchronized(pendingDeleteJobs) {
+            pendingDeleteEntries[entry.id] = entry
             pendingDeleteJobs.remove(entry.id)
-            pendingDeleteEntries.remove(entry.id)
+        }
+        existingJob?.cancel()
+        _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds + entry.id) }
+        val job = viewModelScope.launch {
+            if (delayMs > 0L) delay(delayMs)
+            val shouldDelete = synchronized(pendingDeleteJobs) {
+                pendingDeleteJobs.remove(entry.id)
+                pendingDeleteEntries.remove(entry.id) != null
+            }
             _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds - entry.id) }
-            historyRepository.delete(entry)
-            historyRepository.deleteDayFazitForEntry(entry)
-            historyRepository.deleteWeekFazitForEntry(entry)
+            if (shouldDelete) {
+                historyRepository.delete(entry)
+                historyRepository.deleteDayFazitForEntry(entry)
+                historyRepository.deleteWeekFazitForEntry(entry)
+            }
+        }
+        synchronized(pendingDeleteJobs) {
+            if (pendingDeleteEntries.containsKey(entry.id)) {
+                pendingDeleteJobs[entry.id] = job
+            }
         }
     }
 
     /** Bricht das vorgemerkte Löschen ab und stellt den Eintrag sofort wieder aktiv her. */
     fun undoDeleteEntry(entryId: Long) {
-        pendingDeleteJobs.remove(entryId)?.cancel()
-        pendingDeleteEntries.remove(entryId)
+        val job = synchronized(pendingDeleteJobs) {
+            pendingDeleteEntries.remove(entryId)
+            pendingDeleteJobs.remove(entryId)
+        }
+        job?.cancel()
         _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds - entryId) }
     }
 
     /** Führt alle noch offenen Löschvorgänge sofort endgültig aus (z. B. beim Verlassen des Verlaufs). */
     fun flushPendingDeletes() {
-        val toDelete = pendingDeleteEntries.values.toList()
+        val toDelete = synchronized(pendingDeleteJobs) {
+            val list = pendingDeleteEntries.values.toList()
+            pendingDeleteJobs.values.forEach { it.cancel() }
+            pendingDeleteJobs.clear()
+            pendingDeleteEntries.clear()
+            list
+        }
         if (toDelete.isEmpty()) return
-        pendingDeleteJobs.values.forEach { it.cancel() }
-        pendingDeleteJobs.clear()
-        pendingDeleteEntries.clear()
         _uiState.update { it.copy(pendingDeleteIds = emptySet()) }
         viewModelScope.launch {
             toDelete.forEach { entry ->
@@ -517,27 +528,15 @@ class HistoryViewModel(
             )
         }
         viewModelScope.launch {
-            val result = apiService.dayFazit(
+            fazitManager.computeDayFazit(
+                day = day,
+                entriesOfDay = entriesOfDay,
                 settings = settings,
-                goals = settings.goals,
                 promptContext = promptContext,
                 mealDescriptions = mealDescriptions,
                 prompts = prompts
             )
-            result.onSuccess { res ->
-                val fazit = DayFazit(
-                    dayKey = key,
-                    rating = res.rating,
-                    text = res.text,
-                    entryIds = entriesOfDay.map { it.id },
-                    createdAt = System.currentTimeMillis(),
-                    fingerprint = dayFingerprint(entriesOfDay)
-                )
-                historyRepository.saveDayFazit(fazit)
-                _uiState.update { it.copy(loadingFazits = it.loadingFazits - key) }
-            }.onFailure {
-                _uiState.update { it.copy(loadingFazits = it.loadingFazits - key) }
-            }
+            _uiState.update { it.copy(loadingFazits = it.loadingFazits - key) }
         }
     }
 
@@ -562,19 +561,15 @@ class HistoryViewModel(
         val lines = mealDescriptions ?: wkEntries.map { it.recognizedMeal }
         val promptBundle = prompts ?: FazitPromptBundle("", "", "", "")
         viewModelScope.launch {
-            val result = apiService.dayFazit(
+            val result = fazitManager.computeWeekFazit(
+                weekKey = wk,
+                entriesOfWeek = wkEntries,
                 settings = settings,
-                goals = settings.goals,
                 promptContext = promptContext,
                 mealDescriptions = lines,
                 prompts = promptBundle
             )
-            result.onSuccess { res ->
-                val wf = DayFazit(
-                    wk, res.rating, res.text, wkEntries.map { it.id },
-                    System.currentTimeMillis(), dayFingerprint(wkEntries)
-                )
-                historyRepository.saveWeekFazit(wf)
+            result.onSuccess { wf ->
                 _uiState.update {
                     val newLoading = it.loadingWeeks - wk
                     it.copy(

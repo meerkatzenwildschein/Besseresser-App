@@ -1,4 +1,5 @@
 package de.gurum.besseresser.model
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.Instant
@@ -7,6 +8,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /** Eine gespeicherte Foto-Bewertung. */
+@Immutable
 @Serializable
 data class HistoryEntry(
     val id: Long = 0L,
@@ -157,6 +159,7 @@ fun calendarWeekOfKey(weekKey: String): Int =
     weekMondayOfKey(weekKey)?.let { calendarWeekOf(it) } ?: calendarWeekOf()
 
 /** KI-generiertes Fazit eines Tages (Text-Ampel statt rechnerischem Tagesscore). */
+@Immutable
 @Serializable
 data class DayFazit(
     @SerialName("tag")

@@ -77,17 +77,17 @@ internal fun MainTopBar(
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                modifier = Modifier.size(42.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 IconButton(
                     onClick = onOpenHistory,
                     enabled = menuEnabled,
-                    modifier = Modifier.size(42.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         Icons.Filled.DateRange,
                         contentDescription = stringResource(R.string.menu_history),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -95,16 +95,16 @@ internal fun MainTopBar(
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                    modifier = Modifier.size(42.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     IconButton(
                         onClick = { onMenuToggle(true) },
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             Icons.Filled.Menu,
                             contentDescription = stringResource(R.string.menu_open_description),
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
