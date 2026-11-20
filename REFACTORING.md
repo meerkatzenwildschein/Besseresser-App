@@ -75,7 +75,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Einführung eines `PromptRepository` oder `PromptUseCase`, der über `ApplicationContext` oder lokalisierte String-Provider (`UiText` / `StringProvider`) verfügt. ViewModels fordern Prompts direkt aus dem Domain-Layer an.
 
-#### [MEDIUM] A.4: Unvollständige Wiederherstellung über `SavedStateHandle`
+#### [MEDIUM] [ERLEDIGT] A.4: Unvollständige Wiederherstellung über `SavedStateHandle`
 - **Ort:** `app/src/main/java/de/gurum/besseresser/ui/MainViewModel.kt`
 - **Problem:**
   Während einfache String- und Boolean-Felder in `SavedStateHandle` gesichert werden, wird das aktuelle `Evaluation`-Objekt bei Process Death nicht persistiert. Führt das System einen Process-Kill im Hintergrund aus, geht die noch ungespeicherte KI-Bewertung verloren.
@@ -203,7 +203,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
   Beim JSON-Backup-Export wird das gesamte `Settings`-Objekt inklusive `apiKey` exportiert.
   - Teilt der Nutzer ein Backup oder speichert es unverschlüsselt ab, wird der API-Schlüssel preisgegeben.
 - **Best Practice:**
-  Optionale Checkbox beim Export ("API-Schlüssel in Backup einschließen") oder standardmäßiges Maskieren/Ausschließen von Zugangsdaten im Export.
+  Optionale Checkbox beim Export ("API-Schlüssel in Backup einschließen").
 
 #### [MEDIUM] D.3: `allowBackup="true"` im AndroidManifest ohne differenzierte Backup-Regeln
 - **Ort:** `app/src/main/AndroidManifest.xml`

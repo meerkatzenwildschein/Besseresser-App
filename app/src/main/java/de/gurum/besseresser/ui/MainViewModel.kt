@@ -20,6 +20,8 @@ import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.model.Evaluation
+import de.gurum.besseresser.model.AppJson
+import kotlinx.serialization.encodeToString
 import java.io.File
 
 import de.gurum.besseresser.data.PromptRepository
@@ -72,6 +74,7 @@ class MainViewModel(
         private const val KEY_SAVED_ENTRY_ID = "main_saved_entry_id"
         private const val KEY_SAVED_TO_HISTORY = "main_saved_to_history"
         private const val KEY_MENU_OPEN = "main_menu_open"
+        private const val KEY_EVALUATION = "main_evaluation"
     }
 
     private val _uiState = MutableStateFlow(
@@ -83,7 +86,10 @@ class MainViewModel(
             showRecognizedEdit = savedStateHandle[KEY_SHOW_RECOGNIZED_EDIT] ?: false,
             savedToHistory = savedStateHandle[KEY_SAVED_TO_HISTORY] ?: false,
             savedEntryId = savedStateHandle[KEY_SAVED_ENTRY_ID],
-            menuOpen = savedStateHandle[KEY_MENU_OPEN] ?: false
+            menuOpen = savedStateHandle[KEY_MENU_OPEN] ?: false,
+            evaluation = savedStateHandle.get<String>(KEY_EVALUATION)?.let { json ->
+                runCatching { AppJson.decodeFromString<Evaluation>(json) }.getOrNull()
+            }
         )
     )
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -128,6 +134,7 @@ class MainViewModel(
         savedStateHandle[KEY_SHOW_REVIEW] = false
         savedStateHandle[KEY_SAVED_TO_HISTORY] = false
         savedStateHandle.remove<Long>(KEY_SAVED_ENTRY_ID)
+        savedStateHandle.remove<String>(KEY_EVALUATION)
         _uiState.update {
             it.copy(
                 photoPreviewUri = uri,
@@ -156,6 +163,7 @@ class MainViewModel(
         val cachedEv = settingsRepository.findCachedEvaluation(currentNote, settings.goals) ?: return false
         analyzeJob?.cancel()
         settingsRepository.pushRecentNote(currentNote, cachedEv)
+        savedStateHandle[KEY_EVALUATION] = AppJson.encodeToString(cachedEv)
         _uiState.update {
             it.copy(
                 evaluation = cachedEv,
@@ -187,6 +195,7 @@ class MainViewModel(
                 if (currentNote.isNotBlank()) {
                     settingsRepository.pushRecentNote(currentNote, ev)
                 }
+                savedStateHandle[KEY_EVALUATION] = AppJson.encodeToString(ev)
                 _uiState.update { it.copy(evaluation = ev, isBusy = false) }
             }.onFailure { e ->
                 _uiState.update { it.copy(error = e.message ?: "Analyse fehlgeschlagen.", isBusy = false) }
@@ -234,6 +243,9 @@ class MainViewModel(
             state.copy(evaluation = updatedEv, showRecognizedEdit = false)
         }
         val evToSave = updatedEv
+        if (evToSave != null) {
+            savedStateHandle[KEY_EVALUATION] = AppJson.encodeToString(evToSave)
+        }
         if (evToSave != null && currentNote.isNotBlank()) {
             viewModelScope.launch {
                 settingsRepository.updateRecentNoteEvaluation(currentNote, evToSave)
@@ -262,6 +274,7 @@ class MainViewModel(
         savedStateHandle.remove<Boolean>(KEY_SAVED_TO_HISTORY)
         savedStateHandle.remove<Long>(KEY_SAVED_ENTRY_ID)
         savedStateHandle.remove<Boolean>(KEY_MENU_OPEN)
+        savedStateHandle.remove<String>(KEY_EVALUATION)
         _uiState.update { MainUiState() }
     }
 }
