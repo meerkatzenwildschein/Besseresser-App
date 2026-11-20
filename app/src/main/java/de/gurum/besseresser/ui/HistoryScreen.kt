@@ -21,12 +21,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 import java.io.File
 import de.gurum.besseresser.R
+import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.Profile
 import de.gurum.besseresser.model.Settings
-import de.gurum.besseresser.model.calendarWeekOfKey
 import de.gurum.besseresser.model.weekKeyOf
 
 @Composable
@@ -35,6 +36,7 @@ fun HistoryScreen(
     profile: Profile,
     onPick: (HistoryEntry) -> Unit,
     onBack: () -> Unit,
+    photoCaptureManager: PhotoCaptureManager = koinInject(),
     viewModel: HistoryViewModel = koinViewModel()
 ) {
     val ctx = LocalContext.current
@@ -51,7 +53,7 @@ fun HistoryScreen(
     fun ensureAddCaptureFile(): Pair<File, Uri> {
         val existing = addCaptureState.value
         if (existing != null) return existing
-        val fresh = viewModel.createCaptureFile()
+        val fresh = photoCaptureManager.createCaptureFile()
         addCaptureState.value = fresh
         return fresh
     }
@@ -62,7 +64,7 @@ fun HistoryScreen(
         if (ok) {
             viewModel.setShowAddReview(true)
         } else {
-            addCaptureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+            addCaptureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
             addCaptureState.value = null
         }
     }
@@ -74,12 +76,12 @@ fun HistoryScreen(
     }
     BackHandler(enabled = uiState.showAddCamera) {
         viewModel.setShowAddCamera(false)
-        addCaptureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+        addCaptureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
         addCaptureState.value = null
     }
     BackHandler(enabled = uiState.showAddReview) {
         viewModel.setShowAddReview(false)
-        addCaptureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+        addCaptureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
         addCaptureState.value = null
     }
     BackHandler(enabled = uiState.showAddText) { viewModel.setShowAddText(false) }
@@ -169,12 +171,12 @@ fun HistoryScreen(
             onNoteChange = { viewModel.setAddNote(it) },
             onDismissCamera = {
                 viewModel.setShowAddCamera(false)
-                addCaptureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+                addCaptureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
                 addCaptureState.value = null
             },
             onDismissReview = {
                 viewModel.setShowAddReview(false)
-                addCaptureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+                addCaptureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
                 addCaptureState.value = null
             },
             onDismissText = { viewModel.setShowAddText(false) },

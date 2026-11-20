@@ -89,7 +89,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Die Umwandlung von Roh-Entitäten in Anzeige-Items (`HistoryUiItem`) sollte direkt im ViewModel oder in einem UI-State-Mapper auf Hintergrund-Threads stattfinden.
 
-#### [LOW] A.6: Duplizierte ViewModel-Delegationen für Datei-Operationen
+#### [LOW] [ERLEDIGT] A.6: Duplizierte ViewModel-Delegationen für Datei-Operationen
 - **Ort:** `MainViewModel.kt` & `HistoryViewModel.kt`
 - **Problem:**
   Beide ViewModels leiten Methoden wie `createCaptureFile()`, `deleteCaptureFile()` 1:1 an `PhotoCaptureManager` weiter.

@@ -19,8 +19,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 import java.io.File
 import de.gurum.besseresser.R
+import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.model.Settings
 
@@ -33,6 +35,7 @@ fun MainScreen(
     onOpenProfile: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenConfig: () -> Unit = {},
+    photoCaptureManager: PhotoCaptureManager = koinInject(),
     viewModel: MainViewModel = koinViewModel()
 ) {
     val ctx = LocalContext.current
@@ -43,7 +46,7 @@ fun MainScreen(
     fun ensureCaptureFile(): Pair<File, Uri> {
         val existing = captureState.value
         if (existing != null) return existing
-        val fresh = viewModel.createCaptureFile()
+        val fresh = photoCaptureManager.createCaptureFile()
         captureState.value = fresh
         return fresh
     }
@@ -56,7 +59,7 @@ fun MainScreen(
         if (ok) {
             viewModel.setShowReview(true)
         } else {
-            captureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+            captureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
             captureState.value = null
         }
     }
@@ -64,7 +67,7 @@ fun MainScreen(
     // Android-Zurück-Button: Overlay-Ebenen der Aufnahme schließen, statt die App zu beenden.
     BackHandler(enabled = uiState.showCamera) {
         viewModel.setShowCamera(false)
-        captureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+        captureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
         captureState.value = null
     }
 
@@ -95,7 +98,7 @@ fun MainScreen(
                 onNoteChange = { viewModel.setNote(it) },
                 onCancel = {
                     viewModel.setShowCamera(false)
-                    captureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+                    captureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
                     captureState.value = null
                 },
                 onFallbackSystemCamera = {
@@ -120,7 +123,7 @@ fun MainScreen(
                 onNoteChange = { viewModel.setNote(it) },
                 onBack = {
                     viewModel.setShowReview(false)
-                    captureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+                    captureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
                     viewModel.reset()
                     captureState.value = null
                 },
@@ -132,7 +135,7 @@ fun MainScreen(
                 },
                 onRetake = {
                     viewModel.setShowReview(false)
-                    captureState.value?.first?.let { viewModel.deleteCaptureFile(it) }
+                    captureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
                     viewModel.reset()
                     captureState.value = null
                     val (_, freshUri) = ensureCaptureFile()
