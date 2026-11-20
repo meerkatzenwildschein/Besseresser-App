@@ -115,7 +115,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Zeit- und Datumsbezüge als State aus dem ViewModel bereitstellen.
 
-#### [MEDIUM] B.3: Swipe-to-Dismiss / Gesture-Handler außerhalb von Foundation-Standards
+#### [MEDIUM] [ERLEDIGT] B.3: Swipe-to-Dismiss / Gesture-Handler außerhalb von Foundation-Standards
 - **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryItem.kt`, `HistoryScreen.kt`
 - **Problem:**
   Eigene Gestenverarbeitung (`pointerInput` mit `detectHorizontalDragGestures`) wird für Swipe-Gesten genutzt, statt die offiziellen Material 3 / Compose Foundation APIs (`SwipeToDismissBox`) zu verwenden.

@@ -22,10 +22,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -294,93 +298,72 @@ fun ReorderableDayMealBox(
 }
 
 /**
- * Begrenztes Links-Schieben mit festem kurzem Anschlag (~96dp):
- * Die Karte lässt sich nur so weit nach links schieben, bis das rote Mülleimer-Feld sichtbar ist.
- * Wird die Karte am Anschlag losgelassen, löst [onTriggerDelete] den deaktivierten „Rückgängig"-Zustand aus.
+ * Begrenztes Links-Schieben mit Material 3 [SwipeToDismissBox]:
+ * Wird die Karte nach links geschoben und losgelassen, löst [onTriggerDelete] den deaktivierten „Rückgängig"-Zustand aus.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShortSwipeToDeleteBox(
     enabled: Boolean = true,
     onTriggerDelete: () -> Unit,
     content: @Composable () -> Unit
 ) {
-    val density = LocalDensity.current
-    val maxSwipePx = remember(density) { with(density) { 96.dp.toPx() } }
-    val triggerPx = maxSwipePx * 0.72f
-    var dragOffset by remember { mutableFloatStateOf(0f) }
-    val animatedOffset by animateFloatAsState(
-        targetValue = dragOffset,
-        animationSpec = tween(durationMillis = 150),
-        label = "short-swipe-offset"
-    )
+    if (!enabled) {
+        content()
+        return
+    }
 
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (enabled) {
-                    Modifier.pointerInput(maxSwipePx) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                val shouldDelete = dragOffset <= -triggerPx
-                                dragOffset = 0f
-                                if (shouldDelete) {
-                                    onTriggerDelete()
-                                }
-                            },
-                            onDragCancel = {
-                                dragOffset = 0f
-                            },
-                            onHorizontalDrag = { change, dragAmount ->
-                                // Nur Links-Schieben (oder Zurückschieben aus bereits geöffneter Position) abfangen
-                                if (dragAmount < 0f || dragOffset < 0f) {
-                                    change.consume()
-                                    dragOffset = (dragOffset + dragAmount).coerceIn(-maxSwipePx, 0f)
-                                }
-                            }
-                        )
-                    }
-                } else Modifier
-            )
-    ) {
-        if (animatedOffset < -2f) {
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFFD32F2F)),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .width(96.dp)
-                        .padding(horizontal = 8.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.Delete,
-                        contentDescription = stringResource(R.string.delete),
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        stringResource(R.string.delete),
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.5.sp
-                    )
-                }
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.EndToStart) {
+                onTriggerDelete()
+                false
+            } else {
+                false
             }
         }
+    )
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .offset { IntOffset(animatedOffset.roundToInt(), 0) }
-        ) {
+    SwipeToDismissBox(
+        state = dismissState,
+        enableDismissFromStartToEnd = false,
+        enableDismissFromEndToStart = enabled,
+        backgroundContent = {
+            if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(88.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFFD32F2F)),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .width(96.dp)
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.delete),
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            stringResource(R.string.delete),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.5.sp
+                        )
+                    }
+                }
+            }
+        },
+        content = {
             content()
         }
-    }
+    )
 }
