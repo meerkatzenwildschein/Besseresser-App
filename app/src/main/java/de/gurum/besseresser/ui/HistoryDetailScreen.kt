@@ -405,8 +405,9 @@ fun HistoryDetailScreen(
     }
 
     if (showDuplicateDatePicker) {
+        val initialSelectedMillis = remember { LocalDate.now().toEpochDay() * 86_400_000L }
         val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = LocalDate.now().toEpochDay() * 86_400_000L
+            initialSelectedDateMillis = initialSelectedMillis
         )
         DatePickerDialog(
             onDismissRequest = { showDuplicateDatePicker = false },

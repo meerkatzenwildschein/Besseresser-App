@@ -108,7 +108,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Wickeln der Lambda-Erstellung in `remember(lifecycleOwner, context) { ... }`.
 
-#### [MEDIUM] B.2: Verwendung von dynamischen Datums-/Zeitabfragen in Composition
+#### [MEDIUM] [ERLEDIGT] B.2: Verwendung von dynamischen Datums-/Zeitabfragen in Composition
 - **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryListScreen.kt`
 - **Problem:**
   `LocalDate.now()` und `LocalTime.now().hour` werden direkt im Composable ausgewertet. Bei jeder Rekomposition entstehen neue Objektinstanzen.
