@@ -26,15 +26,36 @@ class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor
      */
     override fun prepareImageDataUri(photoUri: Uri, maxSide: Int): String {
         val resolver = context.contentResolver
-        val bitmap = resolver.openInputStream(photoUri)?.use { BitmapFactory.decodeStream(it) }
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(photoUri)?.use { BitmapFactory.decodeStream(it, null, options) }
             ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
-        val scaled = scaleDown(bitmap, maxSide)
-        val jpeg = ByteArrayOutputStream().also { scaled.compress(Bitmap.CompressFormat.JPEG, COMPRESSION_QUALITY_JPEG, it) }.toByteArray()
-        val dataUri = "data:image/jpeg;base64," + Base64.encodeToString(jpeg, Base64.NO_WRAP)
-        if (scaled !== bitmap) {
-            scaled.recycle()
+
+        var sample = 1
+        while (maxOf(options.outWidth, options.outHeight) / sample > maxSide * 2) {
+            sample *= 2
         }
-        return dataUri
+
+        val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sample }
+        val originalBitmap = resolver.openInputStream(photoUri)?.use {
+            BitmapFactory.decodeStream(it, null, decodeOptions)
+        } ?: throw IllegalStateException("Foto konnte nicht decodiert werden.")
+
+        try {
+            val scaled = scaleDown(originalBitmap, maxSide)
+            try {
+                val jpeg = ByteArrayOutputStream().use { out ->
+                    scaled.compress(Bitmap.CompressFormat.JPEG, COMPRESSION_QUALITY_JPEG, out)
+                    out.toByteArray()
+                }
+                return "data:image/jpeg;base64," + Base64.encodeToString(jpeg, Base64.NO_WRAP)
+            } finally {
+                if (scaled !== originalBitmap) {
+                    scaled.recycle()
+                }
+            }
+        } finally {
+            originalBitmap.recycle()
+        }
     }
 
     /**
