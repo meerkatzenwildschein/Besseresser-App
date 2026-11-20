@@ -8,6 +8,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -94,36 +95,46 @@ class HistoryViewModel(
     private val pendingDeleteEntries = mutableMapOf<Long, HistoryEntry>()
 
     init {
-        observeEntries(historyRepository)
-        observeDayFazits(historyRepository)
-        observeWeekFazits(historyRepository)
+        observeHistoryData(historyRepository)
     }
 
-    private var latestRawWeekMap: Map<String, DayFazit> = emptyMap()
-
-    private fun observeEntries(repo: HistoryRepository) {
+    private fun observeHistoryData(repo: HistoryRepository) {
         viewModelScope.launch {
-            repo.getAllFlow().collect { list ->
-                val validWeekMap = validateAllWeekFazits(list, latestRawWeekMap)
-                val targetWk = latestDueWeekKey(list) ?: weekKeyOf(System.currentTimeMillis())
-                val wkEntries = list.filter { weekKeyOf(it.dateMillis) == targetWk }
+            combine(
+                repo.getAllFlow(),
+                repo.getDayFazitsFlow(),
+                repo.getWeekFazitsFlow()
+            ) { entries, dayFazits, rawWeekFazits ->
+                val validWeekMap = validateAllWeekFazits(entries, rawWeekFazits)
+                val targetWk = latestDueWeekKey(entries) ?: weekKeyOf(System.currentTimeMillis())
+                val wkEntries = entries.filter { weekKeyOf(it.dateMillis) == targetWk }
                 val validWf: DayFazit? = validWeekMap[targetWk] ?: validateWeekFazit(
                     targetWk,
                     repo.loadWeekFazit(targetWk),
                     wkEntries
                 )
                 val mergedWeekMap = if (validWf != null) validWeekMap + (targetWk to validWf) else validWeekMap
+                HistoryDataUpdate(entries, dayFazits, validWf, mergedWeekMap)
+            }.collect { data ->
                 _uiState.update { current ->
                     current.copy(
-                        entries = list,
-                        weekFazit = validWf,
-                        weekFazitMap = mergedWeekMap
+                        entries = data.entries,
+                        fazitMap = data.dayFazits,
+                        weekFazit = data.weekFazit,
+                        weekFazitMap = data.weekFazitMap
                     )
                 }
                 triggerAutoFazits()
             }
         }
     }
+
+    private data class HistoryDataUpdate(
+        val entries: List<HistoryEntry>,
+        val dayFazits: Map<String, DayFazit>,
+        val weekFazit: DayFazit?,
+        val weekFazitMap: Map<String, DayFazit>
+    )
 
     private suspend fun validateAllWeekFazits(
         entries: List<HistoryEntry>,
@@ -152,31 +163,6 @@ class HistoryViewModel(
         } else {
             historyRepository.deleteWeekFazit(weekKey)
             null
-        }
-    }
-
-    private fun observeDayFazits(repo: HistoryRepository) {
-        viewModelScope.launch {
-            repo.getDayFazitsFlow().collect { map ->
-                _uiState.update { it.copy(fazitMap = map) }
-            }
-        }
-    }
-
-    private fun observeWeekFazits(repo: HistoryRepository) {
-        viewModelScope.launch {
-            repo.getWeekFazitsFlow().collect { map ->
-                latestRawWeekMap = map
-                val entries = _uiState.value.entries
-                val validWeekMap = validateAllWeekFazits(entries, map)
-                val targetWk = latestDueWeekKey(entries) ?: weekKeyOf(System.currentTimeMillis())
-                _uiState.update {
-                    it.copy(
-                        weekFazit = validWeekMap[targetWk],
-                        weekFazitMap = validWeekMap
-                    )
-                }
-            }
         }
     }
 
