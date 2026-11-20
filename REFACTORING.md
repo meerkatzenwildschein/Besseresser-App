@@ -13,7 +13,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 | ID | Kategorie | Finding | Priorität | Hebel / Nutzen | Status |
 |---|---|---|---|---|---|
 | **[x] PERF-01** | Performance & Memory | OOM-Gefahr durch ungepuffertes Bitmap-Dekodieren in `AndroidImagePreprocessor` | **Hoch** | Verhindert App-Crashes bei hochauflösenden Kamerafotos (12MP–108MP) | Erledigt |
-| **ARCH-01** | Architektur & Threading | Synchrone Altdaten-Migration im `init`-Block von `DefaultHistoryRepository` | **Hoch** | Verhindert UI-Freezes / ANR (Application Not Responding) beim App-Start |
+| **[x] ARCH-01** | Architektur & Threading | Synchrone Altdaten-Migration im `init`-Block von `DefaultHistoryRepository` | **Hoch** | Verhindert UI-Freezes / ANR (Application Not Responding) beim App-Start | Erledigt |
 | **SEC-01** | Sicherheit & Robustheit | Stiller Klartext-Fallback bei Verschlüsselungsfehlern in `KeyVault` | **Mittel** | Schützt sensible API-Keys und verhindert inkonsistente Entschlüsselungszustände |
 | **NET-01** | Netzwerk & Resilienz | Veraltetes `HttpURLConnection` statt modernem HTTP-Client (Ktor / OkHttp) | **Mittel** | Ermöglicht Connection Pooling, HTTP/2, sauberes Coroutine-Cancellation & Logging |
 | **ARCH-02** | Architektur & Wartbarkeit | Monolithisches `HistoryViewModel` (>750 Zeilen) verletzt Single Responsibility | **Mittel** | Steigert Entwicklerproduktivität, Modularität und isolierte Testbarkeit |
@@ -70,7 +70,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 
 ---
 
-### ARCH-01: Blockierende I/O im Repository-Konstruktor (`DefaultHistoryRepository`)
+### [x] ARCH-01: Blockierende I/O im Repository-Konstruktor (`DefaultHistoryRepository`) [ERLEDIGT]
 * **Datei:** `app/src/main/java/de/gurum/besseresser/data/HistoryRepository.kt` (Zeilen 76–80)
 * **Problem:**
   Im `init`-Block wird `LegacyJsonMigrator.migrateSync(...)` synchron aufgerufen. Da Koin-Singletons oft während des App-Starts oder beim ersten Screen-Zugriff auf dem Main-Thread aufgelöst werden, führt dies zu Festplatten-I/O und synchronen SQLite-Transaktionen im UI-Thread.
@@ -180,7 +180,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 1. **Phase 1: Sofortmaßnahmen (Stabilität & Crash-Prävention / Quick Wins)**
    - [x] Behebung des OOM-Risikos in `AndroidImagePreprocessor` (`inSampleSize` & explizites `recycle()`). [ERLEDIGT]
    - Absicherung der `pendingDeleteJobs`-Maps in `HistoryViewModel` via `Mutex`.
-   - Asynchrone Kapselung der Migration in `DefaultHistoryRepository`.
+   - [x] Asynchrone Kapselung der Migration in `DefaultHistoryRepository`. [ERLEDIGT]
 
 2. **Phase 2: Struktur & Resilienz (Architektur & Sicherheit)**
    - Klare Fehlerbehandlung für den Android Keystore in `KeyVault`.

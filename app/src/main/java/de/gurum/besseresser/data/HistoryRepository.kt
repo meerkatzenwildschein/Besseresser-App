@@ -11,10 +11,12 @@ import de.gurum.besseresser.model.HistoryEntryLogic
 import de.gurum.besseresser.model.dayKeyOf
 import de.gurum.besseresser.model.retentionCutoffMillis
 import de.gurum.besseresser.model.weekKeyOf
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.Instant
@@ -75,7 +77,9 @@ class DefaultHistoryRepository(
 
     init {
         if (autoMigrateLegacyData) {
-            LegacyJsonMigrator.migrateSync(photoStorage.dir(), historyDao, dayFazitDao, weekFazitDao)
+            CoroutineScope(dispatchers.io).launch {
+                LegacyJsonMigrator.migrate(photoStorage.dir(), historyDao, dayFazitDao, weekFazitDao, dispatchers.io)
+            }
         }
     }
 
