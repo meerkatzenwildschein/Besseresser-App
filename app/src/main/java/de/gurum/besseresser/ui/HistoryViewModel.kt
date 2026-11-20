@@ -29,6 +29,9 @@ import de.gurum.besseresser.data.FazitPromptBundle
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.data.PromptBundle
+import de.gurum.besseresser.model.Profile
+import de.gurum.besseresser.data.ProfileRepository
+import de.gurum.besseresser.data.PromptRepository
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.model.weekKeyOf
@@ -40,7 +43,9 @@ class HistoryViewModel(
     private val imagePreprocessor: ImagePreprocessor,
     private val dispatchers: AppDispatchers = AppDispatchers(),
     private val photoCaptureManager: PhotoCaptureManager? = null,
-    private val savedStateHandle: SavedStateHandle = SavedStateHandle()
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
+    private val profileRepository: ProfileRepository? = null,
+    private val promptRepository: PromptRepository? = null
 ) : ViewModel() {
 
     fun createCaptureFile(): Pair<File, Uri> {
@@ -115,6 +120,7 @@ class HistoryViewModel(
                         weekFazitMap = mergedWeekMap
                     )
                 }
+                triggerAutoFazits()
             }
         }
     }
@@ -542,6 +548,49 @@ class HistoryViewModel(
         historyRepository.decodeThumbnail(entry, target)
 
     private var autoFazitJob: Job? = null
+
+    /**
+     * Reaktiv getriggerte Auto-Fazit-Prüfung im ViewModel-Scope ohne UI-Lifecycle-Kopplung.
+     */
+    fun triggerAutoFazits() {
+        val promptRepo = promptRepository ?: return
+        val profileRepo = profileRepository
+        autoFazitJob?.cancel()
+        autoFazitJob = viewModelScope.launch {
+            delay(1200) // Debounce
+            val entries = _uiState.value.entries
+            if (entries.isEmpty()) return@launch
+
+            val settings = settingsRepository.currentSettings()
+            val profile = profileRepo?.currentProfile() ?: Profile()
+            val promptContext = promptRepo.profileContextLine(profile)
+            val dayPrompts = promptRepo.createDayFazitPrompts()
+
+            val nowDate = LocalDate.now()
+            val nowHour = LocalTime.now().hour
+            val autoFazitTime = nowHour >= FAZIT_AUTO_HOUR
+
+            checkAutoDayFazits(
+                entries = entries,
+                nowDate = nowDate,
+                autoFazitTime = autoFazitTime,
+                settings = settings,
+                promptContext = promptContext,
+                dayPrompts = dayPrompts,
+                daymealDescriptionsProvider = { promptRepo.dayFazitMealDescriptions(it) }
+            )
+
+            checkAutoWeekFazits(
+                entries = entries,
+                nowDate = nowDate,
+                nowHour = nowHour,
+                settings = settings,
+                promptContext = promptContext,
+                weekPromptsProvider = { promptRepo.createWeekFazitPrompts(it) },
+                weekmealDescriptionsProvider = { promptRepo.weekFazitMealDescriptions(it) }
+            )
+        }
+    }
 
     /**
      * Prüft und triggert fällige Tages- und Wochenfazits im Hintergrund (ViewModelScope).
