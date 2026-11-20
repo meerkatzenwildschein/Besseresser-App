@@ -48,6 +48,7 @@ val koinVersion = "4.0.4"
 val datastoreVersion = "1.1.3"
 val navigationVersion = "2.8.8"
 val exifVersion = "1.3.7"
+val okhttpVersion = "4.12.0"
 val junitVersion = "4.13.2"
 val coroutinesVersion = "1.9.0"
 val coilVersion = "2.7.0"
@@ -141,6 +142,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:$datastoreVersion")
     implementation("androidx.navigation:navigation-compose:$navigationVersion")
     implementation("androidx.exifinterface:exifinterface:$exifVersion")
+    implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
     implementation("io.coil-kt:coil-compose:$coilVersion")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:$junitVersion")
