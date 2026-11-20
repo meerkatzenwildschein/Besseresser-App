@@ -68,10 +68,9 @@ fun MainScreen(
         captureState.value = null
     }
 
-    val triggerAnalyze: (String, Uri) -> Unit = { trimmedNote, targetUri ->
-        val prompts = createAnalyzePrompts(ctx, trimmedNote)
+    val triggerAnalyze: (String, Uri) -> Unit = { _, targetUri ->
         viewModel.onPhotoTaken(targetUri)
-        viewModel.analyze(settings, prompts)
+        viewModel.analyze(settings)
     }
 
     val lastGoaled = uiState.evaluation != null || uiState.savedToHistory
@@ -205,19 +204,6 @@ fun MainScreen(
         }
     }
 }
-
-private fun createAnalyzePrompts(ctx: Context, trimmedNote: String): PromptBundle = PromptBundle(
-    intro = ctx.getString(R.string.prompt_eval_intro),
-    formatIntro = ctx.getString(R.string.prompt_eval_format),
-    ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-    exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-    responseLanguage = ctx.getString(R.string.prompt_eval_language),
-    recognized = ctx.getString(R.string.prompt_eval_recognized),
-    honesty = ctx.getString(R.string.prompt_honesty),
-    noteHeader = if (trimmedNote.isNotBlank())
-        ctx.getString(R.string.prompt_note_header, trimmedNote)
-    else ""
-)
 
 private class MainSwipeState(
     private val isBlocked: Boolean,
