@@ -9,6 +9,7 @@ const val UNDO_DELETE_DELAY_MS = 5000L
 
 data class HistoryUiState(
     val entries: List<HistoryEntry> = emptyList(),
+    val uiItems: List<HistoryUiItem> = emptyList(),
     val pendingDeleteIds: Set<Long> = emptySet(),
     val fazitMap: Map<String, DayFazit> = emptyMap(),
     val loadingFazits: Set<String> = emptySet(),

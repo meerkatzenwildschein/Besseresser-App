@@ -104,6 +104,7 @@ fun HistoryScreen(
         ) {
             HistoryListContent(
                 entries = uiState.entries,
+                uiItems = uiState.uiItems,
                 pendingDeleteIds = uiState.pendingDeleteIds,
                 fazitMap = uiState.fazitMap,
                 loadingFazits = uiState.loadingFazits.toList(),

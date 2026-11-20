@@ -82,7 +82,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Da `Evaluation` mit `@Serializable` annotiert ist, kann es als JSON-String im `SavedStateHandle` gesichert und bei Prozesswiederherstellung deserialisiert werden.
 
-#### [LOW] A.5: UI-Transformationslogik innerhalb von Composables
+#### [LOW] [ERLEDIGT] A.5: UI-Transformationslogik innerhalb von Composables
 - **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryListScreen.kt` (Zeilen 72–76)
 - **Problem:**
   In `HistoryListContent` wird `buildHistoryUiItems(entries, today, nowHour)` innerhalb von `remember` berechnet.

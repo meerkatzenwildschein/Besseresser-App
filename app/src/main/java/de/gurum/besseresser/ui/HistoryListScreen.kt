@@ -43,6 +43,7 @@ import java.time.LocalTime
 @Composable
 fun HistoryListContent(
     entries: List<HistoryEntry>,
+    uiItems: List<HistoryUiItem> = emptyList(),
     pendingDeleteIds: Set<Long> = emptySet(),
     fazitMap: Map<String, DayFazit>,
     loadingFazits: List<String>,
@@ -69,11 +70,7 @@ fun HistoryListContent(
         icon = Icons.Filled.DateRange
     )
 
-    val today = LocalDate.now()
-    val nowHour = LocalTime.now().hour
-    val uiItems = remember(entries, today, nowHour) {
-        buildHistoryUiItems(entries, today, nowHour)
-    }
+    val itemsToDisplay = if (uiItems.isNotEmpty() || entries.isEmpty()) uiItems else buildHistoryUiItems(entries)
 
     if (entries.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
@@ -90,7 +87,7 @@ fun HistoryListContent(
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items(
-            items = uiItems,
+            items = itemsToDisplay,
             key = { it.key }
         ) { item ->
             when (item) {
