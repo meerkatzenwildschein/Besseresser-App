@@ -63,6 +63,46 @@ class ViewModelCoverageTest {
     // ----------------------------------------------------------------- MainViewModel
 
     @Test
+    fun `MainViewModel restores and persists evaluation in SavedStateHandle across process death`() = runTest(testDispatcher) {
+        val testEv = Evaluation(
+            goalResults = listOf(GoalResult(goal = "Low Carb", rating = TrafficLight.GREEN, reason = "Keine Kohlenhydrate")),
+            summary = "Super Low Carb",
+            recognizedMeal = "Steak mit Brokkoli"
+        )
+        val handle = androidx.lifecycle.SavedStateHandle()
+        val vm1 = MainViewModel(
+            apiService = FakeApiService(analyzeResult = Result.success(testEv)),
+            historyRepository = FakeHistoryRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            savedStateHandle = handle
+        )
+        vm1.onPhotoTaken(TestUri("content://media/photo.jpg"))
+        vm1.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Low Carb")), PromptBundle("", "", "", "", "", "", "", ""))
+        advanceUntilIdle()
+
+        assertEquals(testEv, vm1.uiState.value.evaluation)
+        assertNotNull(handle.get<String>("main_evaluation"))
+
+        // Recreate ViewModel with the same handle (simulating process recreation)
+        val vm2 = MainViewModel(
+            apiService = FakeApiService(),
+            historyRepository = FakeHistoryRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            savedStateHandle = handle
+        )
+        assertEquals(testEv, vm2.uiState.value.evaluation)
+
+        // Reset clears saved evaluation
+        vm2.reset()
+        assertNull(handle.get<String>("main_evaluation"))
+        assertNull(vm2.uiState.value.evaluation)
+    }
+
+    @Test
     fun `analyze returns early when no photoUri set`() = runTest(testDispatcher) {
         val vm = MainViewModel(FakeApiService(), FakeHistoryRepository(), FakeSettingsRepository(), FakeImagePreprocessor(), testDispatchers)
         // photoPreviewUri is null → analyze() returns immediately without touching isBusy
