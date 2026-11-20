@@ -15,7 +15,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 | **[x] PERF-01** | Performance & Memory | OOM-Gefahr durch ungepuffertes Bitmap-Dekodieren in `AndroidImagePreprocessor` | **Hoch** | Verhindert App-Crashes bei hochauflösenden Kamerafotos (12MP–108MP) | Erledigt |
 | **[x] ARCH-01** | Architektur & Threading | Synchrone Altdaten-Migration im `init`-Block von `DefaultHistoryRepository` | **Hoch** | Verhindert UI-Freezes / ANR (Application Not Responding) beim App-Start | Erledigt |
 | **[x] SEC-01** | Sicherheit & Robustheit | Stiller Klartext-Fallback bei Verschlüsselungsfehlern in `KeyVault` | **Mittel** | Schützt sensible API-Keys und verhindert inkonsistente Entschlüsselungszustände | Erledigt |
-| **NET-01** | Netzwerk & Resilienz | Veraltetes `HttpURLConnection` statt modernem HTTP-Client (Ktor / OkHttp) | **Mittel** | Ermöglicht Connection Pooling, HTTP/2, sauberes Coroutine-Cancellation & Logging |
+| **[x] NET-01** | Netzwerk & Resilienz | Veraltetes `HttpURLConnection` statt modernem HTTP-Client (Ktor / OkHttp) | **Mittel** | Ermöglicht Connection Pooling, HTTP/2, sauberes Coroutine-Cancellation & Logging | Erledigt |
 | **ARCH-02** | Architektur & Wartbarkeit | Monolithisches `HistoryViewModel` (>750 Zeilen) verletzt Single Responsibility | **Mittel** | Steigert Entwicklerproduktivität, Modularität und isolierte Testbarkeit |
 | **CONC-01** | Nebenläufigkeit | Thread-unsichere `mutableMapOf` für anstehende Löschaufträge in `HistoryViewModel` | **Mittel** | Beseitigt potenzielle Race Conditions und State Inconsistencies |
 | **UI-01** | Compose & UI-Performance | Fehlende `@Immutable` / `@Stable`-Stabilität auf Domänenmodellen | **Niedrig** | Reduziert unnötige Recompositions und schont CPU/Akku |
@@ -92,7 +92,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 
 ---
 
-### NET-01: Modernisierung des Netzwerk-Clients (`OpenAiChatClient` & `ApiClient`)
+### [x] NET-01: Modernisierung des Netzwerk-Clients (`OpenAiChatClient` & `ApiClient`) [ERLEDIGT]
 * **Dateien:** `app/src/main/java/de/gurum/besseresser/data/OpenAiChatClient.kt`, `ApiClient.kt`
 * **Problem:**
   Für HTTP-Aufrufe wird `HttpURLConnection` eingesetzt. Dies erfordert manuelles Stream-Management, bietet kein standardmäßiges Connection-Pooling oder HTTP/2-Multiplexing und reagiert bei blockierenden Sockets nur eingeschränkt auf Coroutine-Stornierungen (Cancellation).
@@ -185,7 +185,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 2. **Phase 2: Struktur & Resilienz (Architektur & Sicherheit)**
    - [x] Klare Fehlerbehandlung für den Android Keystore in `KeyVault`. [ERLEDIGT]
    - Entflechtung des `HistoryViewModel` in Use-Cases (`FazitCalculator`, `HistoryListViewModel`).
-   - Umstellung des HTTP-Stacks von `HttpURLConnection` auf `Ktor` oder `OkHttp`.
+   - [x] Umstellung des HTTP-Stacks von `HttpURLConnection` auf `Ktor` oder `OkHttp`. [ERLEDIGT]
 
 3. **Phase 3: Feinpolitur & Performance (UI & Polish)**
    - Hinzufügen von `@Immutable`-Annotationen und `ImmutableList` für Compose-Stabilität.
