@@ -267,9 +267,8 @@ fun BackdatedOverlays(
     onDismissReview: () -> Unit,
     onDismissText: () -> Unit,
     onFallbackSystemCamera: () -> Unit,
-    onSubmitBackdated: (photoUri: Uri?, promptBundle: PromptBundle?, textPrompt: String?) -> Unit
+    onSubmitBackdated: (photoUri: Uri?, textOnly: Boolean) -> Unit
 ) {
-    val ctx = LocalContext.current
     if (showCamera && addPhotoFile != null) {
         CameraCaptureScreen(
             outputFile = addPhotoFile,
@@ -279,11 +278,9 @@ fun BackdatedOverlays(
             onFallbackSystemCamera = onFallbackSystemCamera,
             onConfirm = {
                 onDismissCamera()
-                val trimmedNote = addNote.trim()
                 onSubmitBackdated(
                     addPhotoUri,
-                    buildAnalyzePromptBundle(ctx, trimmedNote),
-                    null
+                    false
                 )
             }
         )
@@ -296,11 +293,9 @@ fun BackdatedOverlays(
             onBack = onDismissReview,
             busy = showBusy,
             onRate = {
-                val trimmedNote = addNote.trim()
                 onSubmitBackdated(
                     addPhotoUri,
-                    buildAnalyzePromptBundle(ctx, trimmedNote),
-                    null
+                    false
                 )
             }
         )
@@ -313,44 +308,13 @@ fun BackdatedOverlays(
             onBack = onDismissText,
             busy = showBusy,
             onSend = {
-                val trimmedNote = addNote.trim()
                 onSubmitBackdated(
                     null,
-                    null,
-                    buildAnalyzeTextPrompt(ctx, settings.goals, trimmedNote)
+                    true
                 )
             }
         )
     }
-}
-
-/** PromptBundle für die Foto-Bewertung (Anmerkung als Header). */
-private fun buildAnalyzePromptBundle(ctx: android.content.Context, trimmedNote: String): PromptBundle = PromptBundle(
-    intro = ctx.getString(R.string.prompt_eval_intro),
-    formatIntro = ctx.getString(R.string.prompt_eval_format),
-    ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-    exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-    responseLanguage = ctx.getString(R.string.prompt_eval_language),
-    recognized = ctx.getString(R.string.prompt_eval_recognized),
-    honesty = ctx.getString(R.string.prompt_honesty),
-    noteHeader = if (trimmedNote.isNotBlank()) ctx.getString(R.string.prompt_note_header, trimmedNote) else ""
-)
-
-/** Vollständiger Prompt für die reine Text-Analyse (Nacherfassen ohne Foto). */
-private fun buildAnalyzeTextPrompt(ctx: android.content.Context, goals: List<String>, description: String): String {
-    val textBundle = PromptBundle(
-        intro = ctx.getString(R.string.prompt_eval_intro_textonly),
-        formatIntro = ctx.getString(R.string.prompt_eval_format),
-        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-        responseLanguage = ctx.getString(R.string.prompt_eval_language),
-        honesty = ctx.getString(R.string.prompt_honesty)
-    )
-    return PromptBuilder.createAnalyzeTextPrompt(
-        goals = goals,
-        promptBundle = textBundle,
-        textOnlyContext = ctx.getString(R.string.prompt_textonly_context, description.trim())
-    )
 }
 
 /** Nachtrage-Zweig MIT Foto (Systemkamera-Fallback): Foto prüfen + Anmerkung → bewerten.

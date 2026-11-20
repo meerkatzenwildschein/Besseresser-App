@@ -238,6 +238,22 @@ class HistoryViewModel(
     }
 
     /** Nacherfassen (mit oder ohne Foto): nutzt eine gecachte Bewertung, falls vorhanden,
+     *  ruft sonst die KI an und speichert danach. */
+    fun submitBackdated(
+        photoUri: Uri?,
+        textOnly: Boolean = false,
+        onPick: (HistoryEntry) -> Unit = {}
+    ) {
+        val note = _uiState.value.addNote.trim()
+        viewModelScope.launch {
+            val settings = settingsRepository.currentSettings()
+            val promptBundle = if (photoUri != null) promptRepository?.createAnalyzePromptBundle(note) else null
+            val textPrompt = if (textOnly) promptRepository?.createAnalyzeTextPrompt(settings.goals, note) else null
+            submitBackdated(photoUri, settings, promptBundle, textPrompt, onPick)
+        }
+    }
+
+    /** Nacherfassen (mit oder ohne Foto): nutzt eine gecachte Bewertung, falls vorhanden,
      *  ruft sonst die KI an und speichert danach. Prompts werden von der UI geliefert. */
     fun submitBackdated(
         photoUri: Uri?,
@@ -429,6 +445,51 @@ class HistoryViewModel(
 
         viewModelScope.launch {
             historyRepository.reorderEntries(reorderedDayEntries)
+        }
+    }
+
+    fun generateFazit(
+        day: LocalDate,
+        entriesOfDay: List<HistoryEntry>? = null
+    ) {
+        val key = dayKeyOf(day)
+        if (key in _uiState.value.loadingFazits) return
+        val entries = entriesOfDay ?: _uiState.value.entries.filter {
+            java.time.Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate() == day
+        }
+        viewModelScope.launch {
+            val settings = settingsRepository.currentSettings()
+            val profile = profileRepository?.currentProfile() ?: Profile()
+            val promptContext = promptRepository?.profileContextLine(profile)
+            val prompts = promptRepository?.createDayFazitPrompts() ?: FazitPromptBundle("", "", "", "")
+            val mealDescriptions = promptRepository?.dayFazitMealDescriptions(entries) ?: entries.map { it.recognizedMeal }
+            generateFazit(
+                day = day,
+                entriesOfDay = entries,
+                settings = settings,
+                promptContext = promptContext,
+                mealDescriptions = mealDescriptions,
+                prompts = prompts
+            )
+        }
+    }
+
+    fun generateWeekFazit(weekKey: String) {
+        if (weekKey in _uiState.value.loadingWeeks) return
+        viewModelScope.launch {
+            val settings = settingsRepository.currentSettings()
+            val profile = profileRepository?.currentProfile() ?: Profile()
+            val promptContext = promptRepository?.profileContextLine(profile)
+            val wkEntries = _uiState.value.entries.filter { weekKeyOf(it.dateMillis) == weekKey }
+            val prompts = promptRepository?.createWeekFazitPrompts(calendarWeekOfKey(weekKey)) ?: FazitPromptBundle("", "", "", "")
+            val mealDescriptions = promptRepository?.weekFazitMealDescriptions(wkEntries) ?: wkEntries.map { it.recognizedMeal }
+            generateWeekFazit(
+                settings = settings,
+                promptContext = promptContext,
+                weekKey = weekKey,
+                mealDescriptions = mealDescriptions,
+                prompts = prompts
+            )
         }
     }
 

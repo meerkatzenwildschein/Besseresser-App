@@ -60,7 +60,7 @@ val appModule = module {
     single<BackupService> { BackupManager(androidContext(), get(), get(), get(), get(), get()) }
 
     viewModel { AppStateViewModel(get(), get(), get(), get()) }
-    viewModel { MainViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get()) }
+    viewModel { MainViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get(), promptRepository = get()) }
     viewModel { HistoryViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get(), profileRepository = get(), promptRepository = get()) }
     viewModel { SetupViewModel(get(), get(), get(), savedStateHandle = get()) }
     viewModel { ProfileViewModel(get()) }

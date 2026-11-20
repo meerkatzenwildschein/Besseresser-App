@@ -22,6 +22,8 @@ import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.model.Evaluation
 import java.io.File
 
+import de.gurum.besseresser.data.PromptRepository
+
 data class MainUiState(
     val evaluation: Evaluation? = null,
     val isBusy: Boolean = false,
@@ -44,7 +46,8 @@ class MainViewModel(
     private val imagePreprocessor: ImagePreprocessor,
     private val dispatchers: AppDispatchers = AppDispatchers(),
     private val photoCaptureManager: PhotoCaptureManager? = null,
-    private val savedStateHandle: SavedStateHandle = SavedStateHandle()
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
+    private val promptRepository: PromptRepository? = null
 ) : ViewModel() {
 
     fun createCaptureFile(): Pair<File, Uri> {
@@ -163,12 +166,13 @@ class MainViewModel(
         return true
     }
 
-    fun analyze(settings: Settings, promptBundle: PromptBundle) {
+    fun analyze(settings: Settings? = null, promptBundle: PromptBundle? = null) {
         val uri = _uiState.value.photoPreviewUri ?: return
         val currentNote = _uiState.value.note.trim()
         analyzeJob?.cancel()
         analyzeJob = viewModelScope.launch {
-            if (tryUseCachedEvaluation(settings)) return@launch
+            val resolvedSettings = settings ?: settingsRepository.currentSettings()
+            if (tryUseCachedEvaluation(resolvedSettings)) return@launch
             _uiState.update { it.copy(isBusy = true, error = null) }
             val dataUri = runCatching {
                 withContext(dispatchers.io) { imagePreprocessor.prepareImageDataUri(uri) }
@@ -176,7 +180,9 @@ class MainViewModel(
                 _uiState.update { it.copy(error = e.message ?: "Foto konnte nicht gelesen werden.", isBusy = false) }
                 return@launch
             }
-            val res = apiService.analyze(dataUri, settings, promptBundle)
+            val resolvedPrompts = promptBundle ?: promptRepository?.createAnalyzePromptBundle(currentNote)
+                ?: PromptBundle("", "", "", "", "", "", "")
+            val res = apiService.analyze(dataUri, resolvedSettings, resolvedPrompts)
             res.onSuccess { ev ->
                 if (currentNote.isNotBlank()) {
                     settingsRepository.pushRecentNote(currentNote, ev)

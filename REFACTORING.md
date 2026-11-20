@@ -67,7 +67,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
   )
   ```
 
-#### [MEDIUM] A.3: Kontextabhängige Prompt-Generierung in der UI-Schicht
+#### [MEDIUM] [ERLEDIGT] A.3: Kontextabhängige Prompt-Generierung in der UI-Schicht
 - **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryScreen.kt`, `PromptBuilder.kt`
 - **Problem:**
   Prompt-Erzeugungsfunktionen (wie `createDayFazitPrompts(ctx)`) verlangen einen Android `Context` und werden von UI-Composables instanziiert und als Callbacks/Lambdas an ViewModels übergeben.

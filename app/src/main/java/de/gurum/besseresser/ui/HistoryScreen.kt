@@ -117,23 +117,10 @@ fun HistoryScreen(
                     onPick(entry)
                 },
                 onGenerateFazit = { day, list ->
-                    viewModel.generateFazit(
-                        day = day,
-                        entriesOfDay = list,
-                        settings = settings,
-                        promptContext = profileContextLine(ctx, profile),
-                        mealDescriptions = dayFazitmealDescriptions(ctx, list),
-                        prompts = createDayFazitPrompts(ctx)
-                    )
+                    viewModel.generateFazit(day, list)
                 },
                 onGenerateWeekFazit = { wk ->
-                    viewModel.generateWeekFazit(
-                        settings = settings,
-                        promptContext = profileContextLine(ctx, profile),
-                        weekKey = wk,
-                        mealDescriptions = weekFazitmealDescriptions(ctx, uiState.entries.filter { weekKeyOf(it.dateMillis) == wk }),
-                        prompts = createWeekFazitPrompts(ctx, calendarWeekOfKey(wk))
-                    )
+                    viewModel.generateWeekFazit(wk)
                 },
                 onToggleExpandWeek = { wk -> viewModel.toggleWeekExpanded(wk) },
                 onToggleExpandFazit = { viewModel.toggleFazitExpanded(it) },
@@ -195,13 +182,11 @@ fun HistoryScreen(
                 val (_, uri) = ensureAddCaptureFile()
                 addSystemCameraLauncher.launch(uri)
             },
-            onSubmitBackdated = { uri, promptBundle, textPrompt ->
+            onSubmitBackdated = { uri, textOnly ->
                 addCaptureState.value = null
                 viewModel.submitBackdated(
                     photoUri = uri,
-                    settings = settings,
-                    promptBundle = promptBundle,
-                    textPrompt = textPrompt,
+                    textOnly = textOnly,
                     onPick = onPick
                 )
             }
