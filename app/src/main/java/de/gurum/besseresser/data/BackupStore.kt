@@ -139,10 +139,60 @@ interface BackupService {
     suspend fun importFromUri(uri: Uri): Result<BackupSummary>
 }
 
+/** Schnittstelle für das Schreiben und Lesen von Backup-Dateien (Abstraktion über ContentResolver/Downloads). */
+interface BackupStorage {
+    fun writeToDownloads(fileName: String, json: String)
+    fun readFromUri(uri: Uri): String
+}
+
+class AndroidBackupStorage(
+    private val context: Context
+) : BackupStorage {
+    override fun writeToDownloads(fileName: String, json: String) {
+        val bytes = json.toByteArray(Charsets.UTF_8)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = context.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("Backup-Datei konnte nicht unter Downloads angelegt werden.")
+            try {
+                resolver.openOutputStream(uri)?.use { out ->
+                    out.write(bytes)
+                    out.flush()
+                } ?: throw IllegalStateException("OutputStream für Downloads konnte nicht geöffnet werden.")
+                val doneValues = ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+                resolver.update(uri, doneValues, null, null)
+            } catch (e: Exception) {
+                runCatching { resolver.delete(uri, null, null) }
+                throw e
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                .apply { mkdirs() }
+            val targetFile = File(downloadsDir, fileName)
+            targetFile.writeBytes(bytes)
+        }
+    }
+
+    override fun readFromUri(uri: Uri): String {
+        return context.contentResolver.openInputStream(uri)?.use { input ->
+            input.bufferedReader(Charsets.UTF_8).readText()
+        } ?: throw IllegalStateException("Datei konnte nicht gelesen werden.")
+    }
+}
+
 /** Vollständiger JSON-Export/-Import aller App-Daten (inkl. API-Key & Base64-Fotos).
  *  Zugriff auf die Datenbestände läuft ausschließlich über die injizierten Repositories. */
 class BackupManager(
-    private val context: Context,
+    private val backupStorage: BackupStorage,
     private val settingsRepository: SettingsRepository,
     private val profileRepository: ProfileRepository,
     private val historyRepository: HistoryRepository,
@@ -192,7 +242,7 @@ class BackupManager(
         val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date(now))
         val fileName = "besseresser-backup-$timestamp.json"
 
-        writeJsonToDownloads(fileName, json)
+        backupStorage.writeToDownloads(fileName, json)
 
         BackupSummary(
             fileName = fileName,
@@ -206,45 +256,9 @@ class BackupManager(
         )
     }
 
-    private fun writeJsonToDownloads(fileName: String, json: String) {
-        val bytes = json.toByteArray(Charsets.UTF_8)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val resolver = context.contentResolver
-            val values = ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-                put(MediaStore.MediaColumns.MIME_TYPE, "application/json")
-                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                put(MediaStore.MediaColumns.IS_PENDING, 1)
-            }
-            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: throw IllegalStateException("Backup-Datei konnte nicht unter Downloads angelegt werden.")
-            try {
-                resolver.openOutputStream(uri)?.use { out ->
-                    out.write(bytes)
-                    out.flush()
-                } ?: throw IllegalStateException("OutputStream für Downloads konnte nicht geöffnet werden.")
-                val doneValues = ContentValues().apply {
-                    put(MediaStore.MediaColumns.IS_PENDING, 0)
-                }
-                resolver.update(uri, doneValues, null, null)
-            } catch (e: Exception) {
-                runCatching { resolver.delete(uri, null, null) }
-                throw e
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                .apply { mkdirs() }
-            val targetFile = File(downloadsDir, fileName)
-            targetFile.writeBytes(bytes)
-        }
-    }
-
     /** Liest eine Backup-JSON-Datei über ihre Content-URI ein und stellt alle Daten wieder her. */
     override suspend fun importFromUri(uri: Uri): Result<BackupSummary> = runCatching {
-        val rawJson = context.contentResolver.openInputStream(uri)?.use { input ->
-            input.bufferedReader(Charsets.UTF_8).readText()
-        } ?: throw IllegalStateException("Datei konnte nicht gelesen werden.")
+        val rawJson = backupStorage.readFromUri(uri)
         importFromJson(rawJson).getOrThrow()
     }
 

@@ -7,9 +7,12 @@ import android.util.Base64
 import androidx.core.graphics.scale
 import java.io.ByteArrayOutputStream
 
+const val COMPRESSION_QUALITY_JPEG = 82
+const val DEFAULT_MAX_IMAGE_SIDE = 1280
+
 /** Schnittstelle für die Bild-Aufbereitung (ermöglicht einfache Test-Fakes). */
 interface ImagePreprocessor {
-    fun prepareImageDataUri(photoUri: Uri, maxSide: Int = 1280): String
+    fun prepareImageDataUri(photoUri: Uri, maxSide: Int = DEFAULT_MAX_IMAGE_SIDE): String
 }
 
 /**
@@ -26,7 +29,7 @@ class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor
         val bitmap = resolver.openInputStream(photoUri)?.use { BitmapFactory.decodeStream(it) }
             ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
         val scaled = scaleDown(bitmap, maxSide)
-        val jpeg = ByteArrayOutputStream().also { scaled.compress(Bitmap.CompressFormat.JPEG, 80, it) }.toByteArray()
+        val jpeg = ByteArrayOutputStream().also { scaled.compress(Bitmap.CompressFormat.JPEG, COMPRESSION_QUALITY_JPEG, it) }.toByteArray()
         val dataUri = "data:image/jpeg;base64," + Base64.encodeToString(jpeg, Base64.NO_WRAP)
         if (scaled !== bitmap) {
             scaled.recycle()

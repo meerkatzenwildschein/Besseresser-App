@@ -1,5 +1,6 @@
 package de.gurum.besseresser.ui
 
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -12,6 +13,7 @@ import de.gurum.besseresser.model.Profile
 import de.gurum.besseresser.data.ProfileRepository
 import de.gurum.besseresser.model.Gender
 
+@Immutable
 data class ProfileUiState(
     val birthDate: String? = null,
     val weightText: String = "",

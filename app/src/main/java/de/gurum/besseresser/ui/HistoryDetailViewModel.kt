@@ -1,6 +1,7 @@
 package de.gurum.besseresser.ui
 
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,7 @@ class HistoryDetailViewModel(
     private val dispatchers: AppDispatchers = AppDispatchers()
 ) : ViewModel() {
 
+    @Immutable
     data class DetailUiState(
         val entry: HistoryEntry? = null,
         val loaded: Boolean = false,

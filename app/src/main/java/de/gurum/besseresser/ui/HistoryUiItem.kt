@@ -1,5 +1,6 @@
 package de.gurum.besseresser.ui
 
+import androidx.compose.runtime.Immutable
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.calendarWeekOfKey
 import de.gurum.besseresser.model.dayKeyOf
@@ -10,12 +11,14 @@ import java.time.LocalTime
 import java.time.ZoneId
 
 /** Ein Kalendertag mit allen gespeicherten Bewertungen desselben Tages. */
+@Immutable
 data class DayGroup(
     val day: LocalDate,
     val entries: List<HistoryEntry>
 )
 
 /** Flaches UI-Item-Modell für die funktionale und nebeneffektfreie Darstellung in LazyColumn. */
+@Immutable
 sealed interface HistoryUiItem {
     val key: Any
 

@@ -1,5 +1,6 @@
 package de.gurum.besseresser.ui
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -26,6 +27,7 @@ import java.io.File
 
 import de.gurum.besseresser.data.PromptRepository
 
+@Immutable
 data class MainUiState(
     val evaluation: Evaluation? = null,
     val isBusy: Boolean = false,

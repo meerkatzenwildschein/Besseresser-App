@@ -16,12 +16,13 @@ import de.gurum.besseresser.model.HistoryEntry
  * Zuständig für Speichern (downgesampelt), Lesen (Thumbnails), Kopieren und Löschen.
  */
 class PhotoStorage(
-    private val context: Context,
+    private val context: Context? = null,
+    private val baseDir: File? = null,
     private val dispatchers: AppDispatchers = AppDispatchers()
 ) {
 
     /** Verzeichnis aller Verlaufs-Fotos (und historischer JSON-Dateien, siehe Migration). */
-    fun dir(): File = File(context.filesDir, HISTORY_DIR).apply { mkdirs() }
+    fun dir(): File = baseDir ?: File(context?.filesDir, HISTORY_DIR).apply { mkdirs() }
 
     /** Vollständige Datei zu einem gespeicherten Dateinamen (oder null, wenn nicht vorhanden). */
     fun photoFileOf(photoFileName: String): File? =
@@ -86,7 +87,7 @@ class PhotoStorage(
 
     /** Foto downgesampelt (<1024px) speichern, JPEG-Qualitaet Schritt fuer Schritt bis < 100 KB. */
     private fun writeScaledJpeg(uri: Uri, out: File) {
-        val res = context.contentResolver
+        val res = context?.contentResolver ?: return
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         res.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return

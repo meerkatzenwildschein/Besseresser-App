@@ -122,21 +122,21 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Nutzung von `androidx.compose.material3.SwipeToDismissBox` für konsistentes Animations-, Velocity- und Barrierefreiheitsverhalten.
 
-#### [MEDIUM] B.4: Fehlende Stabilitäts-Annotationen für UI-State-Klassen
+#### [MEDIUM] [ERLEDIGT] B.4: Fehlende Stabilitäts-Annotationen für UI-State-Klassen
 - **Ort:** `MainUiState.kt`, `HistoryUiState.kt`, `DetailUiState.kt`
 - **Problem:**
   Klassen, die Standard-Collections (`List<T>`, `Set<T>`, `Map<K, V>`) enthalten, gelten im Compose Compiler standardmäßig als unbeständig (unstable), was zu unnötigen Rekompositionen von Subtrees führen kann.
 - **Best Practice:**
   Verwendung von `@Immutable` / `@Stable` Annotationen oder Immutable Collections (`kotlinx.collections.immutable.ImmutableList`).
 
-#### [LOW] B.5: Hardcodierte Alphawerte und Farben statt Theme-Tokens
+#### [LOW] [ERLEDIGT] B.5: Hardcodierte Alphawerte und Farben statt Theme-Tokens
 - **Ort:** `CameraScreen.kt`, `CommonUi.kt`, `AmpelUi.kt`
 - **Problem:**
   Verwendung von `Color.Black.copy(alpha = 0.5f)` oder spezifischen Hex-Werten (`0xFF1B7F4C`) direkt in Composables anstelle von `MaterialTheme.colorScheme` Rollen.
 - **Best Practice:**
   Definition von Semantic Custom Color Extensions (z. B. `TrafficLightColors`) auf dem MaterialTheme.
 
-#### [LOW] B.6: ContentDescriptions bei rein dekorativen Elementen
+#### [LOW] [ERLEDIGT] B.6: ContentDescriptions bei rein dekorativen Elementen
 - **Ort:** Diverse Icons in `AmpelUi.kt` und `DayGroupHeader.kt`
 - **Problem:**
   Einige Icons haben keinen oder redundanten `contentDescription`-Text, was Screenreader verwirren kann.
@@ -147,7 +147,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 
 ### C. Data Layer & Persistenz
 
-#### [HIGH] C.1: FallbackToDestructiveMigration ohne Versionierungsstrategie
+#### [HIGH] [ERLEDIGT] C.1: FallbackToDestructiveMigration ohne Versionierungsstrategie
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/BesseresserDatabase.kt` (Zeile 42)
 - **Problem:**
   Die Room-Datenbank ist mit `.fallbackToDestructiveMigration()` konfiguriert.
@@ -155,7 +155,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Implementierung expliziter Room-Migrationen (`Migration(1, 2)`) und automatisierter Migrationstests (`MigrationTestHelper`).
 
-#### [MEDIUM] C.2: Synchroner Cache vs. Single Source of Truth in `SettingsRepository`
+#### [MEDIUM] [ERLEDIGT] C.2: Synchroner Cache vs. Single Source of Truth in `SettingsRepository`
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/SettingsRepository.kt`
 - **Problem:**
   `SettingsRepository` hält lokale In-Memory-Kopien von `Settings`, `Profile`, etc. und aktualisiert diese parallel zu den DataStore-Writes.
@@ -163,7 +163,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   DataStore `data`-Flows als alleinige Single Source of Truth (SSOT) verwenden und mit `stateIn(Eagerly)` als Cache exponieren.
 
-#### [MEDIUM] C.3: Große JSON-Blobs in SharedPreferences/DataStore für MRU-Notizen
+#### [MEDIUM] [ERLEDIGT] C.3: Große JSON-Blobs in SharedPreferences/DataStore für MRU-Notizen
 - **Ort:** `app/src/main/java/de/gurum/besseresser/model/Store.kt`, `SettingsRepository.kt`
 - **Problem:**
   `RecentNotes` (inklusive kompletter gecachter `Evaluation`-Objekte) werden als serialisierter JSON-String in einer DataStore-Preference gespeichert.
@@ -171,14 +171,14 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Auslagerung strukturierter Daten wie `RecentNotes` mit gecachten Bewertungen in eine dedizierte Room-Tabelle (`recent_notes`).
 
-#### [LOW] C.4: Fehlende Transaktionskapselung bei kombinierten Room-Operationen
+#### [LOW] [ERLEDIGT] C.4: Fehlende Transaktionskapselung bei kombinierten Room-Operationen
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/HistoryRepository.kt`
 - **Problem:**
   Methoden wie `duplicateToDate` führen mehrere Einzelschritte (Eintrag einfügen, Foto kopieren) ohne `@Transaction`-Klammerung aus.
 - **Best Practice:**
   Nutzung von `@Transaction` auf DAO-Ebene bzw. `database.withTransaction { ... }`.
 
-#### [LOW] C.5: Unused Foreign Keys / Indices
+#### [LOW] [ERLEDIGT] C.5: Unused Foreign Keys / Indices
 - **Ort:** `app/src/main/java/de/gurum/besseresser/model/Data.kt` (`HistoryEntity`)
 - **Problem:**
   Tages- und Wochenschlüssel (`dateMillis`) werden häufig für Gruppierungen und Filter abgefragt, verfügen aber über keinen expliziten Index.
@@ -189,7 +189,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 
 ### D. Security & Privacy
 
-#### [HIGH] D.1: Unverschlüsselte Speicherung des API-Keys in Preferences DataStore
+#### [HIGH] [ERLEDIGT] D.1: Unverschlüsselte Speicherung des API-Keys in Preferences DataStore
 - **Ort:** `app/src/main/java/de/gurum/besseresser/model/Data.kt` (`Settings.apiKey`)
 - **Problem:**
   Der OpenAI/LLM-API-Key wird im Klartext in der unverschlüsselten DataStore-Datei (`besseresser_prefs.preferences_pb`) auf dem Dateisystem abgelegt.
@@ -197,7 +197,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Speicherung des API-Keys in `EncryptedSharedPreferences` (Jetpack Security) oder Verschlüsselung des Wertes mittels des **Android KeyStore Providers** (AES-256-GCM).
 
-#### [MEDIUM] D.2: Backup-Export enthält sensible API-Schlüssel
+#### [MEDIUM] [ERLEDIGT] D.2: Backup-Export enthält sensible API-Schlüssel
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/BackupManager.kt`
 - **Problem:**
   Beim JSON-Backup-Export wird das gesamte `Settings`-Objekt inklusive `apiKey` exportiert.
@@ -205,7 +205,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Optionale Checkbox beim Export ("API-Schlüssel in Backup einschließen").
 
-#### [MEDIUM] D.3: `allowBackup="true"` im AndroidManifest ohne differenzierte Backup-Regeln
+#### [MEDIUM] [ERLEDIGT] D.3: `allowBackup="true"` im AndroidManifest ohne differenzierte Backup-Regeln
 - **Ort:** `app/src/main/AndroidManifest.xml`
 - **Problem:**
   `android:allowBackup="true"` ist ohne `android:fullBackupContent` oder `android:dataExtractionRules` konfiguriert.
@@ -213,7 +213,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Definition von `res/xml/data_extraction_rules.xml` und `res/xml/backup_rules.xml`, um sensible Einstellungsdateien vom Cloud-/ADB-Backup auszuschließen.
 
-#### [LOW] D.4: Exception-Logging bei Netzwerkfehlern
+#### [LOW] [ERLEDIGT] D.4: Exception-Logging bei Netzwerkfehlern
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/BesseresserApiService.kt`
 - **Problem:**
   Fehlermeldungen aus HTTP-Antworten könnten potenziell sensible Header oder Tokens im `e.message` enthalten.
@@ -224,21 +224,21 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 
 ### E. Concurrency & Coroutines
 
-#### [MEDIUM] E.1: Unnötiges `Dispatchers.IO`-Wrapping für suspendierende Room- und Ktor-Aufrufe
+#### [MEDIUM] [ERLEDIGT] E.1: Unnötiges `Dispatchers.IO`-Wrapping für suspendierende Room- und Ktor-Aufrufe
 - **Ort:** Diverse Stellen in `HistoryRepository.kt` und `BesseresserApiService.kt`
 - **Problem:**
   Room und Ktor Client sind intern vollständig asynchron und "Main-Safe". Das manuelle Kapseln von `dao.insert()` oder `client.post()` in `withContext(dispatchers.io)` ist redundant.
 - **Best Practice:**
   `Dispatchers.IO` gezielt nur für blockierende Datei- und Bitmap-I/O-Operationen (`PhotoStorage`, `BitmapFactory`) reservieren.
 
-#### [MEDIUM] E.2: Fehlende Kooperation bei Job-Cancellation in Datei-Bereinigungen
+#### [MEDIUM] [ERLEDIGT] E.2: Fehlende Kooperation bei Job-Cancellation in Datei-Bereinigungen
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/HistoryRepository.kt` (`cleanupOldData`)
 - **Problem:**
   In Schleifen, die alte Fotos und Einträge löschen, fehlt `ensureActive()` / `yield()`.
 - **Best Practice:**
   Einfügen von `ensureActive()` bei iterativen I/O-Löschoperationen.
 
-#### [LOW] E.3: `runCatching` schluckt `CancellationException`
+#### [LOW] [ERLEDIGT] E.3: `runCatching` schluckt `CancellationException`
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/ImagePreprocessor.kt`, `PhotoStorage.kt`
 - **Problem:**
   Standard-`runCatching` fängt auch `CancellationException` ab, was die Structured Concurrency unterbrechen kann.
@@ -260,7 +260,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 
 ### F. Netzwerk & Error Handling
 
-#### [MEDIUM] F.1: Grobes Error-Mapping auf generische Exception-Strings
+#### [MEDIUM] [ERLEDIGT] F.1: Grobes Error-Mapping auf generische Exception-Strings
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/BesseresserApiService.kt`
 - **Problem:**
   HTTP 401 (Ungültiger API-Key), HTTP 429 (Rate Limit / Quota), HTTP 5xx (Server-Fehler) und Timeouts werden als generischer String `Result.failure(Exception("..."))` zurückgegeben.
@@ -276,14 +276,14 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
   }
   ```
 
-#### [MEDIUM] F.2: Fehlende Verbindungs-Timeouts und Retry-Strategien in Ktor
+#### [MEDIUM] [ERLEDIGT] F.2: Fehlende Verbindungs-Timeouts und Retry-Strategien in Ktor
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/KoinModule.kt`
 - **Problem:**
   Der Ktor `HttpClient` verfügt über keine explizit konfigurierten `HttpTimeout`-Plugins (Connect Timeout, Socket Timeout, Request Timeout).
 - **Best Practice:**
   Konfiguration des `HttpTimeout`-Plugins in Ktor mit realistischen Timeouts (z. B. 30s Connect, 60s Socket Timeout für Bild-Analysen).
 
-#### [LOW] F.3: Unbegrenzter Request-Body-Buffer bei Base64-Encodierung
+#### [LOW] [ERLEDIGT] F.3: Unbegrenzter Request-Body-Buffer bei Base64-Encodierung
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/ImagePreprocessor.kt`
 - **Problem:**
   Bilder werden komplett in Base64-Strings im Arbeitsspeicher konvertiert, bevor sie in das JSON-Payload eingebettet werden.
@@ -294,21 +294,21 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 
 ### G. Kamera & Medienverarbeitung
 
-#### [MEDIUM] G.1: Bitmap-Decodierung ohne `inBitmap`-Wiederverwendung
+#### [MEDIUM] [ERLEDIGT] G.1: Bitmap-Decodierung ohne `inBitmap`-Wiederverwendung
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/PhotoStorage.kt`
 - **Problem:**
   Beim Erstellen von Thumbnails und bei der EXIF-Korrektur werden wiederholt neue Bitmaps allokiert. Bei schnellen Bilderserien kann dies Garbage-Collection-Pausen verursachen.
 - **Best Practice:**
   Verwendung von `BitmapFactory.Options.inSampleSize` und Kapselung der Ladevorgänge über **Coil** (das bereits im Projekt vorhanden ist) anstelle manueller Bitmap-Decodierung.
 
-#### [MEDIUM] G.2: Datei-Bereinigung bei unvollständigen Aufnahmen
+#### [MEDIUM] [ERLEDIGT] G.2: Datei-Bereinigung bei unvollständigen Aufnahmen
 - **Ort:** `app/src/main/java/de/gurum/besseresser/ui/HistoryScreen.kt`, `MainScreen.kt`
 - **Problem:**
   Temporäre Foto-Dateien werden bei Abbruch teilweise manuell gelöscht, können aber bei unerwartetem Schließen der App im Cache verbleiben.
 - **Best Practice:**
   Periodische Bereinigung des Capture-Verzeichnisses beim App-Start im `PhotoCaptureManager`.
 
-#### [LOW] G.3: Hardcodierte JPEG-Kompressionsqualität
+#### [LOW] [ERLEDIGT] G.3: Hardcodierte JPEG-Kompressionsqualität
 - **Ort:** `app/src/main/java/de/gurum/besseresser/data/ImagePreprocessor.kt`
 - **Problem:**
   Qualitätsstufe `82` ist als Magic Number hardcodiert.
@@ -319,21 +319,21 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 
 ### H. Lokalisierung & Internationalisierung (i18n)
 
-#### [MEDIUM] H.1: Formatierung von Zahlen und Datumsangaben ohne explizite User-Locale
+#### [MEDIUM] [ERLEDIGT] H.1: Formatierung von Zahlen und Datumsangaben ohne explizite User-Locale
 - **Ort:** `app/src/main/java/de/gurum/besseresser/ui/CommonUi.kt`, `HistoryItem.kt`
 - **Problem:**
   Datums- und Zeitformatierer (`DateTimeFormatter`) nutzen teilweise die JVM-Default-Locale anstelle der in den App-Einstellungen gewählten Sprache (`appState.language`).
 - **Best Practice:**
   Explizite Übergabe der konfigurierten `appLanguage.locale` an alle Formatierer.
 
-#### [LOW] H.2: Verstreute String-Resource-Auflösungen über Context
+#### [LOW] [ERLEDIGT] H.2: Verstreute String-Resource-Auflösungen über Context
 - **Ort:** `PromptBuilder.kt`, `HistoryViewModel.kt`
 - **Problem:**
   Direkte Aufrufe von `context.getString(...)` in Helper-Dateien.
 - **Best Practice:**
   Konsequente Nutzung der im Projekt bereits angelegten `UiText`-Abstraktion.
 
-#### [LOW] H.3: Fehlende Plural-Ressourcen in Teilbereichen
+#### [LOW] [ERLEDIGT] H.3: Fehlende Plural-Ressourcen in Teilbereichen
 - **Ort:** `app/src/main/res/values/strings.xml`
 - **Problem:**
   Einige Strings mit Zahlenangaben (z. B. "X Wochen") nutzen normale String-Templates statt `<plurals>`.
@@ -344,7 +344,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 
 ### I. Testbarkeit & Dependency Injection
 
-#### [MEDIUM] I.1: ViewModel-Konstruktoren mit Default-Werten statt sauberer DI-Injektion
+#### [MEDIUM] [ERLEDIGT] I.1: ViewModel-Konstruktoren mit Default-Werten statt sauberer DI-Injektion
 - **Ort:** `MainViewModel.kt`, `HistoryViewModel.kt`
 - **Problem:**
   `dispatchers: AppDispatchers = AppDispatchers()` und `savedStateHandle: SavedStateHandle = SavedStateHandle()` sind mit Default-Parametern belegt.
@@ -352,7 +352,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Injektion aller Abhängigkeiten über das Koin-Modul ohne Fallback-Instanziierung im Konstruktor.
 
-#### [MEDIUM] I.2: Fehlende Schnittstellen (Interfaces) für Repositories und Services
+#### [MEDIUM] [ERLEDIGT] I.2: Fehlende Schnittstellen (Interfaces) für Repositories und Services
 - **Ort:** `HistoryRepository`, `SettingsRepository`, `BesseresserApiService`
 - **Problem:**
   Repositories sind als konkrete Klassen ohne Interfaces implementiert.
@@ -360,7 +360,7 @@ Gleichzeitig wurden im Rahmen des Reviews mehrere **Architektur-, Lifecycle-, Pe
 - **Best Practice:**
   Einführung von Interfaces (`interface HistoryRepository`, `class DefaultHistoryRepository : HistoryRepository`).
 
-#### [LOW] I.3: Android-spezifische TestUri-Hilfsklasse
+#### [LOW] [ERLEDIGT] I.3: Android-spezifische TestUri-Hilfsklasse
 - **Ort:** `app/src/test/java/android/net/TestUri.kt`
 - **Problem:**
   Um `android.net.Uri` in JVM-Unit-Tests ohne Robolectric zu nutzen, wurde ein Package-Mocking verwendet.
