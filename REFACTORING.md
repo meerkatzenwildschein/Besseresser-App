@@ -14,7 +14,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 |---|---|---|---|---|---|
 | **[x] PERF-01** | Performance & Memory | OOM-Gefahr durch ungepuffertes Bitmap-Dekodieren in `AndroidImagePreprocessor` | **Hoch** | Verhindert App-Crashes bei hochauflösenden Kamerafotos (12MP–108MP) | Erledigt |
 | **[x] ARCH-01** | Architektur & Threading | Synchrone Altdaten-Migration im `init`-Block von `DefaultHistoryRepository` | **Hoch** | Verhindert UI-Freezes / ANR (Application Not Responding) beim App-Start | Erledigt |
-| **SEC-01** | Sicherheit & Robustheit | Stiller Klartext-Fallback bei Verschlüsselungsfehlern in `KeyVault` | **Mittel** | Schützt sensible API-Keys und verhindert inkonsistente Entschlüsselungszustände |
+| **[x] SEC-01** | Sicherheit & Robustheit | Stiller Klartext-Fallback bei Verschlüsselungsfehlern in `KeyVault` | **Mittel** | Schützt sensible API-Keys und verhindert inkonsistente Entschlüsselungszustände | Erledigt |
 | **NET-01** | Netzwerk & Resilienz | Veraltetes `HttpURLConnection` statt modernem HTTP-Client (Ktor / OkHttp) | **Mittel** | Ermöglicht Connection Pooling, HTTP/2, sauberes Coroutine-Cancellation & Logging |
 | **ARCH-02** | Architektur & Wartbarkeit | Monolithisches `HistoryViewModel` (>750 Zeilen) verletzt Single Responsibility | **Mittel** | Steigert Entwicklerproduktivität, Modularität und isolierte Testbarkeit |
 | **CONC-01** | Nebenläufigkeit | Thread-unsichere `mutableMapOf` für anstehende Löschaufträge in `HistoryViewModel` | **Mittel** | Beseitigt potenzielle Race Conditions und State Inconsistencies |
@@ -81,7 +81,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
 
 ---
 
-### SEC-01: Stiller Fallback auf Klartext in `KeyVault`
+### [x] SEC-01: Stiller Fallback auf Klartext in `KeyVault` [ERLEDIGT]
 * **Datei:** `app/src/main/java/de/gurum/besseresser/data/KeyVault.kt` (Zeilen 43–61)
 * **Problem:**
   Wenn die Verschlüsselung via Android Keystore fehlschlägt, fängt `encrypt()` die Exception ab und speichert den Klartext-Key (`catch (e: Exception) { plain }`). Bei späterem `decrypt()` schlägt jedoch das Entschlüsseln des Klartexts fehl und liefert `null`. `SettingsRepository` versucht zwar einen Fallback (`KeyVault.decrypt(raw) ?: raw`), jedoch führt dies zu einem unbemerkten Sicherheitsrisiko und undurchsichtigen Fehlerzuständen.
@@ -183,7 +183,7 @@ Die Codebasis zeichnet sich bereits durch eine moderne Grundlage aus (Jetpack Co
    - [x] Asynchrone Kapselung der Migration in `DefaultHistoryRepository`. [ERLEDIGT]
 
 2. **Phase 2: Struktur & Resilienz (Architektur & Sicherheit)**
-   - Klare Fehlerbehandlung für den Android Keystore in `KeyVault`.
+   - [x] Klare Fehlerbehandlung für den Android Keystore in `KeyVault`. [ERLEDIGT]
    - Entflechtung des `HistoryViewModel` in Use-Cases (`FazitCalculator`, `HistoryListViewModel`).
    - Umstellung des HTTP-Stacks von `HttpURLConnection` auf `Ktor` oder `OkHttp`.
 

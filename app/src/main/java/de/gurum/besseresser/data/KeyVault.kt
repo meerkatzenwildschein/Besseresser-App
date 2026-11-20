@@ -40,23 +40,20 @@ object KeyVault {
         return generator.generateKey()
     }
 
-    fun encrypt(plain: String): String {
-        if (plain.isBlank()) return ""
-        return try {
+    fun encrypt(plain: String): Result<String> {
+        if (plain.isBlank()) return Result.success("")
+        return runCatching {
             encryptWithKey(plain, getOrCreateKey())
-        } catch (e: Exception) {
-            plain
         }
     }
 
-    /** Gibt null zurück, wenn das Chiffrat nicht mehr entschlüsselt werden kann
-     *  (z. B. nach Backup-Wiederherstellung auf einem anderen Gerät oder bei Legacy-Klartext). */
-    fun decrypt(encoded: String): String? {
-        if (encoded.isBlank()) return ""
-        return try {
+    /** Gibt Result mit Klartext zurück, oder Failure wenn das Chiffrat nicht mehr entschlüsselt werden kann
+     *  (z. B. nach Backup-Wiederherstellung auf einem anderen Gerät oder bei ungültigen Chiffraten). */
+    fun decrypt(encoded: String): Result<String> {
+        if (encoded.isBlank()) return Result.success("")
+        return runCatching {
             decryptWithKey(encoded, getOrCreateKey())
-        } catch (e: Exception) {
-            null
+                ?: throw IllegalStateException("Entschlüsselung fehlgeschlagen (ungültiges Chiffrat).")
         }
     }
 

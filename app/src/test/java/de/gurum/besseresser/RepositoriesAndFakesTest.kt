@@ -1210,10 +1210,10 @@ class RepositoriesAndFakesTest {
         assertEquals("", KeyVault.decryptWithKey("", secretKey))
         assertEquals("", KeyVault.decryptWithKey("   ", secretKey))
 
-        assertEquals("", KeyVault.encrypt(""))
-        assertEquals("", KeyVault.encrypt("   "))
-        assertEquals("", KeyVault.decrypt(""))
-        assertEquals("", KeyVault.decrypt("   "))
+        assertEquals("", KeyVault.encrypt("").getOrNull())
+        assertEquals("", KeyVault.encrypt("   ").getOrNull())
+        assertEquals("", KeyVault.decrypt("").getOrNull())
+        assertEquals("", KeyVault.decrypt("   ").getOrNull())
     }
 
     @Test
@@ -1241,6 +1241,13 @@ class RepositoriesAndFakesTest {
         rawBytes[rawBytes.size - 1] = (rawBytes[rawBytes.size - 1].toInt() xor 0xFF).toByte()
         val tamperedBase64 = java.util.Base64.getEncoder().encodeToString(rawBytes)
         assertNull(KeyVault.decryptWithKey(tamperedBase64, secretKey1))
+    }
+
+    @Test
+    fun testKeyVaultResultErrorPropagation() {
+        val invalidCiphertext = "invalid_cipher_text"
+        val result = KeyVault.decrypt(invalidCiphertext)
+        assertTrue(result.isFailure)
     }
 }
 

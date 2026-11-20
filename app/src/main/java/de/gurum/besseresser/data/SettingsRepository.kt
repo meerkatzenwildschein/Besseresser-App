@@ -69,7 +69,7 @@ class DefaultSettingsRepository(private val dataStore: DataStore<Preferences>) :
             .filter { it.isNotBlank() }
         return Settings(
             baseUrl = this[Keys.BASE_URL] ?: "",
-            apiKey = this[Keys.API_KEY]?.let { raw -> KeyVault.decrypt(raw) ?: raw } ?: "",
+            apiKey = this[Keys.API_KEY]?.let { raw -> KeyVault.decrypt(raw).getOrDefault("") } ?: "",
             model = this[Keys.MODEL] ?: Keys.DEFAULT_MODEL,
             goals = goals,
             goalsWereSplit = this[Keys.GOALS_WERE_SPLIT] ?: false,
@@ -80,9 +80,10 @@ class DefaultSettingsRepository(private val dataStore: DataStore<Preferences>) :
     override suspend fun currentSettings(): Settings = dataStore.data.first().toSettings()
 
     override suspend fun save(settings: Settings) {
+        val encryptedKey = KeyVault.encrypt(settings.apiKey.trim()).getOrThrow()
         dataStore.edit { p ->
             p[Keys.BASE_URL] = settings.baseUrl.trim()
-            p[Keys.API_KEY] = KeyVault.encrypt(settings.apiKey.trim())
+            p[Keys.API_KEY] = encryptedKey
             p[Keys.MODEL] = settings.model.trim()
             p[Keys.GOALS] = settings.goals.joinToString("\n")
             p[Keys.GOALS_WERE_SPLIT] = settings.goalsWereSplit
