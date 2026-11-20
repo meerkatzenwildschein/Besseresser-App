@@ -5,6 +5,8 @@ import de.gurum.besseresser.data.ApiClient
 import de.gurum.besseresser.data.AppDatabase
 import de.gurum.besseresser.data.BackupManager
 import de.gurum.besseresser.data.BackupService
+import de.gurum.besseresser.data.BackupStorage
+import de.gurum.besseresser.data.AndroidBackupStorage
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.DefaultHistoryRepository
 import de.gurum.besseresser.data.DefaultProfileRepository
@@ -57,7 +59,8 @@ val appModule = module {
     single<UiPrefsRepository> { DefaultUiPrefsRepository(get()) }
     single<HistoryRepository> { DefaultHistoryRepository(get(), get(), get(), get()) }
 
-    single<BackupService> { BackupManager(androidContext(), get(), get(), get(), get(), get()) }
+    single<BackupStorage> { AndroidBackupStorage(androidContext()) }
+    single<BackupService> { BackupManager(get(), get(), get(), get(), get(), get()) }
 
     viewModel { AppStateViewModel(get(), get(), get(), get()) }
     viewModel { MainViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get(), promptRepository = get()) }

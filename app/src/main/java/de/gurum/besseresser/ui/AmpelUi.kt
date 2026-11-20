@@ -1,11 +1,31 @@
 package de.gurum.besseresser.ui
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import de.gurum.besseresser.R
 import de.gurum.besseresser.model.TrafficLight
 
-// ----------------------------------------------------------------- TrafficLight UI extensions
+// ----------------------------------------------------------------- TrafficLight UI extensions & Theme Tokens
+
+data class TrafficLightColors(
+    val green: Color = Color(0xFF2E9E44),
+    val yellow: Color = Color(0xFFE6A817),
+    val red: Color = Color(0xFFD32F2F),
+    val unknown: Color = Color(0xFF9E9E9E)
+)
+
+val LocalTrafficLightColors = staticCompositionLocalOf { TrafficLightColors() }
+
+val ColorScheme.trafficLight: TrafficLightColors
+    @Composable
+    get() = LocalTrafficLightColors.current
+
+val MaterialTheme.trafficLightColors: TrafficLightColors
+    @Composable
+    get() = LocalTrafficLightColors.current
 
 /** UI color for a traffic-light rating. */
 fun TrafficLight.color(): Color = when (this) {

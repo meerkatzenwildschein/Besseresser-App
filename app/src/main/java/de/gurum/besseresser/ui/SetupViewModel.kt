@@ -1,6 +1,7 @@
 package de.gurum.besseresser.ui
 
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -20,6 +21,7 @@ import de.gurum.besseresser.data.UrlSecurityStatus
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.data.SplitGoalsRequest
 
+@Immutable
 data class SetupUiState(
     val url: String = "",
     val key: String = "",

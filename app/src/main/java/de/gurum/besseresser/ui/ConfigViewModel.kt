@@ -1,6 +1,7 @@
 package de.gurum.besseresser.ui
 
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +23,7 @@ class ConfigViewModel(
     private val dispatchers: AppDispatchers = AppDispatchers()
 ) : ViewModel() {
 
+    @Immutable
     data class ConfigUiState(
         val busy: Boolean = false,
         val importSummary: BackupSummary? = null,

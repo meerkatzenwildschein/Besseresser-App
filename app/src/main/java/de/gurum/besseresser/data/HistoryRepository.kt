@@ -11,6 +11,8 @@ import de.gurum.besseresser.model.HistoryEntryLogic
 import de.gurum.besseresser.model.dayKeyOf
 import de.gurum.besseresser.model.retentionCutoffMillis
 import de.gurum.besseresser.model.weekKeyOf
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -211,6 +213,7 @@ class DefaultHistoryRepository(
         val stale = historyDao.getAll().map { it.toDomain() }
             .filter { it.dateMillis < cutoffMillis }
         stale.forEach { entry ->
+            currentCoroutineContext().ensureActive()
             photoStorage.deletePhoto(entry.photoFile)
             historyDao.deleteById(entry.id)
         }
@@ -218,10 +221,16 @@ class DefaultHistoryRepository(
         // 2. Tages-/Wochenfazits vor dem Stichtag löschen (inkl. verwaister)
         dayFazitDao.getAll().map { it.dayKey }
             .filter { it < cutoffDayKey }
-            .forEach { dayFazitDao.delete(it) }
+            .forEach {
+                currentCoroutineContext().ensureActive()
+                dayFazitDao.delete(it)
+            }
         weekFazitDao.getAll().map { it.weekKey }
             .filter { it < cutoffWeekKey }
-            .forEach { weekFazitDao.delete(it) }
+            .forEach {
+                currentCoroutineContext().ensureActive()
+                weekFazitDao.delete(it)
+            }
 
         // 3. Session-Guard aufräumen (damit Fazits neuer Tage nicht irrtümlich „versucht" bleiben)
         DayFazitSession.attempted.removeAll { it < cutoffDayKey }
@@ -240,7 +249,10 @@ class DefaultHistoryRepository(
             f.extension.lowercase() in setOf("jpg", "jpeg", "png", "webp") &&
                 f.name !in knownFileNames
         } ?: return 0
-        orphans.forEach { runCatching { it.delete() } }
+        orphans.forEach { file ->
+            currentCoroutineContext().ensureActive()
+            runCatching { file.delete() }
+        }
         return orphans.size
     }
 

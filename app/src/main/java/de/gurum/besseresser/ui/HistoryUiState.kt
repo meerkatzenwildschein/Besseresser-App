@@ -1,5 +1,6 @@
 package de.gurum.besseresser.ui
 
+import androidx.compose.runtime.Immutable
 import de.gurum.besseresser.model.DayFazit
 import de.gurum.besseresser.model.HistoryEntry
 import java.time.LocalDate
@@ -7,6 +8,7 @@ import java.time.LocalTime
 
 const val UNDO_DELETE_DELAY_MS = 5000L
 
+@Immutable
 data class HistoryUiState(
     val entries: List<HistoryEntry> = emptyList(),
     val uiItems: List<HistoryUiItem> = emptyList(),

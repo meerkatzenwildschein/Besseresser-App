@@ -1,4 +1,5 @@
 package de.gurum.besseresser.ui
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,7 @@ import de.gurum.besseresser.model.Settings
 /** App-weiter Zustand, der aus den Repositories als Flows gespeist wird:
  *  Einstellungen, Profil, Theme und Sprache. `loaded` wird true, sobald die
  *  erste Emission aller Quellen vorliegt (DataStore ist initial gelesen). */
+@Immutable
 data class AppState(
     val loaded: Boolean = false,
     val settings: Settings = Settings(),
