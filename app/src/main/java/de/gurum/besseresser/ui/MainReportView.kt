@@ -113,6 +113,19 @@ internal fun MainReportView(
             else HistoryEntry(goalResults = results).score
         }
 
+        if (lastGoaled && !results.isNullOrEmpty() && !savedToHistory) {
+            val summary = evaluation?.summary ?: ""
+            val det = evaluation?.recognizedMeal.orEmpty()
+            if (summary.isNotBlank() || det.isNotBlank()) {
+                CollapsibleSummaryBlock(
+                    summary = summary,
+                    recognizedMeal = det,
+                    note = note,
+                    onEditRecognizedMeal = { if (det.isNotBlank()) onEditRecognizedMeal() }
+                )
+            }
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -149,16 +162,6 @@ internal fun MainReportView(
         }
 
         if (lastGoaled && !results.isNullOrEmpty() && !savedToHistory) {
-            val summary = evaluation?.summary ?: ""
-            val det = evaluation?.recognizedMeal.orEmpty()
-            if (summary.isNotBlank() || det.isNotBlank()) {
-                CollapsibleSummaryBlock(
-                    summary = summary,
-                    recognizedMeal = det,
-                    note = note,
-                    onEditRecognizedMeal = { if (det.isNotBlank()) onEditRecognizedMeal() }
-                )
-            }
             Spacer(Modifier.height(2.dp))
             Button(
                 onClick = onSaveToHistory,
