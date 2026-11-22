@@ -1,4 +1,5 @@
 package de.gurum.besseresser.data
+import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -6,6 +7,8 @@ import android.net.Uri
 import android.util.Base64
 import androidx.core.graphics.scale
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.InputStream
 
 const val COMPRESSION_QUALITY_JPEG = 82
 const val DEFAULT_MAX_IMAGE_SIDE = 1280
@@ -23,11 +26,14 @@ class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor
 
     /**
      * Lädt das Bild von der übergebenen URI, skaliert es herunter und kodiert es als Base64 JPEG Data-URI.
+     *
+     * Öffnet den Stream robust: zuerst via ContentResolver (für content://-URIs), dann direkt
+     * als Datei (für file://-URIs und als Fallback, wenn FileProvider keinen Stream liefert).
      */
     override fun prepareImageDataUri(photoUri: Uri, maxSide: Int): String {
         val resolver = context.contentResolver
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(photoUri)?.use { BitmapFactory.decodeStream(it, null, options) }
+        openStreamRobust(resolver, photoUri)?.use { BitmapFactory.decodeStream(it, null, options) }
             ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
 
         var sample = 1
@@ -36,7 +42,7 @@ class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor
         }
 
         val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sample }
-        val originalBitmap = resolver.openInputStream(photoUri)?.use {
+        val originalBitmap = openStreamRobust(resolver, photoUri)?.use {
             BitmapFactory.decodeStream(it, null, decodeOptions)
         } ?: throw IllegalStateException("Foto konnte nicht decodiert werden.")
 
@@ -67,4 +73,43 @@ class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor
         val factor = maxSide.toFloat() / maxOrig
         return bmp.scale((bmp.width * factor).toInt(), (bmp.height * factor).toInt())
     }
+}
+
+/**
+ * Öffnet einen InputStream für die gegebene URI robust:
+ * 1. ContentResolver.openInputStream (Standard für content://-URIs)
+ * 2. Direkter Dateizugriff als Fallback (für file://-URIs und wenn FileProvider null liefert)
+ *
+ * Hintergrund: FileProvider-content://-URIs werden vom ContentResolver im eigenen Prozess
+ * normalerweise korrekt aufgelöst. Auf einigen Geräten/Android-Versionen kann openInputStream
+ * dennoch null zurückgeben, obwohl die Datei existiert. Der Datei-Fallback greift dann direkt
+ * auf den tatsächlichen Pfad zu.
+ */
+internal fun openStreamRobust(resolver: ContentResolver, uri: Uri): InputStream? {
+    // Versuch 1: Standard ContentResolver (funktioniert für content:// und file://)
+    runCatching { resolver.openInputStream(uri) }
+        .getOrNull()
+        ?.let { return it }
+
+    // Versuch 2: Datei direkt lesen, wenn der Pfad aus der URI extrahierbar ist
+    val path = uri.path
+    if (!path.isNullOrBlank()) {
+        val file = File(path)
+        if (file.exists() && file.length() > 0) {
+            runCatching { file.inputStream() }.getOrNull()?.let { return it }
+        }
+    }
+
+    // Versuch 3: file://-Schema explizit auflösen
+    if (uri.scheme == "file") {
+        val filePath = uri.schemeSpecificPart?.removePrefix("//")
+        if (!filePath.isNullOrBlank()) {
+            val file = File(filePath)
+            if (file.exists() && file.length() > 0) {
+                runCatching { file.inputStream() }.getOrNull()?.let { return it }
+            }
+        }
+    }
+
+    return null
 }
