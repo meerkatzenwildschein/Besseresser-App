@@ -33,16 +33,25 @@ class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor
     override fun prepareImageDataUri(photoUri: Uri, maxSide: Int): String {
         val resolver = context.contentResolver
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        openStreamRobust(resolver, photoUri)?.use { BitmapFactory.decodeStream(it, null, options) }
+
+        // 1. Abmessungen ermitteln (decodeStream liefert bei inJustDecodeBounds=true immer null)
+        val boundsStream = openStreamRobust(resolver, photoUri, context)
             ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
+        boundsStream.use { BitmapFactory.decodeStream(it, null, options) }
+        if (options.outWidth <= 0 || options.outHeight <= 0) {
+            throw IllegalStateException("Foto konnte nicht decodiert werden.")
+        }
 
         var sample = 1
         while (maxOf(options.outWidth, options.outHeight) / sample > maxSide * 2) {
             sample *= 2
         }
 
+        // 2. Bild mit passendem inSampleSize decodieren
         val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sample }
-        val originalBitmap = openStreamRobust(resolver, photoUri)?.use {
+        val decodeStream = openStreamRobust(resolver, photoUri, context)
+            ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
+        val originalBitmap = decodeStream.use {
             BitmapFactory.decodeStream(it, null, decodeOptions)
         } ?: throw IllegalStateException("Foto konnte nicht decodiert werden.")
 
@@ -77,37 +86,55 @@ class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor
 
 /**
  * Öffnet einen InputStream für die gegebene URI robust:
- * 1. ContentResolver.openInputStream (Standard für content://-URIs)
- * 2. Direkter Dateizugriff als Fallback (für file://-URIs und wenn FileProvider null liefert)
- *
- * Hintergrund: FileProvider-content://-URIs werden vom ContentResolver im eigenen Prozess
- * normalerweise korrekt aufgelöst. Auf einigen Geräten/Android-Versionen kann openInputStream
- * dennoch null zurückgeben, obwohl die Datei existiert. Der Datei-Fallback greift dann direkt
- * auf den tatsächlichen Pfad zu.
+ * 1. ContentResolver.openInputStream (Standard für content://- und file://-URIs)
+ * 2. Direkter Zugriff auf App-interne Verzeichnisse bei FileProvider-URIs (falls ContentResolver fehlschlägt)
+ * 3. Direkter Dateizugriff bei file://-URIs und absoluten Pfaden
  */
-internal fun openStreamRobust(resolver: ContentResolver, uri: Uri): InputStream? {
+internal fun openStreamRobust(resolver: ContentResolver?, uri: Uri, context: Context? = null): InputStream? {
     // Versuch 1: Standard ContentResolver (funktioniert für content:// und file://)
-    runCatching { resolver.openInputStream(uri) }
-        .getOrNull()
-        ?.let { return it }
+    if (resolver != null) {
+        val stream = runCatching { resolver.openInputStream(uri) }.getOrNull()
+        if (stream != null) return stream
+    }
 
-    // Versuch 2: Datei direkt lesen, wenn der Pfad aus der URI extrahierbar ist
-    val path = uri.path
-    if (!path.isNullOrBlank()) {
-        val file = File(path)
-        if (file.exists() && file.length() > 0) {
-            runCatching { file.inputStream() }.getOrNull()?.let { return it }
+    // Versuch 2: Bei eigenen FileProvider-URIs direkt im Cache-/Files-Ordner nachsehen
+    if (context != null && uri.authority == "de.gurum.besseresser.fileprovider") {
+        val path = uri.path?.removePrefix("/")
+        if (!path.isNullOrBlank()) {
+            val candidateFile = if (path.startsWith("photos/")) {
+                File(context.cacheDir, path)
+            } else if (path.startsWith("history/")) {
+                File(context.filesDir, path)
+            } else {
+                File(context.cacheDir, path)
+            }
+            if (candidateFile.exists() && candidateFile.length() > 0) {
+                val stream = runCatching { candidateFile.inputStream() }.getOrNull()
+                if (stream != null) return stream
+            }
         }
     }
 
     // Versuch 3: file://-Schema explizit auflösen
     if (uri.scheme == "file") {
-        val filePath = uri.schemeSpecificPart?.removePrefix("//")
+        val raw = uri.path ?: uri.schemeSpecificPart
+        val filePath = raw?.removePrefix("file://")?.removePrefix("file:")?.removePrefix("//")
         if (!filePath.isNullOrBlank()) {
             val file = File(filePath)
             if (file.exists() && file.length() > 0) {
-                runCatching { file.inputStream() }.getOrNull()?.let { return it }
+                val stream = runCatching { file.inputStream() }.getOrNull()
+                if (stream != null) return stream
             }
+        }
+    }
+
+    // Versuch 4: Direkter Dateipfad
+    val rawPath = uri.path
+    if (!rawPath.isNullOrBlank()) {
+        val file = File(rawPath)
+        if (file.exists() && file.length() > 0) {
+            val stream = runCatching { file.inputStream() }.getOrNull()
+            if (stream != null) return stream
         }
     }
 

@@ -89,11 +89,11 @@ class PhotoStorage(
     private fun writeScaledJpeg(uri: Uri, out: File) {
         val res = context?.contentResolver ?: return
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        openStreamRobust(res, uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+        openStreamRobust(res, uri, context)?.use { BitmapFactory.decodeStream(it, null, bounds) }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return
         var sample = 1
         while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1024) sample *= 2
-        val bmp = openStreamRobust(res, uri)?.use {
+        val bmp = openStreamRobust(res, uri, context)?.use {
             BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
         } ?: return
         var quality = 75
