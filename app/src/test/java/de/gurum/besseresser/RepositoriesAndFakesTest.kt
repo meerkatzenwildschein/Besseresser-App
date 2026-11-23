@@ -1150,7 +1150,7 @@ class RepositoriesAndFakesTest {
             val fakeDayFazitDao = FakeDayFazitDao()
             val fakeWeekFazitDao = FakeWeekFazitDao()
 
-            LegacyJsonMigrator.migrateSync(tempDir, fakeHistoryDao, fakeDayFazitDao, fakeWeekFazitDao)
+            LegacyJsonMigrator.migrate(tempDir, fakeHistoryDao, fakeDayFazitDao, fakeWeekFazitDao, testDispatcher)
 
             assertEquals(1, fakeHistoryDao.items.size)
             assertEquals(888L, fakeHistoryDao.items.first().id)

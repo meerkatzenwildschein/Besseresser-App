@@ -116,14 +116,14 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 
 ### E. Nebenläufigkeit & Coroutines
 
-#### E.1 Hardcodierte Dispatcher (`Dispatchers.IO`)
-- **Dateien:** `DefaultApiClient.kt`, `LegacyJsonMigrator.kt`, `PhotoStorage.kt`, `DefaultHistoryRepository.kt`
+#### E.1 [x] Hardcodierte Dispatcher (`Dispatchers.IO`) (Erledigt: AppDispatchers per Koin injiziert)
+- **Dateien:** `AppDispatchers.kt`, `AppModule.kt`, `ApiClient.kt`, `LegacyJsonMigrator.kt`, `PhotoStorage.kt`, `DefaultHistoryRepository.kt`
 - **Problem:** `Dispatchers.IO` wird direkt als Default-Parameter oder statischer Aufruf verwendet, anstatt über Dependency Injection (Koin) bereitgestellt zu werden.
-- **Best Practice:** Injizieren von `CoroutineDispatcher` (z. B. `ioDispatcher: CoroutineDispatcher`).
+- **Best Practice:** Injizieren von `CoroutineDispatcher` (z. B. `ioDispatcher: CoroutineDispatcher` oder `AppDispatchers`).
 - **Nutzen:** In Unit-Tests kann dadurch `StandardTestDispatcher` oder `UnconfinedTestDispatcher` injiziert werden, wodurch Tests synchron, schnell und ohne Flakiness laufen.
 
-#### E.2 `runBlocking` in Migrationspfaden
-- **Datei:** `app/src/main/java/de/gurum/besseresser/data/LegacyJsonMigrator.kt` (Zeile 34)
+#### E.2 [x] `runBlocking` in Migrationspfaden (Erledigt: Asynchrone Migration via Coroutines)
+- **Datei:** `app/src/main/java/de/gurum/besseresser/data/LegacyJsonMigrator.kt`
 - **Problem:** `migrateSync` führt `runBlocking(Dispatchers.IO)` aus. Wird dies während des App-Starts im Main-Thread aufgerufen, blockiert der UI-Thread bis alle Dateien eingelesen und in SQLite geschrieben sind (Gefahr von ANR = Application Not Responding).
 - **Best Practice:** Migrationen strikt asynchron über Coroutines oder WorkManager vor dem ersten Rendern des Hauptscreens durchführen.
 
@@ -165,7 +165,7 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 | **P2** | [x] Java Toolchain in Gradle konfigurieren (`jvmToolchain(17)`) | `app/build.gradle.kts` | Minimal |
 | **P2** | [x] Room-Indizes auf `dateMillis`, `dateOnly`, `calendarWeek` ergänzen | `HistoryEntity.kt`, `AppDatabase.kt` | Gering |
 | **P2** | [x] `@Immutable`-Annotationen für UI-State Data-Classes ergänzen | `MainUiState.kt`, `HistoryUiState.kt` | Gering |
-| **P3** | [ ] Dispatcher-Injection via Koin einführen (`ioDispatcher`) | Koin-Module, Repositories | Mittel |
+| **P3** | [x] Dispatcher-Injection via Koin einführen (`ioDispatcher`) | Koin-Module, Repositories | Mittel |
 | **P3** | [ ] Reaktivierung von Room `Flow` als Single Source of Truth in `MainViewModel` | `MainViewModel.kt`, `HistoryRepository.kt` | Mittel |
 | **P4** | [ ] Streaming / ZIP-Container für Backups mit vielen Fotos | `BackupStore.kt` | Mittel |
 | **P4** | [ ] Integration von Paging 3 für die Historienliste | `HistoryRepository.kt`, `HistoryViewModel.kt` | Hoch |

@@ -25,17 +25,6 @@ object LegacyJsonMigrator {
         migrateInternal(historyDir, historyDao, dayFazitDao, weekFazitDao)
     }
 
-    fun migrateSync(
-        historyDir: File,
-        historyDao: HistoryDao,
-        dayFazitDao: DayFazitDao,
-        weekFazitDao: WeekFazitDao
-    ) {
-        runBlocking(Dispatchers.IO) {
-            migrateInternal(historyDir, historyDao, dayFazitDao, weekFazitDao)
-        }
-    }
-
     private suspend fun migrateInternal(
         historyDir: File,
         historyDao: HistoryDao,

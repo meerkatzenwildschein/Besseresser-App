@@ -48,11 +48,11 @@ val appModule = module {
     single { get<AppDatabase>().weekFazitDao() }
 
     single { androidContext().appDataStore }
-    single { PhotoStorage(androidContext()) }
+    single { PhotoStorage(androidContext(), dispatchers = get()) }
     single<PhotoCaptureManager> { DefaultPhotoCaptureManager(androidContext()) }
     single<ImagePreprocessor> { AndroidImagePreprocessor(androidContext()) }
 
-    single<BesseresserApiService> { ApiClient() }
+    single<BesseresserApiService> { ApiClient(dispatchers = get()) }
 
     single<SettingsRepository> { DefaultSettingsRepository(get()) }
     single<ProfileRepository> { DefaultProfileRepository(get()) }
