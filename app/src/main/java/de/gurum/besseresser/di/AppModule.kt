@@ -15,8 +15,10 @@ import de.gurum.besseresser.data.DefaultSettingsRepository
 import de.gurum.besseresser.data.DefaultUiPrefsRepository
 import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.data.AndroidImagePreprocessor
+import de.gurum.besseresser.data.AndroidNetworkConnectivityChecker
 import de.gurum.besseresser.data.DefaultPhotoCaptureManager
 import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.NetworkConnectivityChecker
 import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.PhotoStorage
 import de.gurum.besseresser.data.ProfileRepository
@@ -51,6 +53,7 @@ val appModule = module {
     single { PhotoStorage(androidContext(), dispatchers = get()) }
     single<PhotoCaptureManager> { DefaultPhotoCaptureManager(androidContext()) }
     single<ImagePreprocessor> { AndroidImagePreprocessor(androidContext()) }
+    single<NetworkConnectivityChecker> { AndroidNetworkConnectivityChecker(androidContext()) }
 
     single<BesseresserApiService> { ApiClient(dispatchers = get()) }
 
@@ -65,11 +68,11 @@ val appModule = module {
     single<BackupService> { BackupManager(get(), get(), get(), get(), get(), get()) }
 
     viewModel { AppStateViewModel(get(), get(), get(), get()) }
-    viewModel { MainViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get(), promptRepository = get()) }
-    viewModel { HistoryViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get(), profileRepository = get(), promptRepository = get()) }
+    viewModel { MainViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get(), promptRepository = get(), networkChecker = get()) }
+    viewModel { HistoryViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get(), profileRepository = get(), promptRepository = get(), networkChecker = get()) }
     viewModel { SetupViewModel(get(), get(), get(), savedStateHandle = get()) }
     viewModel { ProfileViewModel(get()) }
     viewModel { ConfigViewModel(get(), get()) }
     viewModel { RecentNotesViewModel(get()) }
-    viewModel { (entryId: Long) -> HistoryDetailViewModel(entryId, get(), get(), get(), get()) }
+    viewModel { (entryId: Long) -> HistoryDetailViewModel(entryId, get(), get(), get(), get(), get(), promptRepository = get(), networkChecker = get()) }
 }

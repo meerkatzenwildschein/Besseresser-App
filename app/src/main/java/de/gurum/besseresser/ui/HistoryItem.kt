@@ -70,6 +70,9 @@ fun HistoryItem(
     isLifted: Boolean = false,
     onPhotoFile: (HistoryEntry) -> File? = { null }
 ) {
+    val isUnrated = !entry.isRated
+    val amberAccent = Color(0xFFF59E0B)
+    val amberText = Color(0xFFD97706)
     val scale by animateFloatAsState(
         targetValue = if (isLifted) 1.025f else 1f,
         animationSpec = tween(150),
@@ -80,17 +83,22 @@ fun HistoryItem(
         animationSpec = tween(150),
         label = "lift-shadow"
     )
-    val borderColor = if (isLifted) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+    val cardColor = if (isUnrated) {
+        amberAccent.copy(alpha = 0.14f)
     } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+        MaterialTheme.colorScheme.surfaceVariant
+    }
+    val borderColor = when {
+        isLifted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+        isUnrated -> amberAccent.copy(alpha = 0.55f)
+        else -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
     }
 
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(if (isLifted) 1.5.dp else 1.dp, borderColor),
+        color = cardColor,
+        border = BorderStroke(if (isLifted || isUnrated) 1.5.dp else 1.dp, borderColor),
         modifier = Modifier
             .fillMaxWidth()
             .scale(scale)
@@ -148,7 +156,20 @@ fun HistoryItem(
                         fontStyle = if (entry.backdated) FontStyle.Italic else FontStyle.Normal,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    if (entry.goalResults.isNotEmpty()) {
+                    if (isUnrated) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = amberAccent.copy(alpha = 0.22f)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.history_unrated_badge),
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = amberText,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    } else if (entry.goalResults.isNotEmpty()) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(3.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -173,16 +194,29 @@ fun HistoryItem(
                         overflow = TextOverflow.Ellipsis,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                } else if (entry.note.isNotBlank()) {
+                    Text(
+                        stringResource(R.string.history_note_prefix, entry.note),
+                        fontSize = 12.5.sp,
+                        lineHeight = 17.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
                 Text(
-                    zielePreview(
-                        entry,
-                        stringResource(R.string.history_no_goals),
-                        stringResource(
-                            R.string.goals_preview_more,
-                            (entry.goalResults.size - 2).coerceAtLeast(0)
+                    if (isUnrated) {
+                        stringResource(R.string.history_unrated_hint)
+                    } else {
+                        zielePreview(
+                            entry,
+                            stringResource(R.string.history_no_goals),
+                            stringResource(
+                                R.string.goals_preview_more,
+                                (entry.goalResults.size - 2).coerceAtLeast(0)
+                            )
                         )
-                    ),
+                    },
                     fontSize = 11.5.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -190,7 +224,20 @@ fun HistoryItem(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            ScoreBadge(entry)
+            if (isUnrated) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(amberAccent.copy(alpha = 0.22f))
+                        .border(BorderStroke(1.5.dp, amberAccent.copy(alpha = 0.65f)), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("✨", fontSize = 15.sp)
+                }
+            } else {
+                ScoreBadge(entry)
+            }
         }
     }
 }

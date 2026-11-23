@@ -14,6 +14,7 @@ import kotlinx.coroutines.withContext
 import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.NetworkConnectivityChecker
 import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.data.HistoryRepository
@@ -40,7 +41,8 @@ data class MainUiState(
     val showCamera: Boolean = false,
     val showRecognizedEdit: Boolean = false,
     val savedEntryId: Long? = null,
-    val menuOpen: Boolean = false
+    val menuOpen: Boolean = false,
+    val offlineNoRating: Boolean = false
 )
 
 class MainViewModel(
@@ -51,7 +53,8 @@ class MainViewModel(
     private val dispatchers: AppDispatchers = AppDispatchers(),
     private val photoCaptureManager: PhotoCaptureManager? = null,
     private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
-    private val promptRepository: PromptRepository? = null
+    private val promptRepository: PromptRepository? = null,
+    private val networkChecker: NetworkConnectivityChecker = NetworkConnectivityChecker { true }
 ) : ViewModel() {
 
     fun createCaptureFile(): Pair<File, Uri> {
@@ -77,6 +80,7 @@ class MainViewModel(
         private const val KEY_SAVED_TO_HISTORY = "main_saved_to_history"
         private const val KEY_MENU_OPEN = "main_menu_open"
         private const val KEY_EVALUATION = "main_evaluation"
+        private const val KEY_OFFLINE_NO_RATING = "main_offline_no_rating"
     }
 
     private val _uiState = MutableStateFlow(
@@ -89,6 +93,7 @@ class MainViewModel(
             savedToHistory = savedStateHandle[KEY_SAVED_TO_HISTORY] ?: false,
             savedEntryId = savedStateHandle[KEY_SAVED_ENTRY_ID],
             menuOpen = savedStateHandle[KEY_MENU_OPEN] ?: false,
+            offlineNoRating = savedStateHandle[KEY_OFFLINE_NO_RATING] ?: false,
             evaluation = savedStateHandle.get<String>(KEY_EVALUATION)?.let { json ->
                 runCatching { AppJson.decodeFromString<Evaluation>(json) }.getOrNull()
             }
@@ -135,6 +140,7 @@ class MainViewModel(
         savedStateHandle[KEY_SHOW_CAMERA] = false
         savedStateHandle[KEY_SHOW_REVIEW] = false
         savedStateHandle[KEY_SAVED_TO_HISTORY] = false
+        savedStateHandle[KEY_OFFLINE_NO_RATING] = false
         savedStateHandle.remove<Long>(KEY_SAVED_ENTRY_ID)
         savedStateHandle.remove<String>(KEY_EVALUATION)
         _uiState.update {
@@ -146,7 +152,8 @@ class MainViewModel(
                 error = null,
                 evaluation = null,
                 savedToHistory = false,
-                savedEntryId = null
+                savedEntryId = null,
+                offlineNoRating = false
             )
         }
     }
@@ -179,6 +186,7 @@ class MainViewModel(
         savedStateHandle[KEY_SHOW_REVIEW] = true
         savedStateHandle[KEY_SHOW_RECOGNIZED_EDIT] = false
         savedStateHandle[KEY_SAVED_TO_HISTORY] = false
+        savedStateHandle[KEY_OFFLINE_NO_RATING] = false
         savedStateHandle.remove<Long>(KEY_SAVED_ENTRY_ID)
         savedStateHandle.remove<String>(KEY_EVALUATION)
         _uiState.update {
@@ -192,7 +200,8 @@ class MainViewModel(
                 error = null,
                 evaluation = null,
                 savedToHistory = false,
-                savedEntryId = null
+                savedEntryId = null,
+                offlineNoRating = false
             )
         }
     }
@@ -222,7 +231,21 @@ class MainViewModel(
         analyzeJob = viewModelScope.launch {
             val resolvedSettings = settings ?: settingsRepository.currentSettings()
             if (tryUseCachedEvaluation(resolvedSettings)) return@launch
-            _uiState.update { it.copy(isBusy = true, error = null) }
+            if (!networkChecker.isInternetAvailable()) {
+                val msg = promptRepository?.noInternetSavedUnratedMessage()
+                    ?: "Keine Internetverbindung – ohne KI-Bewertung fortgefahren."
+                savedStateHandle[KEY_OFFLINE_NO_RATING] = true
+                _uiState.update {
+                    it.copy(
+                        isBusy = false,
+                        error = msg,
+                        evaluation = null,
+                        offlineNoRating = true
+                    )
+                }
+                return@launch
+            }
+            _uiState.update { it.copy(isBusy = true, error = null, offlineNoRating = false) }
             val dataUri = runCatching {
                 withContext(dispatchers.io) { imagePreprocessor.prepareImageDataUri(uri) }
             }.getOrElse { e ->
@@ -237,7 +260,8 @@ class MainViewModel(
                     settingsRepository.pushRecentNote(currentNote, ev)
                 }
                 savedStateHandle[KEY_EVALUATION] = AppJson.encodeToString(ev)
-                _uiState.update { it.copy(evaluation = ev, isBusy = false) }
+                savedStateHandle[KEY_OFFLINE_NO_RATING] = false
+                _uiState.update { it.copy(evaluation = ev, isBusy = false, offlineNoRating = false) }
             }.onFailure { e ->
                 _uiState.update { it.copy(error = e.message ?: "Analyse fehlgeschlagen.", isBusy = false) }
             }
@@ -250,16 +274,22 @@ class MainViewModel(
     }
 
     fun saveToHistory(onSaved: (HistoryEntry) -> Unit = {}) {
-        val ev = _uiState.value.evaluation ?: return
+        val ev = _uiState.value.evaluation
+            ?: if (_uiState.value.offlineNoRating) Evaluation() else return
+        val isRatedEv = ev.goalResults.isNotEmpty() || ev.summary.isNotBlank() || ev.recognizedMeal.isNotBlank()
         val uri = _uiState.value.photoPreviewUri
         val note = _uiState.value.note
         viewModelScope.launch {
             _uiState.update { it.copy(savingHistory = true) }
             val entry = historyRepository.add(uri, ev, note = note)
             uri?.let { photoCaptureManager?.deleteCaptureFile(it) }
-            historyRepository.deleteDayFazitForEntry(entry)
-            historyRepository.deleteWeekFazitForEntry(entry)
-            settingsRepository.pushRecentNote(note, ev)
+            if (isRatedEv) {
+                historyRepository.deleteDayFazitForEntry(entry)
+                historyRepository.deleteWeekFazitForEntry(entry)
+                settingsRepository.pushRecentNote(note, ev)
+            } else if (note.isNotBlank()) {
+                settingsRepository.pushRecentNote(note)
+            }
             savedStateHandle[KEY_SAVED_TO_HISTORY] = true
             savedStateHandle[KEY_SAVED_ENTRY_ID] = entry.id
             _uiState.update {
@@ -316,6 +346,7 @@ class MainViewModel(
         savedStateHandle.remove<Long>(KEY_SAVED_ENTRY_ID)
         savedStateHandle.remove<Boolean>(KEY_MENU_OPEN)
         savedStateHandle.remove<String>(KEY_EVALUATION)
+        savedStateHandle.remove<Boolean>(KEY_OFFLINE_NO_RATING)
         _uiState.update { MainUiState() }
     }
 }

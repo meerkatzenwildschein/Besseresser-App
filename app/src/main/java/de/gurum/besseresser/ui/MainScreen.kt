@@ -82,7 +82,7 @@ fun MainScreen(
         viewModel.analyze(settings)
     }
 
-    val lastGoaled = uiState.evaluation != null || uiState.savedToHistory
+    val lastGoaled = uiState.evaluation != null || uiState.savedToHistory || uiState.offlineNoRating
     val navBlocked = uiState.isBusy || uiState.showCamera || uiState.showReview || (lastGoaled && !uiState.savedToHistory)
 
     Box(
@@ -148,7 +148,7 @@ fun MainScreen(
                 }
             )
         } else {
-            val reportShown = lastGoaled && !uiState.evaluation?.goalResults.isNullOrEmpty()
+            val reportShown = lastGoaled && (!uiState.evaluation?.goalResults.isNullOrEmpty() || uiState.offlineNoRating)
             val menuEnabled = !uiState.isBusy && !uiState.showCamera && !uiState.showReview && !(lastGoaled && !uiState.savedToHistory)
             MainReportView(
                 settings = settings,

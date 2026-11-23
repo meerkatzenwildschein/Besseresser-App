@@ -17,7 +17,9 @@ import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.NetworkConnectivityChecker
 import de.gurum.besseresser.data.PromptBundle
+import de.gurum.besseresser.data.PromptRepository
 import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.model.Evaluation
 import de.gurum.besseresser.model.HistoryEntry
@@ -31,7 +33,9 @@ class HistoryDetailViewModel(
     private val settingsRepository: SettingsRepository,
     private val apiService: BesseresserApiService,
     private val imagePreprocessor: ImagePreprocessor,
-    private val dispatchers: AppDispatchers = AppDispatchers()
+    private val dispatchers: AppDispatchers = AppDispatchers(),
+    private val promptRepository: PromptRepository? = null,
+    private val networkChecker: NetworkConnectivityChecker = NetworkConnectivityChecker { true }
 ) : ViewModel() {
 
     @Immutable
@@ -93,6 +97,12 @@ class HistoryDetailViewModel(
         textPrompt: String?
     ) {
         val entry = _uiState.value.entry ?: return
+        if (!networkChecker.isInternetAvailable()) {
+            val msg = promptRepository?.noInternetCannotRateMessage()
+                ?: "Keine Internetverbindung – KI-Bewertung ist aktuell nicht möglich."
+            _uiState.update { it.copy(reEvalBusy = false, error = msg) }
+            return
+        }
         _uiState.update { it.copy(reEvalBusy = true, error = null) }
         viewModelScope.launch {
             val photoFile = historyRepository.photoFileOf(entry)
@@ -114,11 +124,17 @@ class HistoryDetailViewModel(
                 return@launch
             }
             result.onSuccess { ev ->
+                val resolvedMeal = entry.recognizedMeal.ifBlank {
+                    ev.recognizedMeal.ifBlank { correctedText.trim() }
+                }
+                if (entry.recognizedMeal.isBlank() && resolvedMeal.isNotBlank()) {
+                    historyRepository.updateRecognizedMeal(entry.id, resolvedMeal)
+                }
                 historyRepository.updateEvaluation(entry.id, ev.goalResults, ev.summary)
                 if (entry.note.isNotBlank()) {
                     settingsRepository.updateRecentNoteEvaluation(
                         entry.note,
-                        Evaluation(goalResults = ev.goalResults, summary = ev.summary, recognizedMeal = entry.recognizedMeal)
+                        Evaluation(goalResults = ev.goalResults, summary = ev.summary, recognizedMeal = resolvedMeal)
                     )
                 }
                 historyRepository.deleteDayFazitForEntry(entry)

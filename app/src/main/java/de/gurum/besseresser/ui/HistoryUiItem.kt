@@ -66,7 +66,7 @@ fun buildHistoryUiItems(
     nowHour: Int = LocalTime.now().hour,
     fazitMap: Map<String, DayFazit> = emptyMap()
 ): List<HistoryUiItem> {
-    val weeksWithEntries = entries.map { weekKeyOf(it.dateMillis) }.toSet()
+    val weeksWithRatedEntries = entries.filter { it.isRated }.map { weekKeyOf(it.dateMillis) }.toSet()
     val rawGroups = groupByDay(entries)
     val displayGroups = if (rawGroups.any { it.day == today }) {
         rawGroups
@@ -81,7 +81,7 @@ fun buildHistoryUiItems(
     displayGroups.forEach { group ->
         val weekKey = weekKeyOf(group.day)
         if (weekKey !in seenWeeks &&
-            weekKey in weeksWithEntries &&
+            weekKey in weeksWithRatedEntries &&
             isWeekFazitDue(weekKey, today, nowHour)
         ) {
             seenWeeks.add(weekKey)
@@ -94,19 +94,17 @@ fun buildHistoryUiItems(
         }
 
         val dayKey = dayKeyOf(group.day)
-        val hasEntries = group.entries.isNotEmpty()
-        val fazit = if (hasEntries) fazitMap[dayKey] else null
-        val staleFazit = hasEntries && fazit != null && (
-            fazit.entryIds.toSet() != group.entries.map { it.id }.toSet() ||
-                (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(group.entries))
-        )
+        val ratedEntries = group.entries.filter { it.isRated }
+        val hasRatedEntries = ratedEntries.isNotEmpty()
+        val fazit = if (hasRatedEntries) fazitMap[dayKey] else null
+        val staleFazit = hasRatedEntries && fazit != null && isFazitOutdated(fazit, ratedEntries)
 
         items.add(
             HistoryUiItem.DayHeaderItem(
                 day = group.day,
                 dayKey = dayKey,
-                entries = group.entries,
-                hasEntries = hasEntries,
+                entries = ratedEntries,
+                hasEntries = hasRatedEntries,
                 staleFazit = staleFazit
             )
         )

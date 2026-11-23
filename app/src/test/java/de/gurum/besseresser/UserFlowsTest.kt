@@ -22,6 +22,7 @@ import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.model.Evaluation
 import de.gurum.besseresser.model.GoalResult
+import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.model.TrafficLight
 import de.gurum.besseresser.ui.HistoryDetailViewModel
@@ -416,5 +417,140 @@ class UserFlowsTest {
         assertEquals(secondUri, vm.uiState.value.photoPreviewUri)
         assertEquals("", vm.uiState.value.note)
         assertTrue(vm.uiState.value.showReview)
+    }
+
+    @Test
+    fun `offline main flow - shows no-internet error banner and allows saving unrated meal to history`() = runTest(testDispatcher) {
+        val captureUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/offline_meal.jpg")
+        val fakeCaptureManager = FakePhotoCaptureManager(
+            file = java.io.File("offline_meal.jpg"),
+            uri = captureUri
+        )
+        val histRepo = FakeHistoryRepository()
+        val setRepo = FakeSettingsRepository()
+        val vm = MainViewModel(
+            apiService = FakeApiService(),
+            historyRepository = histRepo,
+            settingsRepository = setRepo,
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            photoCaptureManager = fakeCaptureManager,
+            networkChecker = { false }
+        )
+
+        vm.setNote("Linseneintopf")
+        vm.onPhotoTaken(captureUri)
+        vm.analyze(
+            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            PromptBundle("", "", "", "", "", "", "", "")
+        )
+        advanceUntilIdle()
+
+        // Must not call AI, must set offlineNoRating = true and show error message
+        assertFalse(vm.uiState.value.isBusy)
+        assertEquals(null, vm.uiState.value.evaluation)
+        assertTrue(vm.uiState.value.offlineNoRating)
+        assertNotNull(vm.uiState.value.error)
+
+        // User can save unrated meal to history
+        vm.saveToHistory()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.savedToHistory)
+        assertTrue(fakeCaptureManager.deletedUris.contains(captureUri))
+        assertEquals(1, histRepo.getAll().size)
+        val savedEntry = histRepo.getAll().first()
+        assertFalse(savedEntry.isRated)
+        assertEquals("Linseneintopf", savedEntry.note)
+        assertTrue(savedEntry.goalResults.isEmpty())
+    }
+
+    @Test
+    fun `offline backdated flow - saves unrated entry without calling AI and opens detail view`() = runTest(testDispatcher) {
+        val histRepo = FakeHistoryRepository()
+        val setRepo = FakeSettingsRepository()
+        val apiService = FakeApiService()
+        val vm = HistoryViewModel(
+            apiService = apiService,
+            historyRepository = histRepo,
+            settingsRepository = setRepo,
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            networkChecker = { false }
+        )
+
+        val targetDay = LocalDate.of(2026, 11, 20)
+        vm.setAddTargetDay(targetDay)
+        vm.setAddTargetTime(LocalTime.of(13, 15))
+        vm.setAddNote("Gemüsepfanne")
+
+        var pickedEntry: HistoryEntry? = null
+        vm.submitBackdated(
+            photoUri = null,
+            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            promptBundle = null,
+            textPrompt = "Prompt",
+            onPick = { pickedEntry = it }
+        )
+        advanceUntilIdle()
+
+        assertEquals(0, apiService.analyzeTextCallCount)
+        assertNotNull(pickedEntry)
+        assertFalse(pickedEntry!!.isRated)
+        assertEquals("Gemüsepfanne", pickedEntry!!.note)
+        assertEquals(1, histRepo.getAll().size)
+    }
+
+    @Test
+    fun `unrated entry detail flow - blocks AI evaluation when still offline, succeeds when online`() = runTest(testDispatcher) {
+        val histRepo = FakeHistoryRepository()
+        val setRepo = FakeSettingsRepository()
+        val apiService = FakeApiService()
+        val unratedEntry = histRepo.add(
+            photoUri = null,
+            ev = Evaluation(),
+            note = "Haferflocken mit Beeren"
+        )
+        assertFalse(unratedEntry.isRated)
+
+        var online = false
+        val detailVm = HistoryDetailViewModel(
+            entryId = unratedEntry.id,
+            historyRepository = histRepo,
+            settingsRepository = setRepo,
+            apiService = apiService,
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            networkChecker = { online }
+        )
+        advanceUntilIdle()
+
+        // Try rating while still offline
+        detailVm.reEvaluate(
+            correctedText = "Haferflocken mit Beeren",
+            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Z1")),
+            photoPromptBundle = null,
+            textPrompt = "Evaluate Haferflocken"
+        )
+        advanceUntilIdle()
+
+        assertNotNull(detailVm.uiState.value.error)
+        assertFalse(histRepo.getAll().first().isRated)
+
+        // Now go online and trigger AI rating again
+        online = true
+        detailVm.reEvaluate(
+            correctedText = "Haferflocken mit Beeren",
+            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Z1")),
+            photoPromptBundle = null,
+            textPrompt = "Evaluate Haferflocken"
+        )
+        advanceUntilIdle()
+
+        assertEquals(null, detailVm.uiState.value.error)
+        val updatedEntry = histRepo.getAll().first()
+        assertTrue(updatedEntry.isRated)
+        assertEquals("Apfel und Nüsse", updatedEntry.recognizedMeal)
+        assertEquals(1, updatedEntry.goalResults.size)
     }
 }

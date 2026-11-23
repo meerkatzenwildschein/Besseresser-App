@@ -113,10 +113,10 @@ internal fun MainReportView(
             else HistoryEntry(goalResults = results).score
         }
 
-        if (lastGoaled && !results.isNullOrEmpty() && !savedToHistory) {
+        if (reportShown && !savedToHistory) {
             val summary = evaluation?.summary ?: ""
             val det = evaluation?.recognizedMeal.orEmpty()
-            if (summary.isNotBlank() || det.isNotBlank()) {
+            if (summary.isNotBlank() || det.isNotBlank() || note.isNotBlank()) {
                 CollapsibleSummaryBlock(
                     summary = summary,
                     recognizedMeal = det,
@@ -161,7 +161,7 @@ internal fun MainReportView(
             GoalRow(goal, res)
         }
 
-        if (lastGoaled && !results.isNullOrEmpty() && !savedToHistory) {
+        if (reportShown && !savedToHistory) {
             Spacer(Modifier.height(2.dp))
             Button(
                 onClick = onSaveToHistory,

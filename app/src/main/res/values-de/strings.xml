@@ -203,6 +203,12 @@
     <string name="history_duplicate_done">Essen auf %1$s dupliziert</string>
     <string name="history_delete_confirm_title">Eintrag löschen?</string>
     <string name="history_delete_confirm_text">Foto und Bewertung werden unwiderruflich entfernt.</string>
+    <string name="no_internet_saved_unrated">Keine Internetverbindung – ohne KI-Bewertung fortgefahren. Du kannst das Essen speichern und später im Verlauf bewerten.</string>
+    <string name="no_internet_cannot_rate">Keine Internetverbindung – KI-Bewertung ist aktuell nicht möglich.</string>
+    <string name="history_unrated_badge">Nicht bewertet</string>
+    <string name="history_unrated_hint">Antippen zum Öffnen &amp; KI-Bewerten</string>
+    <string name="history_entry_ai_rate">Durch KI bewerten</string>
+    <string name="erkannt_edit_title_unrated">Essensbeschreibung bearbeiten</string>
 
     <!-- Konfiguration / Backup -->
     <string name="menu_config">Konfiguration</string>

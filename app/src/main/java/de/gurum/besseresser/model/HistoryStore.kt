@@ -32,6 +32,11 @@ data class HistoryEntry(
     /** Effektiver Sortierschlüssel (Fallback auf dateMillis für ältere Backups/Einträge mit sortOrder == 0). */
     val effectiveSortOrder: Long
         get() = if (sortOrder != 0L) sortOrder else dateMillis
+
+    /** True, wenn für diesen Eintrag eine KI-Bewertung (Ziele, Gesamteindruck oder erkanntes Essen) vorliegt. */
+    val isRated: Boolean
+        get() = goalResults.isNotEmpty() || summary.isNotBlank() || recognizedMeal.isNotBlank()
+
     /** Ampel-Score 0..100 (gruen=100, gelb=50, rot=0, grau ausgeschlossen); -1 = nicht bewertbar. */
     val score: Int
         get() {
@@ -182,7 +187,8 @@ object DayFazitSession {
     val attemptedWeekly = mutableSetOf<String>()
 }
 
-/** „Quellen-Fingerprint" eines Tages: ID+recognizedMeal je Eintrag. Bearbeitete recognizedMeal-Texte
- *  oder gelöschte/ergänzte Einträge machen jedes Tagesfazit auf dieser Basis KEINEN gültigen Basis mehr. */
+/** „Quellen-Fingerprint" eines Tages: ID+recognizedMeal je bewertetem Eintrag. Unbewertete Einträge
+ *  (`!isRated`) werden ignoriert. Bearbeitete recognizedMeal-Texte oder gelöschte/ergänzte bewertete
+ *  Einträge machen jedes Tagesfazit auf dieser Basis veraltet. */
 fun dayFingerprint(entries: List<HistoryEntry>): String =
-    entries.sortedBy { it.id }.joinToString("|") { "${it.id}:${it.recognizedMeal}" }.hashCode().toString(16)
+    entries.filter { it.isRated }.sortedBy { it.id }.joinToString("|") { "${it.id}:${it.recognizedMeal}" }.hashCode().toString(16)

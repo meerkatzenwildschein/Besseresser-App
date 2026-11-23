@@ -21,6 +21,8 @@ interface PromptRepository {
     fun dayFazitMealDescriptions(entriesOfDay: List<HistoryEntry>): List<String>
     fun weekFazitMealDescriptions(entriesOfWeek: List<HistoryEntry>): List<String>
     fun profileContextLine(profile: Profile): String?
+    fun noInternetSavedUnratedMessage(): String = "Keine Internetverbindung – ohne KI-Bewertung fortgefahren."
+    fun noInternetCannotRateMessage(): String = "Keine Internetverbindung – KI-Bewertung ist aktuell nicht möglich."
 }
 
 class DefaultPromptRepository(
@@ -71,7 +73,7 @@ class DefaultPromptRepository(
     )
 
     override fun dayFazitMealDescriptions(entriesOfDay: List<HistoryEntry>): List<String> =
-        entriesOfDay.sortedBy { it.effectiveSortOrder }.map { e ->
+        entriesOfDay.filter { it.isRated }.sortedBy { it.effectiveSortOrder }.map { e ->
             val time = if (e.backdated)
                 context.getString(R.string.nacherfassen_label)
             else
@@ -84,7 +86,7 @@ class DefaultPromptRepository(
         }
 
     override fun weekFazitMealDescriptions(entriesOfWeek: List<HistoryEntry>): List<String> =
-        entriesOfWeek.sortedWith(
+        entriesOfWeek.filter { it.isRated }.sortedWith(
             compareBy<HistoryEntry> {
                 Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate()
             }.thenBy { it.effectiveSortOrder }
@@ -123,4 +125,10 @@ class DefaultPromptRepository(
         if (parts.isEmpty()) return null
         return context.getString(R.string.profile_ctx_header, parts.joinToString(" · "))
     }
+
+    override fun noInternetSavedUnratedMessage(): String =
+        context.getString(R.string.no_internet_saved_unrated)
+
+    override fun noInternetCannotRateMessage(): String =
+        context.getString(R.string.no_internet_cannot_rate)
 }

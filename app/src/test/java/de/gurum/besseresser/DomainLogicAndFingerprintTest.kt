@@ -640,4 +640,55 @@ class DomainLogicAndFingerprintTest {
         val headerStaleFp = itemsStaleFp.filterIsInstance<HistoryUiItem.DayHeaderItem>().first()
         assertTrue("Fazit with mismatched fingerprint must be marked stale", headerStaleFp.staleFazit)
     }
+
+    @Test
+    fun testUnratedEntriesExcludedFromFazitAndFingerprint() {
+        val today = LocalDate.of(2026, 11, 9)
+        val millis = today.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val ratedEntry = HistoryEntry(
+            id = 1L,
+            dateMillis = millis,
+            recognizedMeal = "Vollkornbrot",
+            goalResults = listOf(GoalResult("Z1", TrafficLight.GREEN, "Gut"))
+        )
+        val unratedEntry = HistoryEntry(
+            id = 2L,
+            dateMillis = millis + 1000L,
+            note = "Nur Foto ohne Internet",
+            recognizedMeal = "",
+            goalResults = emptyList(),
+            summary = ""
+        )
+
+        assertTrue(ratedEntry.isRated)
+        assertFalse(unratedEntry.isRated)
+
+        // Fingerprint must ignore unrated entries
+        val fpOnlyRated = dayFingerprint(listOf(ratedEntry))
+        val fpWithUnrated = dayFingerprint(listOf(ratedEntry, unratedEntry))
+        assertEquals("Unrated entry must not affect dayFingerprint", fpOnlyRated, fpWithUnrated)
+
+        // Existing day fazit must NOT become outdated when an unrated entry is added
+        val fazit = DayFazit(
+            dayKey = "20261109",
+            rating = TrafficLight.GREEN,
+            text = "Super Tag",
+            entryIds = listOf(1L),
+            fingerprint = fpOnlyRated
+        )
+        assertFalse(isFazitOutdated(fazit, listOf(ratedEntry, unratedEntry)))
+
+        // A day with ONLY unrated entries has hasEntries=false on DayHeaderItem (no day fazit chip)
+        // but still renders the MealEntryItem in the history list
+        val itemsOnlyUnrated = buildHistoryUiItems(
+            entries = listOf(unratedEntry),
+            today = today
+        )
+        val dayHeader = itemsOnlyUnrated.filterIsInstance<HistoryUiItem.DayHeaderItem>().first()
+        assertFalse("Day with only unrated entries should not offer day fazit", dayHeader.hasEntries)
+        assertTrue(dayHeader.entries.isEmpty())
+        val mealItems = itemsOnlyUnrated.filterIsInstance<HistoryUiItem.MealEntryItem>()
+        assertEquals(1, mealItems.size)
+        assertEquals(2L, mealItems.first().entry.id)
+    }
 }

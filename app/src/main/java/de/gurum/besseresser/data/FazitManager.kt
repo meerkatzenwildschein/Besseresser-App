@@ -24,10 +24,11 @@ class FazitManager(
         entries: List<HistoryEntry>,
         rawMap: Map<String, DayFazit>
     ): Map<String, DayFazit> {
-        if (entries.isEmpty()) return emptyMap()
+        val ratedEntries = entries.filter { it.isRated }
+        if (ratedEntries.isEmpty()) return emptyMap()
         val result = mutableMapOf<String, DayFazit>()
         for ((wk, wf) in rawMap) {
-            val wkEntries = entries.filter { weekKeyOf(it.dateMillis) == wk }
+            val wkEntries = ratedEntries.filter { weekKeyOf(it.dateMillis) == wk }
             val validated = validateWeekFazit(wk, wf, wkEntries)
             if (validated != null) {
                 result[wk] = validated
@@ -42,7 +43,8 @@ class FazitManager(
         entries: List<HistoryEntry>
     ): DayFazit? {
         if (fazit == null) return null
-        return if (entries.isNotEmpty() && fazit.fingerprint == dayFingerprint(entries)) {
+        val ratedEntries = entries.filter { it.isRated }
+        return if (ratedEntries.isNotEmpty() && fazit.fingerprint == dayFingerprint(ratedEntries)) {
             fazit
         } else {
             historyRepository.deleteWeekFazit(weekKey)
@@ -58,6 +60,7 @@ class FazitManager(
         mealDescriptions: List<String>,
         prompts: FazitPromptBundle
     ): Result<DayFazit> {
+        val ratedEntries = entriesOfDay.filter { it.isRated }
         val key = dayKeyOf(day)
         val result = apiService.dayFazit(
             settings = settings,
@@ -71,9 +74,9 @@ class FazitManager(
                 dayKey = key,
                 rating = res.rating,
                 text = res.text,
-                entryIds = entriesOfDay.map { it.id },
+                entryIds = ratedEntries.map { it.id },
                 createdAt = System.currentTimeMillis(),
-                fingerprint = dayFingerprint(entriesOfDay)
+                fingerprint = dayFingerprint(ratedEntries)
             )
             historyRepository.saveDayFazit(fazit)
             fazit
@@ -88,6 +91,7 @@ class FazitManager(
         mealDescriptions: List<String>,
         prompts: FazitPromptBundle
     ): Result<DayFazit> {
+        val ratedEntries = entriesOfWeek.filter { it.isRated }
         val result = apiService.dayFazit(
             settings = settings,
             goals = settings.goals,
@@ -97,8 +101,8 @@ class FazitManager(
         )
         return result.map { res ->
             val wf = DayFazit(
-                weekKey, res.rating, res.text, entriesOfWeek.map { it.id },
-                System.currentTimeMillis(), dayFingerprint(entriesOfWeek)
+                weekKey, res.rating, res.text, ratedEntries.map { it.id },
+                System.currentTimeMillis(), dayFingerprint(ratedEntries)
             )
             historyRepository.saveWeekFazit(wf)
             wf

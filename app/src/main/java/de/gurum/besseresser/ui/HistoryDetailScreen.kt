@@ -108,6 +108,50 @@ private val DuplicateCopyIcon: ImageVector by lazy {
     }.build()
 }
 
+/** Material-Design „AutoAwesome" (KI-Funkeln / Bewerten) als ImageVector. */
+private val AiSparkleIcon: ImageVector by lazy {
+    ImageVector.Builder(
+        name = "AutoAwesome",
+        defaultWidth = 24.dp,
+        defaultHeight = 24.dp,
+        viewportWidth = 24f,
+        viewportHeight = 24f
+    ).apply {
+        path(fill = SolidColor(Color.Black)) {
+            // Großer Stern
+            moveTo(19f, 9f)
+            lineTo(20.25f, 6.25f)
+            lineTo(23f, 5f)
+            lineTo(20.25f, 3.75f)
+            lineTo(19f, 1f)
+            lineTo(17.75f, 3.75f)
+            lineTo(15f, 5f)
+            lineTo(17.75f, 6.25f)
+            close()
+            // Kleiner Stern unten
+            moveTo(19f, 15f)
+            lineTo(17.75f, 17.75f)
+            lineTo(15f, 19f)
+            lineTo(17.75f, 20.25f)
+            lineTo(19f, 23f)
+            lineTo(20.25f, 20.25f)
+            lineTo(23f, 19f)
+            lineTo(20.25f, 17.75f)
+            close()
+            // Hauptstern Mitte-Links
+            moveTo(11.5f, 9.5f)
+            lineTo(9f, 4f)
+            lineTo(6.5f, 9.5f)
+            lineTo(1f, 12f)
+            lineTo(6.5f, 14.5f)
+            lineTo(9f, 20f)
+            lineTo(11.5f, 14.5f)
+            lineTo(17f, 12f)
+            close()
+        }
+    }.build()
+}
+
 /** Baut den Teilen-Text aus erkanntem Essen (🍽️) und allgemeiner Bewertung (🧠) zusammen. */
 internal fun buildShareText(
     recognizedMeal: String,
@@ -184,12 +228,45 @@ fun HistoryDetailScreen(
         viewModel.photoFile()
     }
 
-    // Fehler aus der Re-Evaluation als Toast anzeigen
-    LaunchedEffect(detailState.error) {
-        detailState.error?.let { msg ->
-            Toast.makeText(ctx, ctx.getString(R.string.dayfazit_error_prefix, msg), Toast.LENGTH_LONG).show()
-            viewModel.clearError()
+    val triggerAiEvaluation: (String) -> Unit = { descriptionText ->
+        val trimmed = descriptionText.trim()
+        val hasRecognizedOverride = entry.recognizedMeal.isNotBlank() || (trimmed.isNotBlank() && trimmed != entry.note.trim())
+        val noteHeader = when {
+            hasRecognizedOverride && trimmed.isNotBlank() -> ctx.getString(R.string.prompt_reeval_header, trimmed)
+            trimmed.isNotBlank() -> ctx.getString(R.string.prompt_note_header, trimmed)
+            else -> ""
         }
+        val photoBundle = PromptBundle(
+            intro = ctx.getString(R.string.prompt_eval_intro),
+            formatIntro = ctx.getString(R.string.prompt_eval_format),
+            ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+            exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+            responseLanguage = ctx.getString(R.string.prompt_eval_language),
+            recognized = ctx.getString(R.string.prompt_eval_recognized),
+            honesty = ctx.getString(R.string.prompt_honesty),
+            noteHeader = noteHeader
+        )
+        val textBundle = PromptBundle(
+            intro = ctx.getString(R.string.prompt_eval_intro_textonly),
+            formatIntro = ctx.getString(R.string.prompt_eval_format),
+            ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
+            exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
+            responseLanguage = ctx.getString(R.string.prompt_eval_language),
+            honesty = ctx.getString(R.string.prompt_honesty)
+        )
+        val textPrompt = if (trimmed.isNotBlank()) {
+            PromptBuilder.createAnalyzeTextPrompt(
+                goals = settings.goals,
+                promptBundle = textBundle,
+                textOnlyContext = ctx.getString(R.string.prompt_textonly_context, trimmed)
+            )
+        } else null
+        viewModel.reEvaluate(
+            correctedText = trimmed,
+            settings = settings,
+            photoPromptBundle = photoBundle,
+            textPrompt = textPrompt
+        )
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -204,21 +281,47 @@ fun HistoryDetailScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        IconButton(
-                            onClick = { showDuplicateDatePicker = true },
+                    if (entry.isRated) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
                             modifier = Modifier.size(48.dp)
                         ) {
-                            Icon(
-                                DuplicateCopyIcon,
-                                contentDescription = stringResource(R.string.history_entry_duplicate),
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            IconButton(
+                                onClick = { showDuplicateDatePicker = true },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    DuplicateCopyIcon,
+                                    contentDescription = stringResource(R.string.history_entry_duplicate),
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        Surface(
+                            shape = CircleShape,
+                            color = Color(0xFFF59E0B).copy(alpha = 0.22f),
+                            border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.65f)),
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    if (!detailState.reEvalBusy) {
+                                        triggerAiEvaluation(entry.recognizedMeal.ifBlank { entry.note })
+                                    }
+                                },
+                                enabled = !detailState.reEvalBusy,
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    AiSparkleIcon,
+                                    contentDescription = stringResource(R.string.history_entry_ai_rate),
+                                    tint = Color(0xFFD97706),
+                                    modifier = Modifier.size(21.dp)
+                                )
+                            }
                         }
                     }
                     Surface(
@@ -267,8 +370,16 @@ fun HistoryDetailScreen(
             }
         }
 
+        if (detailState.error != null) {
+            detailState.error?.let { msg ->
+                ErrorBanner(msg)
+            }
+        } else if (!entry.isRated && !detailState.reEvalBusy) {
+            ErrorBanner(stringResource(R.string.no_internet_saved_unrated))
+        }
+
         if (detailState.reEvalBusy) {
-            // Re-Bewertung durch KI läuft (nach recognizedMeal-Korrektur)
+            // Re-Bewertung durch KI läuft (nach recognizedMeal-Korrektur oder manuellem Klick)
             Surface(
                 color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
@@ -295,18 +406,16 @@ fun HistoryDetailScreen(
             }
         }
 
-        val canShare = photoFile != null || entry.recognizedMeal.isNotBlank() || entry.summary.isNotBlank()
-        if (entry.summary.isNotBlank() || entry.recognizedMeal.isNotBlank() || entry.note.isNotBlank()) {
-            // Gleicher antipbarer Block wie in der Auswertung: 🧠 sichtbar, 🍽️/📝 einklappbar,
-            // 🍽️ mit Pencil → recognizedMeal userkorrigierbar, unten rechts Teilen-Button
-            CollapsibleSummaryBlock(
-                summary = entry.summary,
-                recognizedMeal = entry.recognizedMeal,
-                note = entry.note,
-                onEditRecognizedMeal = { if (entry.recognizedMeal.isNotBlank()) showRecognizedEdit = true },
-                onShare = if (canShare) ({ shareHistoryEntry(ctx, viewModel.photoFile(), entry) }) else null
-            )
-        }
+        val canShare = photoFile != null || entry.recognizedMeal.isNotBlank() || entry.summary.isNotBlank() || entry.note.isNotBlank()
+        // Gleicher antipbarer Block wie in der Auswertung: 🧠 sichtbar, 🍽️/📝 einklappbar,
+        // 🍽️ mit Pencil → recognizedMeal/Beschreibung userkorrigierbar (auch wenn noch unbewertet), unten rechts Teilen-Button
+        CollapsibleSummaryBlock(
+            summary = entry.summary,
+            recognizedMeal = entry.recognizedMeal,
+            note = entry.note,
+            onEditRecognizedMeal = { showRecognizedEdit = true },
+            onShare = if (canShare) ({ shareHistoryEntry(ctx, viewModel.photoFile(), entry) }) else null
+        )
 
         Row(
             modifier = Modifier
@@ -337,7 +446,11 @@ fun HistoryDetailScreen(
                 }
             }
         }
-        entry.goalResults.forEach { GoalRow(it.goal, it) }
+        if (entry.goalResults.isNotEmpty()) {
+            entry.goalResults.forEach { GoalRow(it.goal, it) }
+        } else {
+            settings.goals.forEach { goal -> GoalRow(goal, null) }
+        }
 
         Spacer(Modifier.height(16.dp))
         }
@@ -345,40 +458,14 @@ fun HistoryDetailScreen(
 
     if (showRecognizedEdit) {
         RecognizedMealEditDialog(
-            initialText = entry.recognizedMeal,
+            initialText = entry.recognizedMeal.ifBlank { entry.note },
+            titleRes = if (entry.isRated) R.string.erkannt_edit_title else R.string.erkannt_edit_title_unrated,
             onOk = { newText ->
                 val trimmed = newText.trim()
                 viewModel.updateRecognizedMeal(trimmed)
                 showRecognizedEdit = false
-                if (trimmed.isNotBlank() && !detailState.reEvalBusy) {
-                    val photoBundle = PromptBundle(
-                        intro = ctx.getString(R.string.prompt_eval_intro),
-                        formatIntro = ctx.getString(R.string.prompt_eval_format),
-                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                        recognized = ctx.getString(R.string.prompt_eval_recognized),
-                        honesty = ctx.getString(R.string.prompt_honesty),
-                        noteHeader = ctx.getString(R.string.prompt_reeval_header, trimmed)
-                    )
-                    val textBundle = PromptBundle(
-                        intro = ctx.getString(R.string.prompt_eval_intro_textonly),
-                        formatIntro = ctx.getString(R.string.prompt_eval_format),
-                        ampelMeaning = ctx.getString(R.string.prompt_eval_ampel_meaning),
-                        exactlyOne = ctx.getString(R.string.prompt_eval_exactly_one),
-                        responseLanguage = ctx.getString(R.string.prompt_eval_language),
-                        honesty = ctx.getString(R.string.prompt_honesty)
-                    )
-                    viewModel.reEvaluate(
-                        correctedText = trimmed,
-                        settings = settings,
-                        photoPromptBundle = photoBundle,
-                        textPrompt = PromptBuilder.createAnalyzeTextPrompt(
-                            goals = settings.goals,
-                            promptBundle = textBundle,
-                            textOnlyContext = ctx.getString(R.string.prompt_textonly_context, trimmed)
-                        )
-                    )
+                if (!detailState.reEvalBusy && (trimmed.isNotBlank() || photoFile != null)) {
+                    triggerAiEvaluation(trimmed)
                 }
             },
             onDismiss = { showRecognizedEdit = false }

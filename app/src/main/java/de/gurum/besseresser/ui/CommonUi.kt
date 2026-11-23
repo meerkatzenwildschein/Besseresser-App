@@ -181,8 +181,9 @@ fun CollapsibleSummaryBlock(
     onEditRecognizedMeal: (() -> Unit)? = null,
     onShare: (() -> Unit)? = null
 ) {
-    val extraCount = listOf(recognizedMeal.isNotBlank(), note.isNotBlank()).count { it }
-    var expanded by remember { mutableStateOf(false) }
+    val showEditableRow = recognizedMeal.isNotBlank() || onEditRecognizedMeal != null
+    val extraCount = listOf(showEditableRow, note.isNotBlank()).count { it }
+    var expanded by remember(summary.isBlank()) { mutableStateOf(summary.isBlank()) }
     val chevron by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
 
     Surface(
@@ -235,10 +236,13 @@ private fun SummaryDetailsContent(
     onEditRecognizedMeal: (() -> Unit)?
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (recognizedMeal.isNotBlank()) {
-            RecognizedMealDetailCard(recognizedMeal = recognizedMeal, onEditRecognizedMeal = onEditRecognizedMeal)
+        if (recognizedMeal.isNotBlank() || onEditRecognizedMeal != null) {
+            val displayMeal = recognizedMeal.ifBlank {
+                note.ifBlank { stringResource(R.string.dayfazit_line_none) }
+            }
+            RecognizedMealDetailCard(recognizedMeal = displayMeal, onEditRecognizedMeal = onEditRecognizedMeal)
         }
-        if (note.isNotBlank()) {
+        if (note.isNotBlank() && recognizedMeal.isNotBlank()) {
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
@@ -374,11 +378,16 @@ private fun SummaryFooterRow(
 
 /** Dialog zum direkten Korrigieren des recognizedMeal-Essens-Textes. */
 @Composable
-fun RecognizedMealEditDialog(initialText: String, onOk: (String) -> Unit, onDismiss: () -> Unit) {
+fun RecognizedMealEditDialog(
+    initialText: String,
+    titleRes: Int = R.string.erkannt_edit_title,
+    onOk: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
     var text by remember { mutableStateOf(initialText) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.erkannt_edit_title)) },
+        title = { Text(stringResource(titleRes)) },
         text = {
             OutlinedTextField(
                 value = text,

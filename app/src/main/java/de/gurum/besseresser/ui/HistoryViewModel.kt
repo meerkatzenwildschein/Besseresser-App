@@ -20,6 +20,7 @@ import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.FazitManager
 import de.gurum.besseresser.data.ImagePreprocessor
+import de.gurum.besseresser.data.NetworkConnectivityChecker
 import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.model.calendarWeekOfKey
 import de.gurum.besseresser.model.DayFazit
@@ -55,7 +56,8 @@ class HistoryViewModel(
         profileRepository = profileRepository,
         promptRepository = promptRepository,
         dispatchers = dispatchers
-    )
+    ),
+    private val networkChecker: NetworkConnectivityChecker = NetworkConnectivityChecker { true }
 ) : ViewModel() {
 
     fun createCaptureFile(): Pair<File, Uri> {
@@ -264,6 +266,12 @@ class HistoryViewModel(
                 saveBackdatedEntry(cached, photoUri, onPick)
                 return@launch
             }
+            if (!networkChecker.isInternetAvailable()) {
+                settingsRepository.pushRecentNote(note)
+                _uiState.update { it.copy(showAddBusyCard = false, addError = null) }
+                saveBackdatedEntry(Evaluation(), photoUri, onPick)
+                return@launch
+            }
             settingsRepository.pushRecentNote(note)
             _uiState.update { it.copy(showAddBusyCard = true) }
             val result: Result<Evaluation> = when {
@@ -315,15 +323,20 @@ class HistoryViewModel(
         val time = _uiState.value.addTargetTime ?: LocalTime.now()
         val note = _uiState.value.addNote.trim()
         val millis = day.atTime(time.hour, time.minute).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val isRatedEv = ev.goalResults.isNotEmpty() || ev.summary.isNotBlank() || ev.recognizedMeal.isNotBlank()
         viewModelScope.launch {
             val entry = historyRepository.add(
                 photoUri = photoUriIn, ev = ev,
                 note = note, dateOverride = millis, backdated = false
             )
             photoUriIn?.let { photoCaptureManager?.deleteCaptureFile(it) }
-            historyRepository.deleteDayFazitForEntry(entry)
-            historyRepository.deleteWeekFazitForEntry(entry)
-            settingsRepository.pushRecentNote(note, ev)
+            if (isRatedEv) {
+                historyRepository.deleteDayFazitForEntry(entry)
+                historyRepository.deleteWeekFazitForEntry(entry)
+                settingsRepository.pushRecentNote(note, ev)
+            } else if (note.isNotBlank()) {
+                settingsRepository.pushRecentNote(note)
+            }
             savedStateHandle[KEY_SHOW_ADD_CAMERA] = false
             savedStateHandle[KEY_SHOW_ADD_REVIEW] = false
             savedStateHandle[KEY_SHOW_ADD_TEXT] = false
@@ -472,9 +485,10 @@ class HistoryViewModel(
     ) {
         val key = dayKeyOf(day)
         if (key in _uiState.value.loadingFazits) return
-        val entries = entriesOfDay ?: _uiState.value.entries.filter {
+        val entries = (entriesOfDay ?: _uiState.value.entries.filter {
             java.time.Instant.ofEpochMilli(it.dateMillis).atZone(ZoneId.systemDefault()).toLocalDate() == day
-        }
+        }).filter { it.isRated }
+        if (entries.isEmpty()) return
         viewModelScope.launch {
             val settings = settingsRepository.currentSettings()
             val profile = profileRepository?.currentProfile() ?: Profile()
@@ -498,7 +512,8 @@ class HistoryViewModel(
             val settings = settingsRepository.currentSettings()
             val profile = profileRepository?.currentProfile() ?: Profile()
             val promptContext = promptRepository?.profileContextLine(profile)
-            val wkEntries = _uiState.value.entries.filter { weekKeyOf(it.dateMillis) == weekKey }
+            val wkEntries = _uiState.value.entries.filter { it.isRated && weekKeyOf(it.dateMillis) == weekKey }
+            if (wkEntries.isEmpty()) return@launch
             val prompts = promptRepository?.createWeekFazitPrompts(calendarWeekOfKey(weekKey)) ?: FazitPromptBundle("", "", "", "")
             val mealDescriptions = promptRepository?.weekFazitMealDescriptions(wkEntries) ?: wkEntries.map { it.recognizedMeal }
             generateWeekFazit(
@@ -519,6 +534,8 @@ class HistoryViewModel(
         mealDescriptions: List<String>,
         prompts: FazitPromptBundle
     ) {
+        val ratedEntries = entriesOfDay.filter { it.isRated }
+        if (ratedEntries.isEmpty()) return
         val key = dayKeyOf(day)
         if (key in _uiState.value.loadingFazits) return
         _uiState.update {
@@ -530,7 +547,7 @@ class HistoryViewModel(
         viewModelScope.launch {
             fazitManager.computeDayFazit(
                 day = day,
-                entriesOfDay = entriesOfDay,
+                entriesOfDay = ratedEntries,
                 settings = settings,
                 promptContext = promptContext,
                 mealDescriptions = mealDescriptions,
@@ -549,6 +566,8 @@ class HistoryViewModel(
     ) {
         val wk = weekKey
         if (wk in _uiState.value.loadingWeeks) return
+        val wkEntries = _uiState.value.entries.filter { it.isRated && weekKeyOf(it.dateMillis) == wk }
+        if (wkEntries.isEmpty()) return
         _uiState.update {
             it.copy(
                 loadingWeek = true,
@@ -557,7 +576,6 @@ class HistoryViewModel(
                 expandedWeeks = it.expandedWeeks + wk
             )
         }
-        val wkEntries = _uiState.value.entries.filter { weekKeyOf(it.dateMillis) == wk }
         val lines = mealDescriptions ?: wkEntries.map { it.recognizedMeal }
         val promptBundle = prompts ?: FazitPromptBundle("", "", "", "")
         viewModelScope.launch {
@@ -698,6 +716,8 @@ class HistoryViewModel(
         val loadingFazits = _uiState.value.loadingFazits
 
         groupByDay(entries).take(2).forEach { group ->
+            val ratedEntries = group.entries.filter { it.isRated }
+            if (ratedEntries.isEmpty()) return@forEach
             val dayAutoReady = group.day.isBefore(nowDate) || autoFazitTime
             val key = dayKeyOf(group.day)
             if (key in loadingFazits || !dayAutoReady) return@forEach
@@ -708,20 +728,20 @@ class HistoryViewModel(
                     DayFazitSession.attempted.add(key)
                     generateFazit(
                         day = group.day,
-                        entriesOfDay = group.entries,
+                        entriesOfDay = ratedEntries,
                         settings = settings,
                         promptContext = promptContext,
-                        mealDescriptions = daymealDescriptionsProvider(group.entries),
+                        mealDescriptions = daymealDescriptionsProvider(ratedEntries),
                         prompts = dayPrompts
                     )
                 }
-            } else if (isFazitOutdated(fazit, group.entries)) {
+            } else if (isFazitOutdated(fazit, ratedEntries)) {
                 generateFazit(
                     day = group.day,
-                    entriesOfDay = group.entries,
+                    entriesOfDay = ratedEntries,
                     settings = settings,
                     promptContext = promptContext,
-                    mealDescriptions = daymealDescriptionsProvider(group.entries),
+                    mealDescriptions = daymealDescriptionsProvider(ratedEntries),
                     prompts = dayPrompts
                 )
             }
@@ -743,7 +763,8 @@ class HistoryViewModel(
 
         if (dueWk !in loadingWeeks && weekFazitMap[dueWk] == null && dueWk !in DayFazitSession.attemptedWeekly) {
             DayFazitSession.attemptedWeekly.add(dueWk)
-            val wkEntries = entries.filter { weekKeyOf(it.dateMillis) == dueWk }
+            val wkEntries = entries.filter { it.isRated && weekKeyOf(it.dateMillis) == dueWk }
+            if (wkEntries.isEmpty()) return
             generateWeekFazit(
                 settings = settings,
                 promptContext = promptContext,

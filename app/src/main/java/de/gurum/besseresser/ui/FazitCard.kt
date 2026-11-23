@@ -288,8 +288,9 @@ fun createWeekFazitPrompts(ctx: Context, calendarWeek: Int = calendarWeekOf()): 
 )
 
 fun isFazitOutdated(fazit: DayFazit, entries: List<HistoryEntry>): Boolean {
-    if (fazit.entryIds.toSet() != entries.map { it.id }.toSet()) return true
-    return fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(entries)
+    val ratedEntries = entries.filter { it.isRated }
+    if (fazit.entryIds.toSet() != ratedEntries.map { it.id }.toSet()) return true
+    return fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(ratedEntries)
 }
 
 /** Ein Wochenfazit steht bereit (sichtbar & auto-generierbar), sobald der Sonntag der betreffenden
@@ -309,13 +310,14 @@ fun isWeekFazitDue(
     }
 }
 
-/** Liefert den neuesten fälligen Wochen-Key (mit vorhandenen Einträgen), z. B. am Montag die abgelaufene
+/** Liefert den neuesten fälligen Wochen-Key (mit vorhandenen bewerteten Einträgen), z. B. am Montag die abgelaufene
  *  Vorwoche oder am Sonntag ab 18:00 Uhr die laufende Woche. */
 fun latestDueWeekKey(
     entries: List<HistoryEntry>,
     nowDate: LocalDate = LocalDate.now(),
     nowHour: Int = LocalTime.now().hour
 ): String? = entries
+    .filter { it.isRated }
     .map { weekKeyOf(it.dateMillis) }
     .distinct()
     .sortedDescending()
@@ -328,16 +330,18 @@ fun handleAutoDayFazit(
     autoFazitTime: Boolean,
     onGenerateFazit: (LocalDate, List<HistoryEntry>) -> Unit
 ) {
+    val ratedEntries = group.entries.filter { it.isRated }
+    if (ratedEntries.isEmpty()) return
     val key = dayKeyOf(group.day)
     if (key in loadingFazits || !autoFazitTime) return
     val fazit = fazitMap[key]
     if (fazit == null) {
         if (key !in DayFazitSession.attempted) {
             DayFazitSession.attempted.add(key)
-            onGenerateFazit(group.day, group.entries)
+            onGenerateFazit(group.day, ratedEntries)
         }
-    } else if (isFazitOutdated(fazit, group.entries)) {
-        onGenerateFazit(group.day, group.entries)
+    } else if (isFazitOutdated(fazit, ratedEntries)) {
+        onGenerateFazit(group.day, ratedEntries)
     }
 }
 
