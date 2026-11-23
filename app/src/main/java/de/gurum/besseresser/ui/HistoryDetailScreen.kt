@@ -375,7 +375,7 @@ fun HistoryDetailScreen(
                 ErrorBanner(msg)
             }
         } else if (!entry.isRated && !detailState.reEvalBusy) {
-            ErrorBanner(stringResource(R.string.no_internet_saved_unrated))
+            ErrorBanner(stringResource(R.string.unrated_entry_banner))
         }
 
         if (detailState.reEvalBusy) {

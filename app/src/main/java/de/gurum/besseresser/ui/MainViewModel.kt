@@ -249,7 +249,15 @@ class MainViewModel(
             val dataUri = runCatching {
                 withContext(dispatchers.io) { imagePreprocessor.prepareImageDataUri(uri) }
             }.getOrElse { e ->
-                _uiState.update { it.copy(error = e.message ?: "Foto konnte nicht gelesen werden.", isBusy = false) }
+                savedStateHandle[KEY_OFFLINE_NO_RATING] = true
+                _uiState.update {
+                    it.copy(
+                        error = e.message ?: "Foto konnte nicht gelesen werden.",
+                        isBusy = false,
+                        evaluation = null,
+                        offlineNoRating = true
+                    )
+                }
                 return@launch
             }
             val resolvedPrompts = promptBundle ?: promptRepository?.createAnalyzePromptBundle(currentNote)
@@ -263,7 +271,15 @@ class MainViewModel(
                 savedStateHandle[KEY_OFFLINE_NO_RATING] = false
                 _uiState.update { it.copy(evaluation = ev, isBusy = false, offlineNoRating = false) }
             }.onFailure { e ->
-                _uiState.update { it.copy(error = e.message ?: "Analyse fehlgeschlagen.", isBusy = false) }
+                savedStateHandle[KEY_OFFLINE_NO_RATING] = true
+                _uiState.update {
+                    it.copy(
+                        error = e.message ?: "Analyse fehlgeschlagen.",
+                        isBusy = false,
+                        evaluation = null,
+                        offlineNoRating = true
+                    )
+                }
             }
         }
     }

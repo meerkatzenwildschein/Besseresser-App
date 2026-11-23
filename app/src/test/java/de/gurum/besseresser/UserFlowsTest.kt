@@ -553,4 +553,89 @@ class UserFlowsTest {
         assertEquals("Apfel und Nüsse", updatedEntry.recognizedMeal)
         assertEquals(1, updatedEntry.goalResults.size)
     }
+
+    @Test
+    fun `api error main flow - shows error banner and allows saving unrated meal to history`() = runTest(testDispatcher) {
+        val captureUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/failed_ai_meal.jpg")
+        val fakeCaptureManager = FakePhotoCaptureManager(
+            file = java.io.File("failed_ai_meal.jpg"),
+            uri = captureUri
+        )
+        val histRepo = FakeHistoryRepository()
+        val setRepo = FakeSettingsRepository()
+        val failingApi = FakeApiService(
+            analyzeResult = Result.failure(RuntimeException("HTTP 503 Service Unavailable"))
+        )
+        val vm = MainViewModel(
+            apiService = failingApi,
+            historyRepository = histRepo,
+            settingsRepository = setRepo,
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            photoCaptureManager = fakeCaptureManager,
+            networkChecker = { true }
+        )
+
+        vm.setNote("Kürbissuppe")
+        vm.onPhotoTaken(captureUri)
+        vm.analyze(
+            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            PromptBundle("", "", "", "", "", "", "", "")
+        )
+        advanceUntilIdle()
+
+        // AI failed, so error must be displayed and saving without rating must be enabled
+        assertFalse(vm.uiState.value.isBusy)
+        assertEquals(null, vm.uiState.value.evaluation)
+        assertTrue(vm.uiState.value.offlineNoRating)
+        assertEquals("HTTP 503 Service Unavailable", vm.uiState.value.error)
+
+        vm.saveToHistory()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.savedToHistory)
+        assertTrue(fakeCaptureManager.deletedUris.contains(captureUri))
+        assertEquals(1, histRepo.getAll().size)
+        val savedEntry = histRepo.getAll().first()
+        assertFalse(savedEntry.isRated)
+        assertEquals("Kürbissuppe", savedEntry.note)
+    }
+
+    @Test
+    fun `api error backdated flow - saves unrated entry to history and records error when AI fails`() = runTest(testDispatcher) {
+        val histRepo = FakeHistoryRepository()
+        val setRepo = FakeSettingsRepository()
+        val failingApi = FakeApiService(
+            analyzeTextResult = Result.failure(RuntimeException("API Timeout"))
+        )
+        val vm = HistoryViewModel(
+            apiService = failingApi,
+            historyRepository = histRepo,
+            settingsRepository = setRepo,
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            networkChecker = { true }
+        )
+
+        vm.setAddTargetDay(LocalDate.of(2026, 11, 21))
+        vm.setAddTargetTime(LocalTime.of(19, 0))
+        vm.setAddNote("Abendbrot")
+
+        var pickedEntry: HistoryEntry? = null
+        vm.submitBackdated(
+            photoUri = null,
+            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            promptBundle = null,
+            textPrompt = "Prompt",
+            onPick = { pickedEntry = it }
+        )
+        advanceUntilIdle()
+
+        assertEquals(1, failingApi.analyzeTextCallCount)
+        assertEquals("API Timeout", vm.uiState.value.addError)
+        assertNotNull(pickedEntry)
+        assertFalse(pickedEntry!!.isRated)
+        assertEquals("Abendbrot", pickedEntry!!.note)
+        assertEquals(1, histRepo.getAll().size)
+    }
 }

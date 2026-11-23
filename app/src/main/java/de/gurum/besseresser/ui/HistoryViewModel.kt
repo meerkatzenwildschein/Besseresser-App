@@ -280,6 +280,7 @@ class HistoryViewModel(
                         withContext(dispatchers.io) { imagePreprocessor.prepareImageDataUri(photoUri) }
                     }.getOrElse { e ->
                         _uiState.update { it.copy(showAddBusyCard = false, addError = e.message) }
+                        saveBackdatedEntry(Evaluation(), photoUri, onPick)
                         return@launch
                     }
                     apiService.analyze(dataUri, settings, promptBundle)
@@ -296,6 +297,7 @@ class HistoryViewModel(
                 saveBackdatedEntry(ev, photoUri, onPick)
             }.onFailure { e ->
                 _uiState.update { it.copy(showAddBusyCard = false, addError = e.message ?: e.javaClass.simpleName) }
+                saveBackdatedEntry(Evaluation(), photoUri, onPick)
             }
         }
     }

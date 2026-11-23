@@ -205,6 +205,7 @@
     <string name="history_delete_confirm_text">Photo and rating will be removed irreversibly.</string>
     <string name="no_internet_saved_unrated">No internet connection – meal continued without AI rating. You can rate it later in the history.</string>
     <string name="no_internet_cannot_rate">No internet connection – AI rating is currently unavailable.</string>
+    <string name="unrated_entry_banner">This meal has no AI rating yet. You can trigger the AI rating via the ✨ icon at the top right or by editing the description.</string>
     <string name="history_unrated_badge">Not rated</string>
     <string name="history_unrated_hint">Tap to open &amp; rate with AI</string>
     <string name="history_entry_ai_rate">Rate with AI</string>

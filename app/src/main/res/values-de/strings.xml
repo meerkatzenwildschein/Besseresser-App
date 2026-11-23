@@ -205,6 +205,7 @@
     <string name="history_delete_confirm_text">Foto und Bewertung werden unwiderruflich entfernt.</string>
     <string name="no_internet_saved_unrated">Keine Internetverbindung – ohne KI-Bewertung fortgefahren. Du kannst das Essen speichern und später im Verlauf bewerten.</string>
     <string name="no_internet_cannot_rate">Keine Internetverbindung – KI-Bewertung ist aktuell nicht möglich.</string>
+    <string name="unrated_entry_banner">Für dieses Essen liegt noch keine KI-Bewertung vor. Du kannst die Bewertung über das ✨-Symbol oben rechts oder durch Bearbeiten der Beschreibung starten.</string>
     <string name="history_unrated_badge">Nicht bewertet</string>
     <string name="history_unrated_hint">Antippen zum Öffnen &amp; KI-Bewerten</string>
     <string name="history_entry_ai_rate">Durch KI bewerten</string>
