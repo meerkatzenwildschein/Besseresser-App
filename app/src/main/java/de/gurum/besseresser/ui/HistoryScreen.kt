@@ -48,24 +48,13 @@ fun HistoryScreen(
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Capture file is created fresh on demand, not at composition time.
-    val addCaptureState = remember { mutableStateOf<Pair<File, Uri>?>(null) }
-    fun ensureAddCaptureFile(): Pair<File, Uri> {
-        val existing = addCaptureState.value
-        if (existing != null) return existing
-        val fresh = photoCaptureManager.createCaptureFile()
-        addCaptureState.value = fresh
-        return fresh
-    }
-
     val addSystemCameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { ok ->
         if (ok) {
             viewModel.setShowAddReview(true)
         } else {
-            addCaptureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
-            addCaptureState.value = null
+            viewModel.cancelAddPhotoCapture()
         }
     }
 
@@ -75,14 +64,10 @@ fun HistoryScreen(
         }
     }
     BackHandler(enabled = uiState.showAddCamera) {
-        viewModel.setShowAddCamera(false)
-        addCaptureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
-        addCaptureState.value = null
+        viewModel.cancelAddPhotoCapture()
     }
     BackHandler(enabled = uiState.showAddReview) {
-        viewModel.setShowAddReview(false)
-        addCaptureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
-        addCaptureState.value = null
+        viewModel.cancelAddPhotoCapture()
     }
     BackHandler(enabled = uiState.showAddText) { viewModel.setShowAddText(false) }
 
@@ -158,43 +143,32 @@ fun HistoryScreen(
             BackdatedBusyDialog()
         }
 
-        val activeAddCapture = if (uiState.showAddCamera || uiState.showAddReview) {
-            ensureAddCaptureFile()
-        } else {
-            addCaptureState.value
-        }
-
         BackdatedOverlays(
             showCamera = uiState.showAddCamera,
             showReview = uiState.showAddReview,
             showText = uiState.showAddText,
             showBusy = uiState.showAddBusyCard,
-            addPhotoFile = activeAddCapture?.first,
-            addPhotoUri = activeAddCapture?.second,
+            addPhotoFile = uiState.addPhotoFile,
+            addPhotoUri = uiState.addPhotoUri,
             addNote = uiState.addNote,
             addTargetDay = uiState.addTargetDay,
             settings = settings,
             onNoteChange = { viewModel.setAddNote(it) },
             onDismissCamera = {
-                viewModel.setShowAddCamera(false)
-                addCaptureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
-                addCaptureState.value = null
+                viewModel.cancelAddPhotoCapture()
             },
             onDismissReview = {
-                viewModel.setShowAddReview(false)
-                addCaptureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
-                addCaptureState.value = null
+                viewModel.cancelAddPhotoCapture()
             },
             onDismissText = { viewModel.setShowAddText(false) },
             onFallbackSystemCamera = {
+                val (_, uri) = viewModel.ensureAddCaptureFile()
                 viewModel.setShowAddCamera(false)
-                val (_, uri) = ensureAddCaptureFile()
                 addSystemCameraLauncher.launch(uri)
             },
             onSubmitBackdated = { uri, textOnly ->
                 viewModel.setShowAddCamera(false)
                 viewModel.setShowAddReview(false)
-                addCaptureState.value = null
                 viewModel.submitBackdated(
                     photoUri = uri,
                     textOnly = textOnly,

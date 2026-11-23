@@ -638,4 +638,92 @@ class UserFlowsTest {
         assertEquals("Abendbrot", pickedEntry!!.note)
         assertEquals(1, histRepo.getAll().size)
     }
+
+    @Test
+    fun `backdated with photo flow - setShowAddCamera allocates capture file and submitBackdated saves and cleans up`() = runTest(testDispatcher) {
+        val captureFile = java.io.File("backdated_photo.jpg")
+        val captureUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/backdated_photo.jpg")
+        val fakeCaptureManager = FakePhotoCaptureManager(
+            file = captureFile,
+            uri = captureUri
+        )
+        val histRepo = FakeHistoryRepository()
+        val setRepo = FakeSettingsRepository()
+        val apiService = FakeApiService()
+        val vm = HistoryViewModel(
+            apiService = apiService,
+            historyRepository = histRepo,
+            settingsRepository = setRepo,
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            photoCaptureManager = fakeCaptureManager
+        )
+
+        // User taps "+" -> selects "With photo"
+        val targetDay = LocalDate.of(2026, 11, 22)
+        val targetTime = LocalTime.of(12, 45)
+        vm.setAddTargetDay(targetDay)
+        vm.setAddTargetTime(targetTime)
+        vm.setAddDialogForDay(null)
+        vm.setShowAddCamera(true)
+
+        // Camera overlay precondition: both showAddCamera and addPhotoFile must be non-null
+        assertTrue(vm.uiState.value.showAddCamera)
+        assertEquals(captureFile, vm.uiState.value.addPhotoFile)
+        assertEquals(captureUri, vm.uiState.value.addPhotoUri)
+        assertEquals(1, fakeCaptureManager.callCount)
+
+        // User enters note and confirms photo capture in CameraCaptureScreen
+        vm.setAddNote("Griechischer Salat")
+        vm.setShowAddCamera(false)
+        assertFalse("Capture file must NOT be deleted when camera closes on confirm", fakeCaptureManager.deletedFiles.contains(captureFile))
+
+        var pickedEntry: HistoryEntry? = null
+        vm.submitBackdated(
+            photoUri = vm.uiState.value.addPhotoUri,
+            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Z1")),
+            promptBundle = PromptBundle("", "", "", "", "", "", "", ""),
+            textPrompt = null,
+            onPick = { pickedEntry = it }
+        )
+        advanceUntilIdle()
+
+        assertNotNull(pickedEntry)
+        assertTrue(pickedEntry!!.isRated)
+        assertEquals("Griechischer Salat", pickedEntry!!.note)
+        assertTrue(fakeCaptureManager.deletedUris.contains(captureUri))
+        assertNull(vm.uiState.value.addPhotoFile)
+        assertNull(vm.uiState.value.addPhotoUri)
+        assertFalse(vm.uiState.value.showAddCamera)
+    }
+
+    @Test
+    fun `backdated with photo flow - cancelAddPhotoCapture deletes temporary capture file and resets state`() = runTest(testDispatcher) {
+        val captureFile = java.io.File("cancelled_backdated.jpg")
+        val captureUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/cancelled_backdated.jpg")
+        val fakeCaptureManager = FakePhotoCaptureManager(
+            file = captureFile,
+            uri = captureUri
+        )
+        val vm = HistoryViewModel(
+            apiService = FakeApiService(),
+            historyRepository = FakeHistoryRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            photoCaptureManager = fakeCaptureManager
+        )
+
+        vm.setShowAddCamera(true)
+        assertEquals(captureFile, vm.uiState.value.addPhotoFile)
+
+        // User cancels camera overlay
+        vm.cancelAddPhotoCapture()
+
+        assertFalse(vm.uiState.value.showAddCamera)
+        assertFalse(vm.uiState.value.showAddReview)
+        assertNull(vm.uiState.value.addPhotoFile)
+        assertNull(vm.uiState.value.addPhotoUri)
+        assertTrue(fakeCaptureManager.deletedFiles.contains(captureFile))
+    }
 }

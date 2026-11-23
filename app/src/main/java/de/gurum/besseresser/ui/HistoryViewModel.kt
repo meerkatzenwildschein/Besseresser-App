@@ -197,12 +197,66 @@ class HistoryViewModel(
 
     fun setShowAddCamera(show: Boolean) {
         savedStateHandle[KEY_SHOW_ADD_CAMERA] = show
-        _uiState.update { it.copy(showAddCamera = show) }
+        val current = _uiState.value
+        val capturePair = if (show && current.addPhotoFile == null) {
+            photoCaptureManager?.createCaptureFile()
+        } else null
+        _uiState.update {
+            it.copy(
+                showAddCamera = show,
+                addPhotoFile = capturePair?.first ?: it.addPhotoFile,
+                addPhotoUri = capturePair?.second ?: it.addPhotoUri
+            )
+        }
     }
 
     fun setShowAddReview(show: Boolean) {
         savedStateHandle[KEY_SHOW_ADD_REVIEW] = show
-        _uiState.update { it.copy(showAddReview = show) }
+        val current = _uiState.value
+        val capturePair = if (show && current.addPhotoFile == null) {
+            photoCaptureManager?.createCaptureFile()
+        } else null
+        _uiState.update {
+            it.copy(
+                showAddReview = show,
+                addPhotoFile = capturePair?.first ?: it.addPhotoFile,
+                addPhotoUri = capturePair?.second ?: it.addPhotoUri
+            )
+        }
+    }
+
+    /** Stellt sicher, dass eine temporäre Foto-Zieldatei für die Nacherfassung existiert (z. B. vor Start der Systemkamera). */
+    fun ensureAddCaptureFile(): Pair<File, Uri> {
+        val current = _uiState.value
+        val existingFile = current.addPhotoFile
+        val existingUri = current.addPhotoUri
+        if (existingFile != null && existingUri != null) {
+            return existingFile to existingUri
+        }
+        val fresh = createCaptureFile()
+        _uiState.update { it.copy(addPhotoFile = fresh.first, addPhotoUri = fresh.second) }
+        return fresh
+    }
+
+    /** Bricht die Foto-Nacherfassung (Kamera oder Review) ab und löscht die temporäre Foto-Datei. */
+    fun cancelAddPhotoCapture() {
+        val fileToDelete = _uiState.value.addPhotoFile
+        val uriToDelete = _uiState.value.addPhotoUri
+        savedStateHandle[KEY_SHOW_ADD_CAMERA] = false
+        savedStateHandle[KEY_SHOW_ADD_REVIEW] = false
+        _uiState.update {
+            it.copy(
+                showAddCamera = false,
+                showAddReview = false,
+                addPhotoFile = null,
+                addPhotoUri = null
+            )
+        }
+        if (fileToDelete != null) {
+            photoCaptureManager?.deleteCaptureFile(fileToDelete)
+        } else if (uriToDelete != null) {
+            photoCaptureManager?.deleteCaptureFile(uriToDelete)
+        }
     }
 
     fun setShowAddText(show: Boolean) {
@@ -240,12 +294,13 @@ class HistoryViewModel(
         textOnly: Boolean = false,
         onPick: (HistoryEntry) -> Unit = {}
     ) {
+        val resolvedUri = if (textOnly) null else (photoUri ?: _uiState.value.addPhotoUri)
         val note = _uiState.value.addNote.trim()
         viewModelScope.launch {
             val settings = settingsRepository.currentSettings()
-            val promptBundle = if (photoUri != null) promptRepository?.createAnalyzePromptBundle(note) else null
+            val promptBundle = if (resolvedUri != null) promptRepository?.createAnalyzePromptBundle(note) else null
             val textPrompt = if (textOnly) promptRepository?.createAnalyzeTextPrompt(settings.goals, note) else null
-            submitBackdated(photoUri, settings, promptBundle, textPrompt, onPick)
+            submitBackdated(resolvedUri, settings, promptBundle, textPrompt, onPick)
         }
     }
 
@@ -324,6 +379,7 @@ class HistoryViewModel(
         val day = _uiState.value.addTargetDay ?: return
         val time = _uiState.value.addTargetTime ?: LocalTime.now()
         val note = _uiState.value.addNote.trim()
+        val stateFile = _uiState.value.addPhotoFile
         val millis = day.atTime(time.hour, time.minute).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val isRatedEv = ev.goalResults.isNotEmpty() || ev.summary.isNotBlank() || ev.recognizedMeal.isNotBlank()
         viewModelScope.launch {
@@ -331,7 +387,11 @@ class HistoryViewModel(
                 photoUri = photoUriIn, ev = ev,
                 note = note, dateOverride = millis, backdated = false
             )
-            photoUriIn?.let { photoCaptureManager?.deleteCaptureFile(it) }
+            if (photoUriIn != null) {
+                photoCaptureManager?.deleteCaptureFile(photoUriIn)
+            } else if (stateFile != null) {
+                photoCaptureManager?.deleteCaptureFile(stateFile)
+            }
             if (isRatedEv) {
                 historyRepository.deleteDayFazitForEntry(entry)
                 historyRepository.deleteWeekFazitForEntry(entry)
@@ -351,6 +411,8 @@ class HistoryViewModel(
                     showAddReview = false,
                     showAddText = false,
                     showAddBusyCard = false,
+                    addPhotoFile = null,
+                    addPhotoUri = null,
                     addNote = "",
                     addTargetDay = null,
                     addTargetTime = null

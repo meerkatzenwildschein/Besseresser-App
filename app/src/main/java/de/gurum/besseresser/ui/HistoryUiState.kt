@@ -1,8 +1,10 @@
 package de.gurum.besseresser.ui
 
+import android.net.Uri
 import androidx.compose.runtime.Immutable
 import de.gurum.besseresser.model.DayFazit
 import de.gurum.besseresser.model.HistoryEntry
+import java.io.File
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -27,6 +29,8 @@ data class HistoryUiState(
     val showAddReview: Boolean = false,
     val showAddText: Boolean = false,
     val showAddBusyCard: Boolean = false,
+    val addPhotoFile: File? = null,
+    val addPhotoUri: Uri? = null,
     val addNote: String = "",
     val addTargetDay: LocalDate? = null,
     val addTargetTime: LocalTime? = null,
