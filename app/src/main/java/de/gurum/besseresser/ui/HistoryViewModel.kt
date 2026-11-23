@@ -127,7 +127,7 @@ class HistoryViewModel(
             }.collect { data ->
                 val nowDate = LocalDate.now()
                 val nowHour = LocalTime.now().hour
-                val items = buildHistoryUiItems(data.entries, nowDate, nowHour)
+                val items = buildHistoryUiItems(data.entries, nowDate, nowHour, fazitMap = data.dayFazits)
                 _uiState.update { current ->
                     current.copy(
                         entries = data.entries,
@@ -458,7 +458,7 @@ class HistoryViewModel(
 
         val nowDate = LocalDate.now()
         val nowHour = LocalTime.now().hour
-        val items = buildHistoryUiItems(updatedAllEntries, nowDate, nowHour)
+        val items = buildHistoryUiItems(updatedAllEntries, nowDate, nowHour, fazitMap = _uiState.value.fazitMap)
         _uiState.update { it.copy(entries = updatedAllEntries, uiItems = items) }
 
         viewModelScope.launch {

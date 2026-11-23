@@ -1,8 +1,10 @@
 package de.gurum.besseresser.ui
 
 import androidx.compose.runtime.Immutable
+import de.gurum.besseresser.model.DayFazit
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.calendarWeekOfKey
+import de.gurum.besseresser.model.dayFingerprint
 import de.gurum.besseresser.model.dayKeyOf
 import de.gurum.besseresser.model.weekKeyOf
 import java.time.Instant
@@ -33,7 +35,8 @@ sealed interface HistoryUiItem {
         val day: LocalDate,
         val dayKey: String,
         val entries: List<HistoryEntry>,
-        val hasEntries: Boolean
+        val hasEntries: Boolean,
+        val staleFazit: Boolean = false
     ) : HistoryUiItem {
         override val key: String get() = "day-$dayKey"
     }
@@ -56,11 +59,12 @@ fun groupByDay(entries: List<HistoryEntry>): List<DayGroup> =
         DayGroup(day = day, entries = list.sortedByDescending { it.effectiveSortOrder })
     }.sortedByDescending { it.day }
 
-/** Erstellt eine flache, nebeneffektfreie Liste von UI-Elementen für die Historienliste. */
+/** Erstellt eine flache, nebeneffektfreie Liste von UI-Elementen für die Historienliste mit vorberechneten Zuständen. */
 fun buildHistoryUiItems(
     entries: List<HistoryEntry>,
     today: LocalDate = LocalDate.now(),
-    nowHour: Int = LocalTime.now().hour
+    nowHour: Int = LocalTime.now().hour,
+    fazitMap: Map<String, DayFazit> = emptyMap()
 ): List<HistoryUiItem> {
     val weeksWithEntries = entries.map { weekKeyOf(it.dateMillis) }.toSet()
     val rawGroups = groupByDay(entries)
@@ -91,12 +95,19 @@ fun buildHistoryUiItems(
 
         val dayKey = dayKeyOf(group.day)
         val hasEntries = group.entries.isNotEmpty()
+        val fazit = if (hasEntries) fazitMap[dayKey] else null
+        val staleFazit = hasEntries && fazit != null && (
+            fazit.entryIds.toSet() != group.entries.map { it.id }.toSet() ||
+                (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(group.entries))
+        )
+
         items.add(
             HistoryUiItem.DayHeaderItem(
                 day = group.day,
                 dayKey = dayKey,
                 entries = group.entries,
-                hasEntries = hasEntries
+                hasEntries = hasEntries,
+                staleFazit = staleFazit
             )
         )
 

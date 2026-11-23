@@ -586,4 +586,58 @@ class DomainLogicAndFingerprintTest {
         assertEquals(1, (items[5] as HistoryUiItem.MealEntryItem).indexOnDay)
         assertEquals(2, (items[5] as HistoryUiItem.MealEntryItem).totalCountOnDay)
     }
+
+    @Test
+    fun testBuildHistoryUiItemsPrecalculatesStaleFazit() {
+        val today = LocalDate.of(2026, 11, 9)
+        val entry1 = HistoryEntry(
+            id = 1L,
+            dateMillis = today.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli(),
+            recognizedMeal = "Salat"
+        )
+        val fpMatching = dayFingerprint(listOf(entry1))
+
+        val matchingFazit = DayFazit(
+            dayKey = "20261109",
+            text = "Guter Tag",
+            entryIds = listOf(1L),
+            fingerprint = fpMatching
+        )
+
+        val itemsMatching = buildHistoryUiItems(
+            entries = listOf(entry1),
+            today = today,
+            fazitMap = mapOf("20261109" to matchingFazit)
+        )
+        val headerMatching = itemsMatching.filterIsInstance<HistoryUiItem.DayHeaderItem>().first()
+        assertFalse("Matching fazit should not be stale", headerMatching.staleFazit)
+
+        val staleFazitWrongIds = DayFazit(
+            dayKey = "20261109",
+            text = "Guter Tag",
+            entryIds = listOf(999L),
+            fingerprint = fpMatching
+        )
+        val itemsStaleIds = buildHistoryUiItems(
+            entries = listOf(entry1),
+            today = today,
+            fazitMap = mapOf("20261109" to staleFazitWrongIds)
+        )
+        val headerStaleIds = itemsStaleIds.filterIsInstance<HistoryUiItem.DayHeaderItem>().first()
+        assertTrue("Fazit with mismatched entry IDs must be marked stale", headerStaleIds.staleFazit)
+
+        val staleFazitWrongFp = DayFazit(
+            dayKey = "20261109",
+            text = "Guter Tag",
+            entryIds = listOf(1L),
+            fingerprint = "different-hash"
+        )
+        val itemsStaleFp = buildHistoryUiItems(
+            entries = listOf(entry1),
+            today = today,
+            fazitMap = mapOf("20261109" to staleFazitWrongFp)
+        )
+        val headerStaleFp = itemsStaleFp.filterIsInstance<HistoryUiItem.DayHeaderItem>().first()
+        assertTrue("Fazit with mismatched fingerprint must be marked stale", headerStaleFp.staleFazit)
+    }
 }

@@ -70,7 +70,7 @@ fun HistoryListContent(
         icon = Icons.Filled.DateRange
     )
 
-    val itemsToDisplay = if (uiItems.isNotEmpty() || entries.isEmpty()) uiItems else buildHistoryUiItems(entries)
+    val itemsToDisplay = if (uiItems.isNotEmpty() || entries.isEmpty()) uiItems else buildHistoryUiItems(entries, fazitMap = fazitMap)
 
     if (entries.isNotEmpty()) {
         Spacer(Modifier.height(8.dp))
@@ -104,10 +104,7 @@ fun HistoryListContent(
                 is HistoryUiItem.DayHeaderItem -> {
                     val fazit = if (item.hasEntries) fazitMap[item.dayKey] else null
                     val loadingFazit = item.hasEntries && item.dayKey in loadingFazits
-                    val staleFazit = item.hasEntries && fazit != null && (
-                        fazit.entryIds.toSet() != item.entries.map { it.id }.toSet() ||
-                            (fazit.fingerprint.isNotBlank() && fazit.fingerprint != dayFingerprint(item.entries))
-                    )
+                    val staleFazit = item.staleFazit
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()

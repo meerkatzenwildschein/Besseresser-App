@@ -39,7 +39,7 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 
 ### B. Jetpack Compose & UI-Performance
 
-#### B.1 Teure Berechnungen im Recomposition-Scope von LazyColumn Items
+#### B.1 [x] Teure Berechnungen im Recomposition-Scope von LazyColumn Items (Erledigt: Vorberechnung in buildHistoryUiItems / HistoryUiItem)
 - **Datei:** `app/src/main/java/de/gurum/besseresser/ui/HistoryListScreen.kt` (Zeilen 107–110)
 - **Problem:** In `HistoryUiItem.DayHeaderItem` wird beim Rendern der Liste für jedes sichtbare Element Folgendes berechnet:
   ```kotlin
@@ -162,7 +162,7 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 | Priorität | Maßnahme | Betroffene Komponenten | Aufwand |
 | :--- | :--- | :--- | :--- |
 | **P1** | [x] Umstellung Backup auf SAF (`ActivityResultContracts.CreateDocument`) | `BackupStore.kt`, `BackupManager.kt`, UI | Mittel |
-| **P1** | [ ] Vorberechnung von `staleFazit` & Fingerprints außerhalb von LazyColumn | `HistoryListScreen.kt`, `HistoryViewModel.kt` | Gering |
+| **P1** | [x] Vorberechnung von `staleFazit` & Fingerprints außerhalb von LazyColumn | `HistoryListScreen.kt`, `HistoryViewModel.kt` | Gering |
 | **P2** | [ ] Java Toolchain in Gradle konfigurieren (`jvmToolchain(17)`) | `app/build.gradle.kts` | Minimal |
 | **P2** | [ ] Room-Indizes auf `dateMillis`, `dateOnly`, `calendarWeek` ergänzen | `HistoryEntity.kt`, `AppDatabase.kt` | Gering |
 | **P2** | [ ] `@Immutable`-Annotationen für UI-State Data-Classes ergänzen | `MainUiState.kt`, `HistoryUiState.kt` | Gering |
