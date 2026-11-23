@@ -153,8 +153,47 @@ class MainViewModel(
 
     fun onSystemCameraResult(ok: Boolean, photoUri: Uri) {
         if (ok) {
+            savedStateHandle[KEY_PHOTO_URI] = photoUri.toString()
             savedStateHandle[KEY_SHOW_REVIEW] = true
-            _uiState.update { it.copy(error = null, showReview = true) }
+            _uiState.update { it.copy(photoPreviewUri = photoUri, error = null, showReview = true) }
+        }
+    }
+
+    /**
+     * Übernimmt ein aus einer anderen App geteiltes Bild (und optionalen Begleittext)
+     * und öffnet die Vorschau/Anmerkungs-Ansicht, genau wie nach einer Fotoaufnahme.
+     */
+    fun onSharedImageReceived(photoUri: Uri, sharedNote: String? = null) {
+        analyzeJob?.cancel()
+        val oldUri = savedStateHandle.get<String>(KEY_PHOTO_URI)?.let { Uri.parse(it) }
+            ?: _uiState.value.photoPreviewUri
+        val wasSaved = savedStateHandle.get<Boolean>(KEY_SAVED_TO_HISTORY) ?: _uiState.value.savedToHistory
+        if (!wasSaved && oldUri != null && oldUri != photoUri) {
+            photoCaptureManager?.deleteCaptureFile(oldUri)
+        }
+        val finalUri = photoCaptureManager?.copyToCaptureFile(photoUri)?.second ?: photoUri
+        val noteToUse = sharedNote?.trim().orEmpty()
+        savedStateHandle[KEY_NOTE] = noteToUse
+        savedStateHandle[KEY_PHOTO_URI] = finalUri.toString()
+        savedStateHandle[KEY_SHOW_CAMERA] = false
+        savedStateHandle[KEY_SHOW_REVIEW] = true
+        savedStateHandle[KEY_SHOW_RECOGNIZED_EDIT] = false
+        savedStateHandle[KEY_SAVED_TO_HISTORY] = false
+        savedStateHandle.remove<Long>(KEY_SAVED_ENTRY_ID)
+        savedStateHandle.remove<String>(KEY_EVALUATION)
+        _uiState.update {
+            it.copy(
+                photoPreviewUri = finalUri,
+                note = noteToUse,
+                showCamera = false,
+                showReview = true,
+                showRecognizedEdit = false,
+                isBusy = false,
+                error = null,
+                evaluation = null,
+                savedToHistory = false,
+                savedEntryId = null
+            )
         }
     }
 

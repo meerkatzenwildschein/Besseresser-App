@@ -14,10 +14,6 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-kotlin {
-    jvmToolchain(17)
-}
-
 // Deterministic build timestamp: taken from the current git HEAD commit date
 // (UTC), so builds of the same commit are reproducible across machines.
 val buildTime: String = run {

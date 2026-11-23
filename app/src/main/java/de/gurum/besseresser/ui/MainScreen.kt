@@ -70,6 +70,12 @@ fun MainScreen(
         captureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
         captureState.value = null
     }
+    BackHandler(enabled = uiState.showReview && !uiState.isBusy) {
+        viewModel.setShowReview(false)
+        captureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
+        viewModel.reset()
+        captureState.value = null
+    }
 
     val triggerAnalyze: (String, Uri) -> Unit = { _, targetUri ->
         viewModel.onPhotoTaken(targetUri)
@@ -114,9 +120,9 @@ fun MainScreen(
                 }
             )
         } else if (uiState.showReview) {
-            val captureUri = captureState.value?.second
+            val activeUri = uiState.photoPreviewUri ?: captureState.value?.second
             MainReviewScreen(
-                photoUri = uiState.photoPreviewUri ?: captureUri,
+                photoUri = activeUri,
                 note = uiState.note,
                 error = uiState.error,
                 busy = uiState.isBusy,
@@ -130,7 +136,7 @@ fun MainScreen(
                 onRate = {
                     val trimmed = uiState.note.trim()
                     viewModel.pushRecentNote(trimmed)
-                    captureUri?.let { triggerAnalyze(trimmed, it) }
+                    activeUri?.let { triggerAnalyze(trimmed, it) }
                     captureState.value = null
                 },
                 onRetake = {
@@ -138,8 +144,7 @@ fun MainScreen(
                     captureState.value?.first?.let { photoCaptureManager.deleteCaptureFile(it) }
                     viewModel.reset()
                     captureState.value = null
-                    val (_, freshUri) = ensureCaptureFile()
-                    cameraLauncher.launch(freshUri)
+                    viewModel.setShowCamera(true)
                 }
             )
         } else {

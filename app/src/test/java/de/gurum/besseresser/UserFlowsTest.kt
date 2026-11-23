@@ -336,4 +336,85 @@ class UserFlowsTest {
         assertTrue(fakeCaptureManager.deletedUris.contains(testUri))
         assertEquals(1, histRepo.getAll().size)
     }
+
+    @Test
+    fun `share image flow - opens review screen with shared image and note, then analyzes and saves`() = runTest(testDispatcher) {
+        val cachedUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/shared_copy.jpg")
+        val fakeCaptureManager = FakePhotoCaptureManager(
+            file = java.io.File("shared_copy.jpg"),
+            uri = cachedUri
+        )
+        val histRepo = FakeHistoryRepository()
+        val setRepo = FakeSettingsRepository()
+        val apiService = FakeApiService()
+        val vm = MainViewModel(
+            apiService = apiService,
+            historyRepository = histRepo,
+            settingsRepository = setRepo,
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            photoCaptureManager = fakeCaptureManager
+        )
+
+        val externalSharedUri = TestUri("content://com.external.gallery/images/42")
+        vm.onSharedImageReceived(externalSharedUri, "  Vollkornpasta mit Pesto  ")
+
+        // Verify review screen state is active with copied URI and trimmed note
+        assertTrue(vm.uiState.value.showReview)
+        assertFalse(vm.uiState.value.showCamera)
+        assertFalse(vm.uiState.value.isBusy)
+        assertEquals(cachedUri, vm.uiState.value.photoPreviewUri)
+        assertEquals("Vollkornpasta mit Pesto", vm.uiState.value.note)
+        assertTrue(fakeCaptureManager.copiedSourceUris.contains(externalSharedUri))
+
+        // User taps "Jetzt bewerten" in MainReviewScreen
+        vm.pushRecentNote(vm.uiState.value.note)
+        vm.onPhotoTaken(vm.uiState.value.photoPreviewUri!!)
+        vm.analyze(
+            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            PromptBundle("", "", "", "", "", "", "", "")
+        )
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.showReview)
+        assertFalse(vm.uiState.value.isBusy)
+        assertNotNull(vm.uiState.value.evaluation)
+
+        // Save to history and verify temporary cached file is deleted
+        vm.saveToHistory()
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.savedToHistory)
+        assertTrue(fakeCaptureManager.deletedUris.contains(cachedUri))
+        assertEquals(1, histRepo.getAll().size)
+        assertEquals("Vollkornpasta mit Pesto", histRepo.getAll().first().note)
+    }
+
+    @Test
+    fun `share image flow - replacing an unsaved capture cleans up previous capture file`() = runTest(testDispatcher) {
+        val firstUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/first.jpg")
+        val secondUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/second.jpg")
+        val fakeCaptureManager = FakePhotoCaptureManager(
+            file = java.io.File("second.jpg"),
+            uri = secondUri
+        )
+        val vm = MainViewModel(
+            apiService = FakeApiService(),
+            historyRepository = FakeHistoryRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            photoCaptureManager = fakeCaptureManager
+        )
+
+        // Simulate existing unsaved capture
+        vm.onPhotoTaken(firstUri)
+        // Receive shared image before saving first capture
+        vm.onSharedImageReceived(TestUri("content://external/99"), null)
+
+        assertTrue(fakeCaptureManager.deletedUris.contains(firstUri))
+        assertEquals(secondUri, vm.uiState.value.photoPreviewUri)
+        assertEquals("", vm.uiState.value.note)
+        assertTrue(vm.uiState.value.showReview)
+    }
 }

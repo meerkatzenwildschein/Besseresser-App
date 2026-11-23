@@ -367,12 +367,18 @@ class FakePhotoCaptureManager(
     var uri: Uri = TestUri()
 ) : PhotoCaptureManager {
     var callCount = 0
+    val copiedSourceUris = mutableListOf<Uri>()
     val deletedFiles = mutableListOf<File>()
     val deletedUris = mutableListOf<Uri>()
     var cleanupCalled = false
 
     override fun createCaptureFile(): Pair<File, Uri> {
         callCount++
+        return file to uri
+    }
+
+    override fun copyToCaptureFile(sourceUri: Uri): Pair<File, Uri>? {
+        copiedSourceUris.add(sourceUri)
         return file to uri
     }
 
@@ -1055,6 +1061,25 @@ class RepositoriesAndFakesTest {
             assertFalse(expiredFile.exists())
             assertFalse(zeroByteFile.exists())
             assertTrue(recentFile.exists())
+
+            // Test copyToCaptureFile with external source file
+            val externalFile = File(tempDir, "shared_from_gallery.jpg").apply {
+                writeText("shared image content")
+            }
+            val copiedPair = manager.copyToCaptureFile(TestUri(externalFile.absolutePath))
+            assertNotNull(copiedPair)
+            assertTrue(copiedPair!!.first.exists())
+            assertEquals("shared image content", copiedPair.first.readText())
+
+            // Test copyToCaptureFile returns same file when already in app's FileProvider cache
+            val alreadyCachedUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/${copiedPair.first.name}")
+            val reusedPair = manager.copyToCaptureFile(alreadyCachedUri)
+            assertNotNull(reusedPair)
+            assertEquals(copiedPair.first.absolutePath, reusedPair!!.first.absolutePath)
+
+            // Test copyToCaptureFile returns null for non-existent source
+            val failedCopy = manager.copyToCaptureFile(TestUri("file:///does/not/exist.jpg"))
+            assertEquals(null, failedCopy)
         } finally {
             tempDir.deleteRecursively()
         }

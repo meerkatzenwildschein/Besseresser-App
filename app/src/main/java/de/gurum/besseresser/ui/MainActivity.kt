@@ -1,6 +1,8 @@
 package de.gurum.besseresser.ui
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -26,9 +28,13 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,6 +42,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.core.content.IntentCompat
+import androidx.core.util.Consumer
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -44,8 +52,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import kotlinx.serialization.Serializable
+import org.koin.android.ext.android.inject
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
+import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.model.AppLanguage
 import de.gurum.besseresser.model.AppThemeMode
 
@@ -167,17 +177,81 @@ object Routes {
     data class Detail(val entryId: Long)
 }
 
+/** Daten eines aus einer anderen App geteilten Bildes (ACTION_SEND). */
+data class SharedImagePayload(
+    val photoUri: Uri,
+    val note: String? = null
+)
+
 class MainActivity : ComponentActivity() {
+
+    private val photoCaptureManager: PhotoCaptureManager by inject()
+    private var pendingSharedImage by mutableStateOf<SharedImagePayload?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setContent { BesseresserAppContent() }
+        if (savedInstanceState == null) {
+            handleShareIntent(intent)
+        }
+        val onNewIntentListener = Consumer<Intent> { newIntent ->
+            setIntent(newIntent)
+            handleShareIntent(newIntent)
+        }
+        addOnNewIntentListener(onNewIntentListener)
+        setContent {
+            DisposableEffect(Unit) {
+                onDispose { removeOnNewIntentListener(onNewIntentListener) }
+            }
+            BesseresserAppContent(
+                pendingSharedImage = pendingSharedImage,
+                onSharedImageConsumed = { pendingSharedImage = null }
+            )
+        }
+    }
+
+    private fun handleShareIntent(incomingIntent: Intent?) {
+        val payload = extractSharedImagePayload(incomingIntent, photoCaptureManager) ?: return
+        // Action zurücksetzen, damit derselbe Intent bei Konfigurationsänderungen nicht erneut ausgewertet wird
+        incomingIntent?.action = Intent.ACTION_MAIN
+        incomingIntent?.removeExtra(Intent.EXTRA_STREAM)
+        incomingIntent?.removeExtra(Intent.EXTRA_TEXT)
+        incomingIntent?.clipData = null
+        pendingSharedImage = payload
     }
 }
 
+/**
+ * Extrahiert ein geteiltes Bild (und optionalen Begleittext) aus einem [Intent.ACTION_SEND]-Intent
+ * und sichert das Bild sofort über [photoCaptureManager] im App-Cache, solange die temporäre
+ * Lese-Berechtigung des Share-Intents aktiv ist.
+ */
+internal fun extractSharedImagePayload(
+    incomingIntent: Intent?,
+    photoCaptureManager: PhotoCaptureManager? = null
+): SharedImagePayload? {
+    if (incomingIntent == null || incomingIntent.action != Intent.ACTION_SEND) return null
+    val mime = incomingIntent.type.orEmpty()
+    if (!mime.startsWith("image/") && mime != "*/*") return null
+
+    val streamUri: Uri? = IntentCompat.getParcelableExtra(incomingIntent, Intent.EXTRA_STREAM, Uri::class.java)
+        ?: incomingIntent.clipData?.let { clip ->
+            if (clip.itemCount > 0) clip.getItemAt(0).uri else null
+        }
+    if (streamUri == null) return null
+
+    val sharedText = incomingIntent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.trim()
+        ?.takeIf { it.isNotEmpty() }
+
+    val cachedUri = photoCaptureManager?.copyToCaptureFile(streamUri)?.second ?: streamUri
+    return SharedImagePayload(photoUri = cachedUri, note = sharedText)
+}
+
 @Composable
-fun BesseresserAppContent() {
+fun BesseresserAppContent(
+    pendingSharedImage: SharedImagePayload? = null,
+    onSharedImageConsumed: () -> Unit = {}
+) {
     val baseCtx = LocalContext.current
     val appStateViewModel: AppStateViewModel = koinViewModel()
     val appState by appStateViewModel.uiState.collectAsStateWithLifecycle()
@@ -232,7 +306,9 @@ fun BesseresserAppContent() {
                         AppNavHost(
                             appState = appState,
                             appStateViewModel = appStateViewModel,
-                            baseCtx = baseCtx
+                            baseCtx = baseCtx,
+                            pendingSharedImage = pendingSharedImage,
+                            onSharedImageConsumed = onSharedImageConsumed
                         )
                     }
                 }
@@ -245,11 +321,22 @@ fun BesseresserAppContent() {
 private fun AppNavHost(
     appState: AppState,
     appStateViewModel: AppStateViewModel,
-    baseCtx: Context
+    baseCtx: Context,
+    pendingSharedImage: SharedImagePayload? = null,
+    onSharedImageConsumed: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val mainViewModel: MainViewModel = koinViewModel()
     val startDestination: Any = if (appState.settings.isComplete) Routes.Main else Routes.Setup
+
+    LaunchedEffect(pendingSharedImage, appState.settings.isComplete) {
+        val shared = pendingSharedImage ?: return@LaunchedEffect
+        mainViewModel.onSharedImageReceived(shared.photoUri, shared.note)
+        onSharedImageConsumed()
+        if (appState.settings.isComplete) {
+            navController.popBackStack<Routes.Main>(inclusive = false)
+        }
+    }
 
     NavHost(
         navController = navController,

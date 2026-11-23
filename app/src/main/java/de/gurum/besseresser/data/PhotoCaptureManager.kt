@@ -23,6 +23,12 @@ interface PhotoCaptureManager {
     /** Creates a new uniquely-named JPEG file in the app's cache and returns its [Uri]. */
     fun createCaptureFile(): Pair<File, Uri>
 
+    /**
+     * Copies an external/shared image [sourceUri] into a fresh temporary capture file in the app's cache
+     * and returns its [File] and [Uri], or `null` if the stream cannot be read.
+     */
+    fun copyToCaptureFile(sourceUri: Uri): Pair<File, Uri>?
+
     /** Deletes the specified capture file if present. */
     fun deleteCaptureFile(file: File?)
 
@@ -58,6 +64,34 @@ class DefaultPhotoCaptureManager(private val context: Context) : PhotoCaptureMan
             Uri.fromFile(file)
         }
         return file to uri
+    }
+
+    override fun copyToCaptureFile(sourceUri: Uri): Pair<File, Uri>? {
+        if (sourceUri.authority == FILEPROVIDER_AUTHORITY) {
+            val lastSegment = sourceUri.lastPathSegment
+                ?: sourceUri.path?.substringAfterLast('/')
+            if (!lastSegment.isNullOrBlank()) {
+                val existingFile = File(getPhotoCacheDir(), lastSegment)
+                if (existingFile.exists() && existingFile.length() > 0L) {
+                    return existingFile to sourceUri
+                }
+            }
+        }
+        val (targetFile, targetUri) = createCaptureFile()
+        val copied = runCatching {
+            openStreamRobust(context.contentResolver, sourceUri, context)?.use { input ->
+                targetFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+                true
+            } ?: false
+        }.getOrDefault(false)
+        if (!copied || !targetFile.exists() || targetFile.length() == 0L) {
+            deleteCaptureFile(targetFile)
+            return null
+        }
+        PhotoStorage.correctOrientationSync(targetFile)
+        return targetFile to targetUri
     }
 
     override fun deleteCaptureFile(file: File?) {
