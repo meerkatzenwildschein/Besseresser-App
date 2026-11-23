@@ -145,7 +145,7 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 
 ### G. Build-Konfiguration & Gradle
 
-#### G.1 Fehlende Gradle Java Toolchain
+#### G.1 [x] Fehlende Gradle Java Toolchain (Erledigt: jvmToolchain(17) in app/build.gradle.kts)
 - **Datei:** `build.gradle.kts` / `app/build.gradle.kts`
 - **Problem:** Das Projekt verlässt sich auf die Umgebungsvariable `JAVA_HOME`. Ist auf dem System ein neueres JDK (z. B. JDK 25) als Standard gesetzt, schlägt der Gradle-Build fehl, weil das Android Gradle Plugin (AGP) / Kotlin Compiler Java 17/21 erwartet.
 - **Best Practice:** Explizite Toolchain-Definition in `app/build.gradle.kts`:
@@ -163,7 +163,7 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 | :--- | :--- | :--- | :--- |
 | **P1** | [x] Umstellung Backup auf SAF (`ActivityResultContracts.CreateDocument`) | `BackupStore.kt`, `BackupManager.kt`, UI | Mittel |
 | **P1** | [x] Vorberechnung von `staleFazit` & Fingerprints außerhalb von LazyColumn | `HistoryListScreen.kt`, `HistoryViewModel.kt` | Gering |
-| **P2** | [ ] Java Toolchain in Gradle konfigurieren (`jvmToolchain(17)`) | `app/build.gradle.kts` | Minimal |
+| **P2** | [x] Java Toolchain in Gradle konfigurieren (`jvmToolchain(17)`) | `app/build.gradle.kts` | Minimal |
 | **P2** | [ ] Room-Indizes auf `dateMillis`, `dateOnly`, `calendarWeek` ergänzen | `HistoryEntity.kt`, `AppDatabase.kt` | Gering |
 | **P2** | [ ] `@Immutable`-Annotationen für UI-State Data-Classes ergänzen | `MainUiState.kt`, `HistoryUiState.kt` | Gering |
 | **P3** | [ ] Dispatcher-Injection via Koin einführen (`ioDispatcher`) | Koin-Module, Repositories | Mittel |
