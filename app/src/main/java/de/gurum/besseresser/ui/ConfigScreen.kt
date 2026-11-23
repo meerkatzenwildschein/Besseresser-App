@@ -61,9 +61,25 @@ import de.gurum.besseresser.BuildConfig
 import de.gurum.besseresser.model.AppLanguage
 import de.gurum.besseresser.model.AppThemeMode
 
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 /** Öffnet den System-Dateipicker direkt mit Startverzeichnis „Downloads". */
 class OpenBackupDocumentContract : ActivityResultContracts.OpenDocument() {
     override fun createIntent(context: Context, input: Array<String>): Intent {
+        val intent = super.createIntent(context, input)
+        runCatching {
+            val downloadsUri = "content://com.android.externalstorage.documents/document/primary%3ADownload".toUri()
+            intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, downloadsUri)
+        }
+        return intent
+    }
+}
+
+/** Erstellt ein neues Dokument über das Storage Access Framework (SAF) mit Standardverzeichnis „Downloads". */
+class CreateBackupDocumentContract : ActivityResultContracts.CreateDocument("application/json") {
+    override fun createIntent(context: Context, input: String): Intent {
         val intent = super.createIntent(context, input)
         runCatching {
             val downloadsUri = "content://com.android.externalstorage.documents/document/primary%3ADownload".toUri()
@@ -96,6 +112,11 @@ fun ConfigScreen(
     var showClearConfirm by remember { mutableStateOf(false) }
 
     BackHandler(enabled = !state.busy) { onBack() }
+
+    val exportLauncher = rememberLauncherForActivityResult(CreateBackupDocumentContract()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        viewModel.exportBackup(uri)
+    }
 
     val importLauncher = rememberLauncherForActivityResult(OpenBackupDocumentContract()) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -350,7 +371,10 @@ fun ConfigScreen(
             )
 
             Button(
-                onClick = { viewModel.exportBackup() },
+                onClick = {
+                    val timestamp = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.US).format(Date())
+                    exportLauncher.launch("besseresser-backup-$timestamp.json")
+                },
                 enabled = !state.busy,
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier

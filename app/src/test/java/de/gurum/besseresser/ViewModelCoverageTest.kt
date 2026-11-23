@@ -606,6 +606,33 @@ class ViewModelCoverageTest {
     // ----------------------------------------------------------------- ConfigViewModel
 
     @Test
+    fun `ConfigViewModel exportBackup with Uri success updates uiState`() = runTest(testDispatcher) {
+        val summary = BackupSummary(fileName = "backup.json", entriesCount = 5, hasProfile = true, recentNotesCount = 2, hasApiKey = true)
+        val backupService = FakeBackupService(exportResult = Result.success(summary))
+        val vm = ConfigViewModel(backupService, FakeHistoryRepository(), testDispatchers)
+
+        vm.exportBackup(TestUri("content://backup.json"))
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.busy)
+        assertNull(vm.uiState.value.error)
+        assertEquals(summary, vm.uiState.value.exportSummary)
+    }
+
+    @Test
+    fun `ConfigViewModel exportBackup with Uri failure sets error`() = runTest(testDispatcher) {
+        val backupService = FakeBackupService(exportResult = Result.failure(RuntimeException("Export fehlgeschlagen")))
+        val vm = ConfigViewModel(backupService, FakeHistoryRepository(), testDispatchers)
+
+        vm.exportBackup(TestUri("content://backup.json"))
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.busy)
+        assertEquals("Export fehlgeschlagen", vm.uiState.value.error)
+        assertNull(vm.uiState.value.exportSummary)
+    }
+
+    @Test
     fun `ConfigViewModel exportBackup success updates uiState`() = runTest(testDispatcher) {
         val summary = BackupSummary(fileName = "backup.json", entriesCount = 5, hasProfile = true, recentNotesCount = 2, hasApiKey = true)
         val backupService = FakeBackupService(exportResult = Result.success(summary))

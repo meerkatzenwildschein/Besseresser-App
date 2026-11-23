@@ -35,6 +35,18 @@ class ConfigViewModel(
     private val _uiState = MutableStateFlow(ConfigUiState())
     val uiState: StateFlow<ConfigUiState> = _uiState.asStateFlow()
 
+    fun exportBackup(uri: Uri) {
+        _uiState.update { it.copy(busy = true, error = null, importSummary = null, exportSummary = null, cleared = false) }
+        viewModelScope.launch {
+            val res = withContext(dispatchers.io) { backupService.exportToUri(uri) }
+            res.onSuccess { summary ->
+                _uiState.update { it.copy(busy = false, exportSummary = summary) }
+            }.onFailure { e ->
+                _uiState.update { it.copy(busy = false, error = e.message) }
+            }
+        }
+    }
+
     fun exportBackup() {
         _uiState.update { it.copy(busy = true, error = null, importSummary = null, exportSummary = null, cleared = false) }
         viewModelScope.launch {

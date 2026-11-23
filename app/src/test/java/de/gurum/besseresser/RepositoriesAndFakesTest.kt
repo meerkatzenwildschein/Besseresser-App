@@ -353,6 +353,7 @@ class FakeBackupService(
     var importResult: Result<BackupSummary> = Result.success(BackupSummary(entriesCount = 1)),
     var exportResult: Result<BackupSummary> = Result.success(BackupSummary(fileName = "backup.json"))
 ) : BackupService {
+    override suspend fun exportToUri(uri: Uri): Result<BackupSummary> = exportResult
     override suspend fun exportToDownloads(): Result<BackupSummary> = exportResult
     override suspend fun importFromUri(uri: Uri): Result<BackupSummary> = importResult
 }

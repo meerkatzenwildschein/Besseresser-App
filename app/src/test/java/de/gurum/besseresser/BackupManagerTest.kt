@@ -27,7 +27,14 @@ import java.io.File
 class FakeBackupStorage : BackupStorage {
     var writtenFileName: String? = null
     var writtenJson: String? = null
+    var writtenUri: Uri? = null
     var readJsonContent: String = ""
+
+    override fun writeToUri(uri: Uri, json: String) {
+        writtenUri = uri
+        writtenFileName = uri.lastPathSegment
+        writtenJson = json
+    }
 
     override fun writeToDownloads(fileName: String, json: String) {
         writtenFileName = fileName
@@ -40,6 +47,57 @@ class FakeBackupStorage : BackupStorage {
 }
 
 class BackupManagerTest {
+
+    @Test
+    fun `createBackup and exportToUri exports all repositories correctly`() = runTest {
+        val fakeStorage = FakeBackupStorage()
+        val settingsRepo = FakeSettingsRepository(initialSettings = Settings(baseUrl = "https://ai.example.com", apiKey = "secret", model = "gpt-4o"))
+        val profileRepo = FakeProfileRepository(initialProfile = Profile(birthDate = "1990-01-01", weightKg = 75.0, heightCm = 180, notes = "Fit", gender = Gender.MALE))
+        val uiPrefsRepo = FakeUiPrefsRepository(initialTheme = AppThemeMode.DARK, initialLanguage = AppLanguage.EN)
+        val historyRepo = FakeHistoryRepository()
+        historyRepo.add(
+            photoUri = null,
+            ev = Evaluation(
+                goalResults = listOf(GoalResult("Low Carb", TrafficLight.GREEN, "Gut")),
+                summary = "Perfekt",
+                recognizedMeal = "Salat"
+            ),
+            note = "Mittag"
+        )
+
+        val tempDir = File.createTempFile("photos", "test").apply { delete(); mkdirs() }
+        val photoStorage = PhotoStorage(baseDir = tempDir)
+
+        val backupManager = BackupManager(
+            backupStorage = fakeStorage,
+            settingsRepository = settingsRepo,
+            profileRepository = profileRepo,
+            historyRepository = historyRepo,
+            photoStorage = photoStorage,
+            uiPrefsRepository = uiPrefsRepo
+        )
+
+        val exportUri = TestUri("content://documents/besseresser-backup-2026.json")
+        val exportResult = backupManager.exportToUri(exportUri)
+        assertTrue(exportResult.isSuccess)
+        val summary = exportResult.getOrThrow()
+        assertEquals(1, summary.entriesCount)
+        assertTrue(summary.hasApiKey)
+        assertTrue(summary.hasProfile)
+        assertEquals(exportUri, fakeStorage.writtenUri)
+        assertTrue(fakeStorage.writtenJson!!.contains("https://ai.example.com"))
+
+        // Now test importFromUri
+        fakeStorage.readJsonContent = fakeStorage.writtenJson!!
+        val importResult = backupManager.importFromUri(exportUri)
+        assertTrue(importResult.isSuccess)
+        val importSummary = importResult.getOrThrow()
+        assertEquals(1, importSummary.entriesCount)
+        assertTrue(importSummary.hasApiKey)
+        assertTrue(importSummary.hasProfile)
+
+        tempDir.deleteRecursively()
+    }
 
     @Test
     fun `createBackup and exportToDownloads exports all repositories correctly`() = runTest {

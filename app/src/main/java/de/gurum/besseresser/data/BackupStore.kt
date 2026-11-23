@@ -135,12 +135,14 @@ object BackupLogic {
 
 /** Schnittstelle für Backup-Export/-Import (ermöglicht einfache Test-Fakes). */
 interface BackupService {
+    suspend fun exportToUri(uri: Uri): Result<BackupSummary>
     suspend fun exportToDownloads(): Result<BackupSummary>
     suspend fun importFromUri(uri: Uri): Result<BackupSummary>
 }
 
-/** Schnittstelle für das Schreiben und Lesen von Backup-Dateien (Abstraktion über ContentResolver/Downloads). */
+/** Schnittstelle für das Schreiben und Lesen von Backup-Dateien (Abstraktion über ContentResolver/Downloads/SAF). */
 interface BackupStorage {
+    fun writeToUri(uri: Uri, json: String)
     fun writeToDownloads(fileName: String, json: String)
     fun readFromUri(uri: Uri): String
 }
@@ -148,6 +150,14 @@ interface BackupStorage {
 class AndroidBackupStorage(
     private val context: Context
 ) : BackupStorage {
+    override fun writeToUri(uri: Uri, json: String) {
+        val bytes = json.toByteArray(Charsets.UTF_8)
+        context.contentResolver.openOutputStream(uri)?.use { out ->
+            out.write(bytes)
+            out.flush()
+        } ?: throw IllegalStateException("OutputStream für URI konnte nicht geöffnet werden.")
+    }
+
     override fun writeToDownloads(fileName: String, json: String) {
         val bytes = json.toByteArray(Charsets.UTF_8)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -231,6 +241,26 @@ class BackupManager(
             weekFazits = weekFazits,
             themeMode = uiPrefsRepository.currentThemeMode(),
             language = uiPrefsRepository.currentLanguage()
+        )
+    }
+
+    /** Exportiert alle App-Daten als JSON-Datei in eine vom Nutzer gewählte URI (Storage Access Framework). */
+    override suspend fun exportToUri(uri: Uri): Result<BackupSummary> = runCatching {
+        val now = System.currentTimeMillis()
+        val backup = createBackup(now)
+        val json = BackupLogic.serializeBackup(backup)
+        backupStorage.writeToUri(uri, json)
+        val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "backup.json"
+
+        BackupSummary(
+            fileName = fileName,
+            entriesCount = backup.historyEntries.size,
+            photosCount = backup.historyEntries.count { !it.photoBase64.isNullOrBlank() },
+            dayFazitsCount = backup.dayFazits.size,
+            weekFazitsCount = backup.weekFazits.size,
+            recentNotesCount = backup.recentNotes.size,
+            hasApiKey = backup.settings.apiKey.isNotBlank(),
+            hasProfile = !backup.profile.isEmpty
         )
     }
 
