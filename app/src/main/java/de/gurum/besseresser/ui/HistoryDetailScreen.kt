@@ -109,7 +109,7 @@ private val DuplicateCopyIcon: ImageVector by lazy {
 }
 
 /** Material-Design „AutoAwesome" (KI-Funkeln / Bewerten) als ImageVector. */
-private val AiSparkleIcon: ImageVector by lazy {
+internal val AiSparkleIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "AutoAwesome",
         defaultWidth = 24.dp,

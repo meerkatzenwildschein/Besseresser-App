@@ -225,15 +225,28 @@ fun HistoryItem(
             }
             Spacer(Modifier.width(8.dp))
             if (isUnrated) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(amberAccent.copy(alpha = 0.22f))
-                        .border(BorderStroke(1.5.dp, amberAccent.copy(alpha = 0.65f)), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("✨", fontSize = 15.sp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(amberAccent.copy(alpha = 0.22f))
+                            .border(BorderStroke(1.5.dp, amberAccent.copy(alpha = 0.65f)), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            AiSparkleIcon,
+                            contentDescription = stringResource(R.string.history_entry_ai_rate),
+                            tint = amberText,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        stringResource(R.string.score_caption),
+                        fontSize = 9.5.sp,
+                        color = Color.Transparent
+                    )
                 }
             } else {
                 ScoreBadge(entry)
