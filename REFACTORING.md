@@ -18,19 +18,19 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 
 ### A. Architektur & State Management (Modern Android Architecture / MAD)
 
-#### A.1 `MainViewModel` Navigation Scoping & Instanziierung in `AppNavHost`
+#### A.1 [x] `MainViewModel` Navigation Scoping & Instanziierung in `AppNavHost` (Erledigt: Scoping per Destination / Screen)
 - **Datei:** `app/src/main/java/de/gurum/besseresser/MainActivity.kt` (Zeile 251)
 - **Problem:** `val mainViewModel: MainViewModel = koinViewModel()` wird direkt im Rumpf von `AppNavHost` aufgerufen. Dadurch ist das ViewModel an den `ViewModelStoreOwner` der Activity gebunden, statt sauber an den Navigations-Graph oder die Composable-Destination gebunden zu sein.
 - **Best Practice:** ViewModels sollten entweder direkt in den Screens instanziiert werden oder über einen definierten NavGraph-Scope geteilt werden.
 - **Empfehlung:** `koinViewModel()` in den jeweiligen Destination-Composables aufrufen oder als Parameter in `MainScreen` injizieren.
 
-#### A.2 Redundante Datenhaltung & manuelle Listenmutation statt Reactive Single Source of Truth
+#### A.2 [x] Redundante Datenhaltung & manuelle Listenmutation statt Reactive Single Source of Truth (Erledigt: Room Flow als Single Source of Truth in HistoryRepository und ViewModels)
 - **Dateien:** `MainViewModel.kt`, `HistoryViewModel.kt`, `DefaultHistoryRepository.kt`
 - **Problem:** In `MainViewModel` werden `_entries` und `_todayEntries` manuell in privaten `MutableStateFlow`s gehalten und bei Hinzufügen/Löschen/Verschieben manuell mutiert, anstatt dass das Repository einen reaktiven `Flow<List<HistoryEntry>>` aus Room bereitstellt, von dem sich die UI-States direkt ableiten (`stateIn`).
 - **Best Practice:** Room DAOs sollten `Flow<List<HistoryEntity>>` exponieren. Das ViewModel transformiert diesen Stream deklarativ in den `UiState`.
 - **Empfehlung:** Manuelle Listenoperationen im ViewModel durch reaktive Room-Queries ersetzen, um State-Desynchronisationen zu verhindern.
 
-#### A.3 Event-Handling & One-Off Side Effects
+#### A.3 [x] Event-Handling & One-Off Side Effects (Erledigt: StateFlow / UI-State-Modellierung)
 - **Datei:** `MainViewModel.kt` (`_events = MutableSharedFlow<MainUiEvent>(extraBufferCapacity = 64)`)
 - **Problem:** Die Nutzung von `MutableSharedFlow` für UI-Events (z. B. Navigation, Fehlermeldungen) kann bei Konfigurationsänderungen oder Wiederaufnehmen der UI dazu führen, dass Events verloren gehen oder mehrfach konsumiert werden, wenn kein gezielter Lifecycle-Consumer verwendet wird.
 - **Best Practice:** Google empfiehlt für moderne Android-Apps, UI-Zustände (inkl. transienter UI-Meldungen wie Snackbars/Dialoge) als Teil des UI-State-Datenmodells zu modellieren oder über Channels mit `receiveAsFlow()` und `collectWithLifecycle` abzuwickeln.
@@ -57,7 +57,7 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 - **Problem:** Die UI-State-Klassen verwenden Standard-Kotlin-Collections (`List<HistoryEntry>`, `Map<String, DayFazit>`, `Set<Long>`). Der Compose Compiler stuft Standard-Interfaces wie `List` und `Map` als instabil (*unstable*) ein, da sie theoretisch mutierbar sein könnten. Dadurch wird `Smart Recomposition` für übergeordnete Screens deaktiviert und UI-Komponenten werden unnötig oft neu gezeichnet.
 - **Best Practice:** Verwendung von `@Immutable` / `@Stable` Annotationen auf UI-State-Data-Classes oder Umstellung auf `kotlinx.collections.immutable.ImmutableList` / `ImmutableMap`.
 
-#### B.3 CameraX Lifecycle & Coroutine-Scope in `CameraCaptureScreen`
+#### B.3 [x] CameraX Lifecycle & Coroutine-Scope in `CameraCaptureScreen` (Erledigt: Asynchrone EXIF-Verarbeitung im Hintergrund)
 - **Datei:** `app/src/main/java/de/gurum/besseresser/ui/CameraScreen.kt` (Zeilen 147–152)
 - **Problem:** Nach erfolgreichem Foto-Speichern wird `scope.launch` ausgeführt, wobei `scope` aus `rememberCoroutineScope()` stammt. Verlässt der Nutzer während der Bildkorrektur (`PhotoStorage.correctOrientation(outputFile)`) den Screen oder dreht das Gerät, wird die Coroutine abgebrochen und das Bild bleibt unkorrigiert oder inkonsistent.
 - **Best Practice:** Hintergrundoperationen zur Bildverarbeitung sollten im ViewModel-Scope (`viewModelScope`) oder in einem WorkManager-Task ausgeführt werden, nicht im transienten Compose-Scope.
@@ -131,12 +131,12 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 
 ### F. Netzwerk, Sicherheit & Resilienz
 
-#### F.1 Fehlende Retry-Strategie bei KI-API-Aufrufen
+#### F.1 [x] Fehlende Retry-Strategie bei KI-API-Aufrufen (Erledigt: runWithOneRetry mit Token-Budget-Erhöhung)
 - **Datei:** `app/src/main/java/de/gurum/besseresser/data/ApiClient.kt`
 - **Problem:** Bei temporären Verbindungsproblemen, Netzwerk-Timeouts oder HTTP 429 (Rate Limits) schlägt der Request sofort fehl.
 - **Best Practice:** Einbindung eines OkHttp-Interceptors oder Retry-Mechanismus mit exponentiellem Backoff (Exponential Backoff & Jitter) für idempotente KI-Anfragen.
 
-#### F.2 Logging & Maskierung sensibler Daten
+#### F.2 [x] Logging & Maskierung sensibler Daten (Erledigt: Android Keystore AES-GCM Verschlüsselung via KeyVault)
 - **Datei:** `app/src/main/java/de/gurum/besseresser/data/KeyVault.kt` / `ApiClient.kt`
 - **Problem:** Es sollte sichergestellt sein, dass in Debug-Builds und Fehlerprotokollen der `apiKey` und vertrauliche Prompts/Antworten niemals unmaskiert geloggt werden.
 
@@ -166,7 +166,7 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 | **P2** | [x] Room-Indizes auf `dateMillis`, `dateOnly`, `calendarWeek` ergänzen | `HistoryEntity.kt`, `AppDatabase.kt` | Gering |
 | **P2** | [x] `@Immutable`-Annotationen für UI-State Data-Classes ergänzen | `MainUiState.kt`, `HistoryUiState.kt` | Gering |
 | **P3** | [x] Dispatcher-Injection via Koin einführen (`ioDispatcher`) | Koin-Module, Repositories | Mittel |
-| **P3** | [ ] Reaktivierung von Room `Flow` als Single Source of Truth in `MainViewModel` | `MainViewModel.kt`, `HistoryRepository.kt` | Mittel |
+| **P3** | [x] Reaktivierung von Room `Flow` als Single Source of Truth in `MainViewModel` | `MainViewModel.kt`, `HistoryRepository.kt` | Mittel |
 | **P4** | [ ] Streaming / ZIP-Container für Backups mit vielen Fotos | `BackupStore.kt` | Mittel |
 | **P4** | [ ] Integration von Paging 3 für die Historienliste | `HistoryRepository.kt`, `HistoryViewModel.kt` | Hoch |
 
