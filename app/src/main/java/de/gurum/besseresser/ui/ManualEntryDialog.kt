@@ -277,7 +277,6 @@ fun BackdatedOverlays(
             onCancel = onDismissCamera,
             onFallbackSystemCamera = onFallbackSystemCamera,
             onConfirm = {
-                onDismissCamera()
                 onSubmitBackdated(
                     addPhotoUri,
                     false

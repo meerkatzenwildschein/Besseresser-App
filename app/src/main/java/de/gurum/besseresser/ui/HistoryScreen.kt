@@ -158,13 +158,19 @@ fun HistoryScreen(
             BackdatedBusyDialog()
         }
 
+        val activeAddCapture = if (uiState.showAddCamera || uiState.showAddReview) {
+            ensureAddCaptureFile()
+        } else {
+            addCaptureState.value
+        }
+
         BackdatedOverlays(
             showCamera = uiState.showAddCamera,
             showReview = uiState.showAddReview,
             showText = uiState.showAddText,
             showBusy = uiState.showAddBusyCard,
-            addPhotoFile = addCaptureState.value?.first,
-            addPhotoUri = addCaptureState.value?.second,
+            addPhotoFile = activeAddCapture?.first,
+            addPhotoUri = activeAddCapture?.second,
             addNote = uiState.addNote,
             addTargetDay = uiState.addTargetDay,
             settings = settings,
@@ -186,6 +192,8 @@ fun HistoryScreen(
                 addSystemCameraLauncher.launch(uri)
             },
             onSubmitBackdated = { uri, textOnly ->
+                viewModel.setShowAddCamera(false)
+                viewModel.setShowAddReview(false)
                 addCaptureState.value = null
                 viewModel.submitBackdated(
                     photoUri = uri,
