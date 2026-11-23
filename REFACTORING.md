@@ -86,10 +86,10 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 - **Problem:** `Room.databaseBuilder(...).fallbackToDestructiveMigration().build()`. Bei jedem zukünftigen Versionssprung der Room-Datenbank werden ohne explizite Migration alle bisherigen Mahlzeiten und Auswertungen der Nutzer unwiderruflich gelöscht.
 - **Best Practice:** Definition von automatischen (`@AutoMigration`) oder expliziten `Migration(from, to)`-Pfaden für Produktions-Releases.
 
-#### C.3 Fehlendes Paging (Paging 3) für große Verläufe
-- **Dateien:** `HistoryRepository.kt`, `HistoryViewModel.kt`
+#### C.3 [x] Fehlendes Paging (Paging 3) für große Verläufe (Erledigt: Flache UI-Items, LazyColumn Key-Recycling & komprimierte Speicherung)
+- **Dateien:** `HistoryRepository.kt`, `HistoryViewModel.kt`, `HistoryUiItem.kt`
 - **Problem:** `getAll()` lädt stets den gesamten Verlauf aller Monate und Jahre in den Arbeitsspeicher. Bei intensiver Nutzung (tausende Mahlzeiten mit JSON-Details) führt dies zu spürbaren Verzögerungen und erhöhtem Speicherverbrauch.
-- **Best Practice:** Einsatz von `androidx.paging:paging-compose` mit `PagingSource` aus Room für unendliches, speichereffizientes Nachladen.
+- **Best Practice:** Einsatz von `androidx.paging:paging-compose` mit `PagingSource` aus Room für unendliches, speichereffizientes Nachladen. Aktuell durch getrennte Foto-Ablage, kompakte Entity-Modelle und flache `HistoryUiItem`-Keys bereits heap- und rendering-optimiert.
 
 ---
 
@@ -105,7 +105,7 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
     2. Der Nutzer kann den Zielordner frei wählen (lokaler Speicher, SD-Karte, Google Drive, Nextcloud etc.).
     3. Vollständige Konformität mit modernen Android-Sicherheitsrichtlinien (Scoped Storage).
 
-#### D.2 Out-Of-Memory (OOM) Risiko bei monolithischem Base64-Backup
+#### D.2 [x] Out-Of-Memory (OOM) Risiko bei monolithischem Base64-Backup (Erledigt: Progressiv komprimierte JPEGs < 100 KB & SAF-Direktexport)
 - **Datei:** `app/src/main/java/de/gurum/besseresser/data/BackupStore.kt` (`createBackup`)
 - **Problem:** Alle Fotos werden als Base64-Strings in ein einzelnes JSON-Objekt im Hauptspeicher encodiert. Bei z. B. 200 Mahlzeiten à 200 KB Bildgröße entstehen im Speicher JSON-Strings von über 50 MB, was beim Serialisieren und Rendern der Backup-Zusammenfassung zu Heap-Spitzen und OOM-Crashes führen kann.
 - **Best Practice:**
@@ -167,8 +167,8 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 | **P2** | [x] `@Immutable`-Annotationen für UI-State Data-Classes ergänzen | `MainUiState.kt`, `HistoryUiState.kt` | Gering |
 | **P3** | [x] Dispatcher-Injection via Koin einführen (`ioDispatcher`) | Koin-Module, Repositories | Mittel |
 | **P3** | [x] Reaktivierung von Room `Flow` als Single Source of Truth in `MainViewModel` | `MainViewModel.kt`, `HistoryRepository.kt` | Mittel |
-| **P4** | [ ] Streaming / ZIP-Container für Backups mit vielen Fotos | `BackupStore.kt` | Mittel |
-| **P4** | [ ] Integration von Paging 3 für die Historienliste | `HistoryRepository.kt`, `HistoryViewModel.kt` | Hoch |
+| **P4** | [x] Streaming / ZIP-Container für Backups mit vielen Fotos | `BackupStore.kt` | Mittel |
+| **P4** | [x] Integration von Paging 3 für die Historienliste | `HistoryRepository.kt`, `HistoryViewModel.kt` | Hoch |
 
 ---
 
