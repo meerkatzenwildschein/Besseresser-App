@@ -52,8 +52,8 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 - **Best Practice:** Items in Lazy-Listen müssen vorberechnete Zustände enthalten. Keine schweren Hash-Berechnungen oder Collection-Mappings im Composable-Body.
 - **Empfehlung:** Die `staleFazit`-Berechnung in `buildHistoryUiItems` oder im `HistoryViewModel` vorab durchführen und als `Boolean`-Flag im `HistoryUiItem.DayHeaderItem` kapseln.
 
-#### B.2 Instabile State-Klassen (Compose Compiler Stability)
-- **Dateien:** `MainUiState.kt`, `HistoryUiState.kt`, `SetupUiState.kt`
+#### B.2 [x] Instabile State-Klassen (Compose Compiler Stability) (Erledigt: @Immutable auf allen UI-State-Klassen und Domänenmodellen)
+- **Dateien:** `MainUiState.kt`, `HistoryUiState.kt`, `SetupUiState.kt`, `AppStateViewModel.kt`, `ConfigViewModel.kt`, `ProfileViewModel.kt`
 - **Problem:** Die UI-State-Klassen verwenden Standard-Kotlin-Collections (`List<HistoryEntry>`, `Map<String, DayFazit>`, `Set<Long>`). Der Compose Compiler stuft Standard-Interfaces wie `List` und `Map` als instabil (*unstable*) ein, da sie theoretisch mutierbar sein könnten. Dadurch wird `Smart Recomposition` für übergeordnete Screens deaktiviert und UI-Komponenten werden unnötig oft neu gezeichnet.
 - **Best Practice:** Verwendung von `@Immutable` / `@Stable` Annotationen auf UI-State-Data-Classes oder Umstellung auf `kotlinx.collections.immutable.ImmutableList` / `ImmutableMap`.
 
@@ -164,7 +164,7 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 | **P1** | [x] Vorberechnung von `staleFazit` & Fingerprints außerhalb von LazyColumn | `HistoryListScreen.kt`, `HistoryViewModel.kt` | Gering |
 | **P2** | [x] Java Toolchain in Gradle konfigurieren (`jvmToolchain(17)`) | `app/build.gradle.kts` | Minimal |
 | **P2** | [x] Room-Indizes auf `dateMillis`, `dateOnly`, `calendarWeek` ergänzen | `HistoryEntity.kt`, `AppDatabase.kt` | Gering |
-| **P2** | [ ] `@Immutable`-Annotationen für UI-State Data-Classes ergänzen | `MainUiState.kt`, `HistoryUiState.kt` | Gering |
+| **P2** | [x] `@Immutable`-Annotationen für UI-State Data-Classes ergänzen | `MainUiState.kt`, `HistoryUiState.kt` | Gering |
 | **P3** | [ ] Dispatcher-Injection via Koin einführen (`ioDispatcher`) | Koin-Module, Repositories | Mittel |
 | **P3** | [ ] Reaktivierung von Room `Flow` als Single Source of Truth in `MainViewModel` | `MainViewModel.kt`, `HistoryRepository.kt` | Mittel |
 | **P4** | [ ] Streaming / ZIP-Container für Backups mit vielen Fotos | `BackupStore.kt` | Mittel |
