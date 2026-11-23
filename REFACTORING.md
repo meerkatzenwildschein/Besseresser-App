@@ -66,8 +66,8 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 
 ### C. Datenpersistenz, Room Database & DataStore
 
-#### C.1 Fehlende Indizes auf häufig abgefragten Entitäts-Feldern
-- **Datei:** `app/src/main/java/de/gurum/besseresser/data/HistoryEntity.kt`
+#### C.1 [x] Fehlende Indizes auf häufig abgefragten Entitäts-Feldern (Erledigt: Indizes auf dateMillis und sortOrder in AppDatabase.kt / HistoryEntryEntity)
+- **Datei:** `app/src/main/java/de/gurum/besseresser/data/AppDatabase.kt`
 - **Problem:** Die Room-Tabelle `history_entries` hat Indizes nur für den Primary Key `id`. Abfragen wie `SELECT * FROM history_entries ORDER BY dateMillis DESC` oder Selektionen nach `dateOnly` und `effectiveSortOrder` führen zu Full Table Scans.
 - **Best Practice:**
   ```kotlin
@@ -75,14 +75,13 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
       tableName = "history_entries",
       indices = [
           Index(value = ["dateMillis"]),
-          Index(value = ["dateOnly"]),
-          Index(value = ["calendarWeek"])
+          Index(value = ["sortOrder"])
       ]
   )
-  data class HistoryEntity(...)
+  data class HistoryEntryEntity(...)
   ```
 
-#### C.2 Destruktive Migrationen als Standard
+#### C.2 [x] Destruktive Migrationen als Standard (Erledigt: MIGRATION_1_2 und MIGRATION_2_3 in AppDatabase.kt ohne fallbackToDestructiveMigration)
 - **Datei:** `app/src/main/java/de/gurum/besseresser/data/AppDatabase.kt` (Zeile 78)
 - **Problem:** `Room.databaseBuilder(...).fallbackToDestructiveMigration().build()`. Bei jedem zukünftigen Versionssprung der Room-Datenbank werden ohne explizite Migration alle bisherigen Mahlzeiten und Auswertungen der Nutzer unwiderruflich gelöscht.
 - **Best Practice:** Definition von automatischen (`@AutoMigration`) oder expliziten `Migration(from, to)`-Pfaden für Produktions-Releases.
@@ -164,7 +163,7 @@ Dieses Code-Review analysiert die Codebasis im Hinblick auf **Android Best Pract
 | **P1** | [x] Umstellung Backup auf SAF (`ActivityResultContracts.CreateDocument`) | `BackupStore.kt`, `BackupManager.kt`, UI | Mittel |
 | **P1** | [x] Vorberechnung von `staleFazit` & Fingerprints außerhalb von LazyColumn | `HistoryListScreen.kt`, `HistoryViewModel.kt` | Gering |
 | **P2** | [x] Java Toolchain in Gradle konfigurieren (`jvmToolchain(17)`) | `app/build.gradle.kts` | Minimal |
-| **P2** | [ ] Room-Indizes auf `dateMillis`, `dateOnly`, `calendarWeek` ergänzen | `HistoryEntity.kt`, `AppDatabase.kt` | Gering |
+| **P2** | [x] Room-Indizes auf `dateMillis`, `dateOnly`, `calendarWeek` ergänzen | `HistoryEntity.kt`, `AppDatabase.kt` | Gering |
 | **P2** | [ ] `@Immutable`-Annotationen für UI-State Data-Classes ergänzen | `MainUiState.kt`, `HistoryUiState.kt` | Gering |
 | **P3** | [ ] Dispatcher-Injection via Koin einführen (`ioDispatcher`) | Koin-Module, Repositories | Mittel |
 | **P3** | [ ] Reaktivierung von Room `Flow` als Single Source of Truth in `MainViewModel` | `MainViewModel.kt`, `HistoryRepository.kt` | Mittel |
