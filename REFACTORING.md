@@ -96,7 +96,7 @@ fun RecentNotesButton(
 
 ---
 
-### 3.2 Unbehandelte Ausnahmen / Hardcodierte Fehlerstrings in UI-Schicht
+### 3.2 [x] Unbehandelte Ausnahmen / Hardcodierte Fehlerstrings in UI-Schicht
 - **Ort**: 
   - `HistoryDetailViewModel.kt` (Zeile 101: Fallback-String `"Keine Internetverbindung – KI-Bewertung ist aktuell nicht möglich."` direkt im Code)
   - `HistoryViewModel.kt` (`addError = e.message ?: e.javaClass.simpleName`)

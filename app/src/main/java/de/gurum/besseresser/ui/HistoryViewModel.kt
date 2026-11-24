@@ -336,7 +336,7 @@ class HistoryViewModel(
                     val dataUri = runCatching {
                         withContext(dispatchers.io) { imagePreprocessor.prepareImageDataUri(photoUri) }
                     }.getOrElse { e ->
-                        _uiState.update { it.copy(showAddBusyCard = false, addError = e.message) }
+                        _uiState.update { it.copy(showAddBusyCard = false, addError = ErrorMapper.toUserMessage(e)) }
                         saveBackdatedEntry(Evaluation(), photoUri, onPick)
                         return@launch
                     }
@@ -353,7 +353,7 @@ class HistoryViewModel(
                 _uiState.update { it.copy(showAddBusyCard = false) }
                 saveBackdatedEntry(ev, photoUri, onPick)
             }.onFailure { e ->
-                _uiState.update { it.copy(showAddBusyCard = false, addError = e.message ?: e.javaClass.simpleName) }
+                _uiState.update { it.copy(showAddBusyCard = false, addError = ErrorMapper.toUserMessage(e)) }
                 saveBackdatedEntry(Evaluation(), photoUri, onPick)
             }
         }

@@ -141,7 +141,7 @@ class HistoryDetailViewModel(
                 historyRepository.deleteWeekFazitForEntry(entry)
                 _uiState.update { it.copy(reEvalBusy = false) }
             }.onFailure { e ->
-                _uiState.update { it.copy(reEvalBusy = false, error = e.message ?: e.javaClass.simpleName) }
+                _uiState.update { it.copy(reEvalBusy = false, error = ErrorMapper.toUserMessage(e)) }
             }
         }
     }
