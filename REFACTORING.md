@@ -108,7 +108,7 @@ fun RecentNotesButton(
 
 ---
 
-### 3.3 Scope & Dispatcher-Hygiene bei Bilddecodierung und IO
+### 3.3 [x] Scope & Dispatcher-Hygiene bei Bilddecodierung und IO
 - **Ort**: `HistoryViewModel.kt`, `HistoryDetailViewModel.kt`, `PhotoStorage.kt`
 - **Problem**: 
   Einige Methoden deklarieren `suspend fun` ohne internen `withContext(dispatchers.io)`, sodass der Aufrufer den Dispatcher steuern muss (z. B. `decodeThumbnail` in `HistoryViewModel` ruft `historyRepository.decodeThumbnail` auf, welches sicherstellen muss, niemals den Main-Thread zu blockieren).

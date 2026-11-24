@@ -596,7 +596,9 @@ class HistoryViewModel(
         historyRepository.photoFileOf(entry)
 
     suspend fun decodeThumbnail(entry: HistoryEntry, target: Int = 128): android.graphics.Bitmap? =
-        historyRepository.decodeThumbnail(entry, target)
+        withContext(dispatchers.io) {
+            historyRepository.decodeThumbnail(entry, target)
+        }
 
     private var autoFazitJob: Job? = null
 
