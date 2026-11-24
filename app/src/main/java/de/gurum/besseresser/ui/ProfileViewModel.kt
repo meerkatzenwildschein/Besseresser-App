@@ -3,9 +3,11 @@ package de.gurum.besseresser.ui
 import androidx.compose.runtime.Immutable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import de.gurum.besseresser.R
@@ -30,6 +32,9 @@ class ProfileViewModel(
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
+
+    private val _eventChannel = Channel<UiEvent>(Channel.BUFFERED)
+    val eventFlow = _eventChannel.receiveAsFlow()
 
     fun initFromProfile(profile: Profile) {
         _uiState.update {
@@ -76,12 +81,16 @@ class ProfileViewModel(
         val w = if (state.weightText.isBlank()) null
         else state.weightText.replace(',', '.').toDoubleOrNull()
         if (state.weightText.isNotBlank() && (w == null || w <= 0 || w > 500)) {
-            _uiState.update { it.copy(error = UiText.StringResource(R.string.profile_err_weight)) }
+            val err = UiText.StringResource(R.string.profile_err_weight)
+            _uiState.update { it.copy(error = err) }
+            _eventChannel.trySend(UiEvent.ShowSnackbar(err))
             return false
         }
         val h = if (state.heightText.isBlank()) null else state.heightText.toIntOrNull()
         if (state.heightText.isNotBlank() && (h == null || h <= 30 || h > 280)) {
-            _uiState.update { it.copy(error = UiText.StringResource(R.string.profile_err_height)) }
+            val err = UiText.StringResource(R.string.profile_err_height)
+            _uiState.update { it.copy(error = err) }
+            _eventChannel.trySend(UiEvent.ShowSnackbar(err))
             return false
         }
         _uiState.update { it.copy(error = null) }

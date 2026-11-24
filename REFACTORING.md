@@ -132,7 +132,7 @@ fun RecentNotesButton(
 - **Befund**: In `SummaryFooterRow` (`CommonUi.kt`) wird `LocalContext.current.resources.getQuantityString(...)` genutzt, während an anderen Stellen `pluralStringResource(...)` aus Compose verwendet wird.
 - **Empfehlung**: Einheitlich die Compose-Funktion `pluralStringResource(R.plurals.details_toggle_more, extraCount, extraCount)` einsetzen.
 
-### 4.2 Sealed Interface für UI-Events / Single Live Events
+### 4.2 [x] Sealed Interface für UI-Events / Single Live Events
 - **Befund**: Toasts und Fehlermeldungen werden teils über `error: String?` im UI-State gehalten und erfordern manuelle `clearError()`-Aufrufe nach dem Rendern.
 - **Empfehlung**: Verwendung von Kotlin `Channel<UiEvent>` / `SharedFlow` für "One-Shot Events" (z. B. `ShowToast`, `NavigateBack`, `RequestPermission`), um State-Clear-Boilerplate zu vermeiden.
 
