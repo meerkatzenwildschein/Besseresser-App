@@ -206,7 +206,7 @@ fun CameraCaptureScreen(
                     },
                     modifier = Modifier.fillMaxSize()
                 )
-                DisposableEffect(Unit) {
+                DisposableEffect(lifecycleOwner) {
                     onDispose {
                         providerHolder.value?.unbindAll()
                         previewView = null

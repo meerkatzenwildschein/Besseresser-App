@@ -117,7 +117,7 @@ fun RecentNotesButton(
 
 ---
 
-### 3.4 Kamera-Ressourcenfreigabe im `DisposableEffect` absichern
+### 3.4 [x] Kamera-Ressourcenfreigabe im `DisposableEffect` absichern
 - **Ort**: `CameraCaptureScreen.kt` (Zeilen 209–214)
 - **Problem**: 
   Die Kamera-Bindung erfolgt über `ProcessCameraProvider`. Im `DisposableEffect(Unit)` wird `providerHolder.value?.unbindAll()` aufgerufen. Bei schnellen Konfigurationsänderungen oder Navigationswechseln sollte geprüft werden, ob `ProcessCameraProvider` immer rechtzeitig gebunden bzw. entbunden wird.
