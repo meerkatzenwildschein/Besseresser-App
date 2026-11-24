@@ -17,6 +17,13 @@ import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.data.UiPrefsRepository
 import de.gurum.besseresser.data.WeekFazitDao
 import de.gurum.besseresser.di.appModule
+import de.gurum.besseresser.di.appModules
+import de.gurum.besseresser.di.databaseModule
+import de.gurum.besseresser.di.dispatchersModule
+import de.gurum.besseresser.di.networkModule
+import de.gurum.besseresser.di.repositoryModule
+import de.gurum.besseresser.di.storageModule
+import de.gurum.besseresser.di.viewModelModule
 import de.gurum.besseresser.ui.AppStateViewModel
 import de.gurum.besseresser.ui.ConfigViewModel
 import de.gurum.besseresser.ui.HistoryDetailViewModel
@@ -100,5 +107,16 @@ class KoinDiTest : KoinTest {
         assertNotNull(get<ConfigViewModel>())
         assertNotNull(get<RecentNotesViewModel>())
         assertNotNull(get<HistoryDetailViewModel> { parametersOf(123L) })
+    }
+
+    @Test
+    fun testModularKoinModuleStructure() {
+        org.junit.Assert.assertEquals(6, appModules.size)
+        org.junit.Assert.assertTrue(appModules.contains(dispatchersModule))
+        org.junit.Assert.assertTrue(appModules.contains(databaseModule))
+        org.junit.Assert.assertTrue(appModules.contains(networkModule))
+        org.junit.Assert.assertTrue(appModules.contains(storageModule))
+        org.junit.Assert.assertTrue(appModules.contains(repositoryModule))
+        org.junit.Assert.assertTrue(appModules.contains(viewModelModule))
     }
 }

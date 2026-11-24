@@ -136,7 +136,7 @@ fun RecentNotesButton(
 - **Befund**: Toasts und Fehlermeldungen werden teils über `error: String?` im UI-State gehalten und erfordern manuelle `clearError()`-Aufrufe nach dem Rendern.
 - **Empfehlung**: Verwendung von Kotlin `Channel<UiEvent>` / `SharedFlow` für "One-Shot Events" (z. B. `ShowToast`, `NavigateBack`, `RequestPermission`), um State-Clear-Boilerplate zu vermeiden.
 
-### 4.3 Koin Modul-Modularisierung
+### 4.3 [x] Koin Modul-Modularisierung
 - **Befund**: `appModule` in `BesseresserApp.kt` definiert alle Singletons, Repositories und ViewModels in einer Datei.
 - **Empfehlung**: Aufteilung in logische Module:
   - `networkModule` (OkHttp, ApiClient, ApiService, NetworkChecker)
