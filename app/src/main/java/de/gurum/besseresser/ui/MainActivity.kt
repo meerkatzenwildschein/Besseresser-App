@@ -29,6 +29,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -178,6 +179,7 @@ object Routes {
 }
 
 /** Daten eines aus einer anderen App geteilten Bildes (ACTION_SEND). */
+@Immutable
 data class SharedImagePayload(
     val photoUri: Uri,
     val note: String? = null

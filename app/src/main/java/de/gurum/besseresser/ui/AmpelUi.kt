@@ -2,6 +2,7 @@ package de.gurum.besseresser.ui
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -10,6 +11,7 @@ import de.gurum.besseresser.model.TrafficLight
 
 // ----------------------------------------------------------------- TrafficLight UI extensions & Theme Tokens
 
+@Immutable
 data class TrafficLightColors(
     val green: Color = Color(0xFF2E9E44),
     val yellow: Color = Color(0xFFE6A817),

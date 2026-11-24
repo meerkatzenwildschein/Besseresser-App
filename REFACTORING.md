@@ -83,7 +83,7 @@ fun RecentNotesButton(
 
 ## 3. Wichtige Findings (Mittlere Priorität)
 
-### 3.1 Compose-Recomposition-Optimierung mit `ImmutableList` / `@Immutable`
+### 3.1 [x] Compose-Recomposition-Optimierung mit `ImmutableList` / `@Immutable`
 - **Ort**: 
   - `HistoryUiState` (`entries: List<HistoryEntry>`, `fazitMap: Map<...>`, `loadingWeeks: Set<String>`)
   - `HistoryDetailViewModel.DetailUiState`
