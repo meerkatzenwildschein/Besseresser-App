@@ -19,13 +19,15 @@ import java.io.File
 import de.gurum.besseresser.data.AppDispatchers
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.FazitManager
+import de.gurum.besseresser.data.HistoryDeleteManager
+import de.gurum.besseresser.data.HistoryReorderUseCase
 import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.data.NetworkConnectivityChecker
 import de.gurum.besseresser.data.PhotoCaptureManager
+import de.gurum.besseresser.data.TriggerAutoFazitUseCase
+import de.gurum.besseresser.data.UNDO_DELETE_DELAY_MS
 import de.gurum.besseresser.model.calendarWeekOfKey
 import de.gurum.besseresser.model.DayFazit
-import de.gurum.besseresser.model.DayFazitSession
-import de.gurum.besseresser.model.dayFingerprint
 import de.gurum.besseresser.model.dayKeyOf
 import de.gurum.besseresser.model.Evaluation
 import de.gurum.besseresser.data.FazitPromptBundle
@@ -37,6 +39,7 @@ import de.gurum.besseresser.data.ProfileRepository
 import de.gurum.besseresser.data.PromptRepository
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.data.SettingsRepository
+import de.gurum.besseresser.ui.latestDueWeekKey
 import de.gurum.besseresser.model.weekKeyOf
 
 class HistoryViewModel(
@@ -57,7 +60,15 @@ class HistoryViewModel(
         promptRepository = promptRepository,
         dispatchers = dispatchers
     ),
-    private val networkChecker: NetworkConnectivityChecker = NetworkConnectivityChecker { true }
+    private val networkChecker: NetworkConnectivityChecker = NetworkConnectivityChecker { true },
+    private val deleteManager: HistoryDeleteManager = HistoryDeleteManager(historyRepository),
+    private val reorderUseCase: HistoryReorderUseCase = HistoryReorderUseCase(historyRepository),
+    private val autoFazitUseCase: TriggerAutoFazitUseCase = TriggerAutoFazitUseCase(
+        fazitManager = fazitManager,
+        settingsRepository = settingsRepository,
+        profileRepository = profileRepository,
+        promptRepository = promptRepository
+    )
 ) : ViewModel() {
 
     fun createCaptureFile(): Pair<File, Uri> {
@@ -101,9 +112,6 @@ class HistoryViewModel(
         )
     )
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
-
-    private val pendingDeleteJobs = mutableMapOf<Long, Job>()
-    private val pendingDeleteEntries = mutableMapOf<Long, HistoryEntry>()
 
     init {
         observeHistoryData(historyRepository)
@@ -225,7 +233,6 @@ class HistoryViewModel(
         }
     }
 
-    /** Stellt sicher, dass eine temporäre Foto-Zieldatei für die Nacherfassung existiert (z. B. vor Start der Systemkamera). */
     fun ensureAddCaptureFile(): Pair<File, Uri> {
         val current = _uiState.value
         val existingFile = current.addPhotoFile
@@ -238,7 +245,6 @@ class HistoryViewModel(
         return fresh
     }
 
-    /** Bricht die Foto-Nacherfassung (Kamera oder Review) ab und löscht die temporäre Foto-Datei. */
     fun cancelAddPhotoCapture() {
         val fileToDelete = _uiState.value.addPhotoFile
         val uriToDelete = _uiState.value.addPhotoUri
@@ -287,8 +293,6 @@ class HistoryViewModel(
         _uiState.update { it.copy(addError = null) }
     }
 
-    /** Nacherfassen (mit oder ohne Foto): nutzt eine gecachte Bewertung, falls vorhanden,
-     *  ruft sonst die KI an und speichert danach. */
     fun submitBackdated(
         photoUri: Uri?,
         textOnly: Boolean = false,
@@ -304,8 +308,6 @@ class HistoryViewModel(
         }
     }
 
-    /** Nacherfassen (mit oder ohne Foto): nutzt eine gecachte Bewertung, falls vorhanden,
-     *  ruft sonst die KI an und speichert danach. Prompts werden von der UI geliefert. */
     fun submitBackdated(
         photoUri: Uri?,
         settings: Settings,
@@ -357,9 +359,6 @@ class HistoryViewModel(
         }
     }
 
-    /** Prüft beim Nacherfassen (mit oder ohne Foto), ob für die aktuelle Anmerkung [addNote]
-     *  bereits eine zu [settings.goals] passende KI-Bewertung im Menü-Speicher existiert.
-     *  Falls ja, wird der Eintrag sofort ohne KI-Aufruf gespeichert. */
     suspend fun trySaveCachedBackdated(
         settings: Settings,
         photoUriIn: Uri?,
@@ -423,115 +422,35 @@ class HistoryViewModel(
     }
 
     fun deleteEntry(entry: HistoryEntry) {
-        val job = synchronized(pendingDeleteJobs) {
-            pendingDeleteEntries.remove(entry.id)
-            pendingDeleteJobs.remove(entry.id)
-        }
-        job?.cancel()
-        _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds - entry.id) }
-        viewModelScope.launch {
-            historyRepository.delete(entry)
-            historyRepository.deleteDayFazitForEntry(entry)
-            historyRepository.deleteWeekFazitForEntry(entry)
+        deleteManager.deleteEntry(entry, viewModelScope) { pendingIds ->
+            _uiState.update { it.copy(pendingDeleteIds = pendingIds) }
         }
     }
 
-    /** Markiert einen Eintrag zunächst als „vorgemerkt zum Löschen" (deaktiviert + Rückgängig-Option)
-     *  und führt das endgültige Löschen erst nach [delayMs] (Standard: 5 Sekunden) aus. */
     fun requestDeleteEntry(
         entry: HistoryEntry,
         delayMs: Long = UNDO_DELETE_DELAY_MS
     ) {
-        val existingJob = synchronized(pendingDeleteJobs) {
-            pendingDeleteEntries[entry.id] = entry
-            pendingDeleteJobs.remove(entry.id)
-        }
-        existingJob?.cancel()
-        _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds + entry.id) }
-        val job = viewModelScope.launch {
-            if (delayMs > 0L) delay(delayMs)
-            val shouldDelete = synchronized(pendingDeleteJobs) {
-                pendingDeleteJobs.remove(entry.id)
-                pendingDeleteEntries.remove(entry.id) != null
-            }
-            _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds - entry.id) }
-            if (shouldDelete) {
-                historyRepository.delete(entry)
-                historyRepository.deleteDayFazitForEntry(entry)
-                historyRepository.deleteWeekFazitForEntry(entry)
-            }
-        }
-        synchronized(pendingDeleteJobs) {
-            if (pendingDeleteEntries.containsKey(entry.id)) {
-                pendingDeleteJobs[entry.id] = job
-            }
+        deleteManager.requestDeleteEntry(entry, delayMs, viewModelScope) { pendingIds ->
+            _uiState.update { it.copy(pendingDeleteIds = pendingIds) }
         }
     }
 
-    /** Bricht das vorgemerkte Löschen ab und stellt den Eintrag sofort wieder aktiv her. */
     fun undoDeleteEntry(entryId: Long) {
-        val job = synchronized(pendingDeleteJobs) {
-            pendingDeleteEntries.remove(entryId)
-            pendingDeleteJobs.remove(entryId)
+        deleteManager.undoDeleteEntry(entryId) { pendingIds ->
+            _uiState.update { it.copy(pendingDeleteIds = pendingIds) }
         }
-        job?.cancel()
-        _uiState.update { it.copy(pendingDeleteIds = it.pendingDeleteIds - entryId) }
     }
 
-    /** Führt alle noch offenen Löschvorgänge sofort endgültig aus (z. B. beim Verlassen des Verlaufs). */
     fun flushPendingDeletes() {
-        val toDelete = synchronized(pendingDeleteJobs) {
-            val list = pendingDeleteEntries.values.toList()
-            pendingDeleteJobs.values.forEach { it.cancel() }
-            pendingDeleteJobs.clear()
-            pendingDeleteEntries.clear()
-            list
-        }
-        if (toDelete.isEmpty()) return
-        _uiState.update { it.copy(pendingDeleteIds = emptySet()) }
-        viewModelScope.launch {
-            toDelete.forEach { entry ->
-                historyRepository.delete(entry)
-                historyRepository.deleteDayFazitForEntry(entry)
-                historyRepository.deleteWeekFazitForEntry(entry)
-            }
+        deleteManager.flushPendingDeletes(viewModelScope) { pendingIds ->
+            _uiState.update { it.copy(pendingDeleteIds = pendingIds) }
         }
     }
 
-    /** Verschiebt einen Eintrag innerhalb seines Tages von [fromIndex] nach [toIndex].
-     *  Aktualisiert ausschließlich [HistoryEntry.sortOrder] (absteigend), sodass die echte
-     *  Erfassungsuhrzeit ([HistoryEntry.dateMillis]) unverändert erhalten bleibt. */
     fun moveEntryWithinDay(day: LocalDate, fromIndex: Int, toIndex: Int) {
-        if (fromIndex == toIndex) return
         val currentEntries = _uiState.value.entries
-        val dayEntries = currentEntries.filter {
-            java.time.Instant.ofEpochMilli(it.dateMillis)
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate() == day
-        }.sortedByDescending { it.effectiveSortOrder }.toMutableList()
-
-        if (fromIndex !in dayEntries.indices || toIndex !in dayEntries.indices) return
-
-        val moved = dayEntries.removeAt(fromIndex)
-        dayEntries.add(toIndex, moved)
-
-        // Die vorhandenen Sortierwerte absteigend sortieren und der neuen Reihenfolge zuweisen
-        val sortOrders = dayEntries.map { it.effectiveSortOrder }.sortedDescending().toMutableList()
-        // Sicherstellen, dass keine doppelten Sortierwerte existieren (jeweils mind. 1000 Differenz)
-        for (i in 1 until sortOrders.size) {
-            if (sortOrders[i] >= sortOrders[i - 1]) {
-                sortOrders[i] = sortOrders[i - 1] - 1000L
-            }
-        }
-
-        val reorderedDayEntries = dayEntries.mapIndexed { idx, entry ->
-            entry.copy(sortOrder = sortOrders[idx])
-        }
-
-        // Optimistisches Update im UI-State
-        val reorderedMap = reorderedDayEntries.associateBy { it.id }
-        val updatedAllEntries = currentEntries.map { reorderedMap[it.id] ?: it }
-            .sortedByDescending { it.effectiveSortOrder }
+        val updatedAllEntries = reorderUseCase.reorderWithinDay(day, fromIndex, toIndex, currentEntries) ?: return
 
         val nowDate = LocalDate.now()
         val nowHour = LocalTime.now().hour
@@ -539,7 +458,7 @@ class HistoryViewModel(
         _uiState.update { it.copy(entries = updatedAllEntries, uiItems = items) }
 
         viewModelScope.launch {
-            historyRepository.reorderEntries(reorderedDayEntries)
+            reorderUseCase.persistReorder(day, updatedAllEntries)
         }
     }
 
@@ -672,6 +591,7 @@ class HistoryViewModel(
             }
         }
     }
+
     fun photoFileOf(entry: HistoryEntry): java.io.File? =
         historyRepository.photoFileOf(entry)
 
@@ -680,53 +600,29 @@ class HistoryViewModel(
 
     private var autoFazitJob: Job? = null
 
-    /**
-     * Reaktiv getriggerte Auto-Fazit-Prüfung im ViewModel-Scope ohne UI-Lifecycle-Kopplung.
-     */
     fun triggerAutoFazits() {
-        val promptRepo = promptRepository ?: return
-        val profileRepo = profileRepository
         autoFazitJob?.cancel()
         autoFazitJob = viewModelScope.launch {
             delay(1200) // Debounce
             val entries = _uiState.value.entries
             if (entries.isEmpty()) return@launch
 
-            val settings = settingsRepository.currentSettings()
-            val profile = profileRepo?.currentProfile() ?: Profile()
-            val promptContext = promptRepo.profileContextLine(profile)
-            val dayPrompts = promptRepo.createDayFazitPrompts()
-
-            val nowDate = LocalDate.now()
-            val nowHour = LocalTime.now().hour
-            val autoFazitTime = nowHour >= FAZIT_AUTO_HOUR
-
-            checkAutoDayFazits(
+            autoFazitUseCase.checkAndTriggerAutoFazits(
                 entries = entries,
-                nowDate = nowDate,
-                autoFazitTime = autoFazitTime,
-                settings = settings,
-                promptContext = promptContext,
-                dayPrompts = dayPrompts,
-                daymealDescriptionsProvider = { promptRepo.dayFazitMealDescriptions(it) }
-            )
-
-            checkAutoWeekFazits(
-                entries = entries,
-                nowDate = nowDate,
-                nowHour = nowHour,
-                settings = settings,
-                promptContext = promptContext,
-                weekPromptsProvider = { promptRepo.createWeekFazitPrompts(it) },
-                weekmealDescriptionsProvider = { promptRepo.weekFazitMealDescriptions(it) }
+                fazitMap = _uiState.value.fazitMap,
+                loadingFazits = _uiState.value.loadingFazits,
+                weekFazitMap = _uiState.value.weekFazitMap,
+                loadingWeeks = _uiState.value.loadingWeeks,
+                onGenerateDayFazit = { day, ratedEntries, settings, promptContext, mealDescriptions, prompts ->
+                    generateFazit(day, ratedEntries, settings, promptContext, mealDescriptions, prompts)
+                },
+                onGenerateWeekFazit = { settings, promptContext, weekKey, mealDescriptions, prompts ->
+                    generateWeekFazit(settings, promptContext, weekKey, mealDescriptions, prompts)
+                }
             )
         }
     }
 
-    /**
-     * Prüft und triggert fällige Tages- und Wochenfazits im Hintergrund (ViewModelScope).
-     * Entkoppelt von UI-Rendering/LaunchedEffects für maximale Stabilität und Robustheit.
-     */
     fun checkAndTriggerAutoFazits(
         settings: Settings,
         promptContext: String?,
@@ -741,100 +637,24 @@ class HistoryViewModel(
             val entries = _uiState.value.entries
             if (entries.isEmpty()) return@launch
 
-            val nowDate = LocalDate.now()
-            val nowHour = LocalTime.now().hour
-            val autoFazitTime = nowHour >= FAZIT_AUTO_HOUR
-
-            checkAutoDayFazits(
+            autoFazitUseCase.checkAndTriggerAutoFazits(
                 entries = entries,
-                nowDate = nowDate,
-                autoFazitTime = autoFazitTime,
+                fazitMap = _uiState.value.fazitMap,
+                loadingFazits = _uiState.value.loadingFazits,
+                weekFazitMap = _uiState.value.weekFazitMap,
+                loadingWeeks = _uiState.value.loadingWeeks,
                 settings = settings,
                 promptContext = promptContext,
                 dayPrompts = dayPrompts,
-                daymealDescriptionsProvider = daymealDescriptionsProvider
-            )
-
-            checkAutoWeekFazits(
-                entries = entries,
-                nowDate = nowDate,
-                nowHour = nowHour,
-                settings = settings,
-                promptContext = promptContext,
                 weekPromptsProvider = weekPromptsProvider,
-                weekmealDescriptionsProvider = weekmealDescriptionsProvider
-            )
-        }
-    }
-
-    private fun checkAutoDayFazits(
-        entries: List<HistoryEntry>,
-        nowDate: LocalDate,
-        autoFazitTime: Boolean,
-        settings: Settings,
-        promptContext: String?,
-        dayPrompts: FazitPromptBundle,
-        daymealDescriptionsProvider: (List<HistoryEntry>) -> List<String>
-    ) {
-        val fazitMap = _uiState.value.fazitMap
-        val loadingFazits = _uiState.value.loadingFazits
-
-        groupByDay(entries).take(2).forEach { group ->
-            val ratedEntries = group.entries.filter { it.isRated }
-            if (ratedEntries.isEmpty()) return@forEach
-            val dayAutoReady = group.day.isBefore(nowDate) || autoFazitTime
-            val key = dayKeyOf(group.day)
-            if (key in loadingFazits || !dayAutoReady) return@forEach
-
-            val fazit = fazitMap[key]
-            if (fazit == null) {
-                if (key !in DayFazitSession.attempted) {
-                    DayFazitSession.attempted.add(key)
-                    generateFazit(
-                        day = group.day,
-                        entriesOfDay = ratedEntries,
-                        settings = settings,
-                        promptContext = promptContext,
-                        mealDescriptions = daymealDescriptionsProvider(ratedEntries),
-                        prompts = dayPrompts
-                    )
+                daymealDescriptionsProvider = daymealDescriptionsProvider,
+                weekmealDescriptionsProvider = weekmealDescriptionsProvider,
+                onGenerateDayFazit = { day, ratedEntries, set, ctx, descriptions, prompts ->
+                    generateFazit(day, ratedEntries, set, ctx, descriptions, prompts)
+                },
+                onGenerateWeekFazit = { set, ctx, weekKey, descriptions, prompts ->
+                    generateWeekFazit(set, ctx, weekKey, descriptions, prompts)
                 }
-            } else if (isFazitOutdated(fazit, ratedEntries)) {
-                generateFazit(
-                    day = group.day,
-                    entriesOfDay = ratedEntries,
-                    settings = settings,
-                    promptContext = promptContext,
-                    mealDescriptions = daymealDescriptionsProvider(ratedEntries),
-                    prompts = dayPrompts
-                )
-            }
-        }
-    }
-
-    private fun checkAutoWeekFazits(
-        entries: List<HistoryEntry>,
-        nowDate: LocalDate,
-        nowHour: Int,
-        settings: Settings,
-        promptContext: String?,
-        weekPromptsProvider: (calendarWeek: Int) -> FazitPromptBundle,
-        weekmealDescriptionsProvider: (List<HistoryEntry>) -> List<String>
-    ) {
-        val weekFazitMap = _uiState.value.weekFazitMap
-        val loadingWeeks = _uiState.value.loadingWeeks
-        val dueWk = latestDueWeekKey(entries, nowDate, nowHour) ?: return
-
-        if (dueWk !in loadingWeeks && weekFazitMap[dueWk] == null && dueWk !in DayFazitSession.attemptedWeekly) {
-            DayFazitSession.attemptedWeekly.add(dueWk)
-            val wkEntries = entries.filter { it.isRated && weekKeyOf(it.dateMillis) == dueWk }
-            if (wkEntries.isEmpty()) return
-            generateWeekFazit(
-                settings = settings,
-                promptContext = promptContext,
-                weekKey = dueWk,
-                mealDescriptions = weekmealDescriptionsProvider(wkEntries),
-                prompts = weekPromptsProvider(calendarWeekOfKey(dueWk))
             )
         }
     }

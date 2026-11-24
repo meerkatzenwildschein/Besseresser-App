@@ -64,7 +64,7 @@ fun RecentNotesButton(
 
 ---
 
-### 2.3 `HistoryViewModel` bündelt zu viele Verantwortlichkeiten (Large ViewModel)
+### 2.3 [x] `HistoryViewModel` bündelt zu viele Verantwortlichkeiten (Large ViewModel)
 - **Ort**: `de/gurum/besseresser/ui/HistoryViewModel.kt` (> 800 Zeilen)
 - **Problem**: 
   Das `HistoryViewModel` verwaltet gleichzeitig:
