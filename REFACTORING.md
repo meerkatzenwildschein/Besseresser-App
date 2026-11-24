@@ -52,7 +52,7 @@ fun RecentNotesButton(
 
 ---
 
-### 2.2 Fehlendes Type-Safe Navigation Compose
+### 2.2 [x] Fehlendes Type-Safe Navigation Compose
 - **Ort**: `MainActivity.kt`, `MainScreen.kt`, `HistoryScreen.kt`
 - **Problem**: 
   Die Navigation zwischen Screens (Setup, Profil, Konfiguration, Verlauf, Detail, Kamera) erfolgt primär über Zustandsvariablen (`currentScreen`, `showCamera`, `showReview`, `addDialogForDay`).
