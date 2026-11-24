@@ -128,7 +128,7 @@ fun RecentNotesButton(
 
 ## 4. Optimierungspotenziale & Code Smells (Niedrige Priorität)
 
-### 4.1 String-Formatierung & Plural-Ressourcen
+### 4.1 [x] String-Formatierung & Plural-Ressourcen
 - **Befund**: In `SummaryFooterRow` (`CommonUi.kt`) wird `LocalContext.current.resources.getQuantityString(...)` genutzt, während an anderen Stellen `pluralStringResource(...)` aus Compose verwendet wird.
 - **Empfehlung**: Einheitlich die Compose-Funktion `pluralStringResource(R.plurals.details_toggle_more, extraCount, extraCount)` einsetzen.
 
