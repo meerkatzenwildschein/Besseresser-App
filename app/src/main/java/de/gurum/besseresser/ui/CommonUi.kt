@@ -406,15 +406,19 @@ fun RecognizedMealEditDialog(
     )
 }
 
-/** Kleines trailing-Icon im Anmerkungsfeld: Liste der letzten 5 Eingaben.
+/** Kleines trailing-Icon im Anmerkungsfeld: Liste der letzten 5 Eingaben (stateless mit State Hoisting).
  *  Auswahl setzt den Text und verschiebt den Eintrag an die Spitze (MRU). */
 @Composable
-fun RecentNotesButton(onPick: (String) -> Unit) {
-    val viewModel: RecentNotesViewModel = koinViewModel()
-    val notes by viewModel.notes.collectAsStateWithLifecycle()
+fun RecentNotesButton(
+    notes: List<RecentNote>,
+    onPick: (String) -> Unit,
+    onToggleStar: (RecentNote) -> Unit,
+    onPush: (RecentNote) -> Unit,
+    modifier: Modifier = Modifier
+) {
     var open by remember { mutableStateOf(false) }
     val isEnabled = notes.isNotEmpty()
-    Box {
+    Box(modifier = modifier) {
         IconButton(
             onClick = { open = true },
             enabled = isEnabled,
@@ -435,15 +439,13 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
                         IconButton(onClick = {
                             // Eintrag in der SICHTBAREN Liste kippen und persistieren —
                             // kein Neusortieren zwischendurch, sonst springt der Eintrag
-                            viewModel.toggleStar(n)
+                            onToggleStar(n)
                         }, modifier = Modifier.size(32.dp)) {
                             Icon(
                                 Icons.Filled.Star,
                                 contentDescription = stringResource(R.string.recent_notes_star_desc),
-                                // Core-Library kennt nur den gefüllten Stern: Favorit = primary-farbig,
-                                // unmarkiert = deselect-dimmed grau statt Umriss
                                 tint = if (n.starred) MaterialTheme.colorScheme.primary
-                                       else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -458,13 +460,30 @@ fun RecentNotesButton(onPick: (String) -> Unit) {
                     },
                     onClick = {
                         open = false
-                        viewModel.push(n)   // Auswahl rutscht nach oben (MRU)
+                        onPush(n)   // Auswahl rutscht nach oben (MRU)
                         onPick(n.text)
                     }
                 )
             }
         }
     }
+}
+
+/** Stateful Convenience-Wrapper für Screen-Ebene */
+@Composable
+fun RecentNotesButton(
+    onPick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: RecentNotesViewModel = koinViewModel()
+) {
+    val notes by viewModel.notes.collectAsStateWithLifecycle()
+    RecentNotesButton(
+        notes = notes,
+        onPick = onPick,
+        onToggleStar = viewModel::toggleStar,
+        onPush = viewModel::push,
+        modifier = modifier
+    )
 }
 
 @Composable
