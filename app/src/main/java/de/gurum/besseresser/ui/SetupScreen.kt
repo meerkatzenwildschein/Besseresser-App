@@ -24,13 +24,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -51,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -154,19 +160,8 @@ fun SetupScreen(
     }
 
     val save: () -> Unit = {
-        val text = uiState.goals.trim()
-        when {
-            text.isBlank() -> doSave(defaultGoals, true)
-            initial.goalsWereSplit && !uiState.goalsDirty -> doSave(
-                text.split("\n").map { it.trim() }.filter { it.isNotBlank() }, true
-            )
-            else -> viewModel.startSplitGoals(
-                rawGoals = text,
-                splitIntro = ctx.getString(R.string.prompt_split_intro),
-                splitRules = ctx.getString(R.string.prompt_split_rules),
-                onDone = onDone
-            )
-        }
+        val currentGoals = uiState.goals.ifEmpty { defaultGoals }
+        doSave(currentGoals, true)
     }
 
     Box(
@@ -214,9 +209,19 @@ fun SetupScreen(
 
                 SetupGoalsSection(
                     goals = uiState.goals,
-                    defaultGoalsText = defaultGoals.joinToString("\n"),
+                    newGoalText = uiState.newGoalText,
                     splitting = uiState.splitting,
-                    onGoalsChange = { viewModel.setGoals(it) }
+                    canAdd = NetworkSecurity.isPermittedUrl(uiState.url) && uiState.key.isNotBlank(),
+                    onNewGoalTextChange = { viewModel.setNewGoalText(it) },
+                    onAddGoal = {
+                        viewModel.addGoalsFromText(
+                            splitIntro = ctx.getString(R.string.prompt_split_intro),
+                            splitRules = ctx.getString(R.string.prompt_split_rules)
+                        )
+                    },
+                    onMoveUp = { viewModel.moveGoalUp(it) },
+                    onMoveDown = { viewModel.moveGoalDown(it) },
+                    onDelete = { viewModel.removeGoal(it) }
                 )
 
                 SetupRetentionSection(
@@ -253,24 +258,6 @@ fun SetupScreen(
                 viewModel.setShowProviders(false)
             },
             onDismiss = { viewModel.setShowProviders(false) }
-        )
-    }
-
-    if (uiState.showSplit) {
-        SplitGoalsDialog(
-            splitDebug = uiState.splitDebug,
-            splitEdited = uiState.splitEdited,
-            onSplitEditedChange = { viewModel.setSplitEdited(it) },
-            onConfirm = {
-                val liste = uiState.splitEdited.split("\n").map { it.trim() }.filter { it.isNotBlank() }
-                viewModel.setShowSplit(false)
-                doSave(liste, true)
-            },
-            onKeepOriginal = {
-                viewModel.setShowSplit(false)
-                doSave(listOf(uiState.splitRaw), true)
-            },
-            onDismiss = { viewModel.setShowSplit(false) }
         )
     }
 }
@@ -445,28 +432,167 @@ private fun SetupApiSection(
 
 @Composable
 private fun SetupGoalsSection(
-    goals: String,
-    defaultGoalsText: String,
+    goals: List<String>,
+    newGoalText: String,
     splitting: Boolean,
-    onGoalsChange: (String) -> Unit
+    canAdd: Boolean,
+    onNewGoalTextChange: (String) -> Unit,
+    onAddGoal: () -> Unit,
+    onMoveUp: (Int) -> Unit,
+    onMoveDown: (Int) -> Unit,
+    onDelete: (Int) -> Unit
 ) {
     SectionCard(title = stringResource(R.string.setup_section_goals)) {
-        LabelledField(stringResource(R.string.setup_goals_label), required = false) {
-            OutlinedTextField(
-                value = goals,
-                onValueChange = onGoalsChange,
-                placeholder = { Text(defaultGoalsText) },
+        Text(
+            stringResource(R.string.setup_goals_hint),
+            fontSize = 12.5.sp,
+            lineHeight = 17.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        if (goals.isEmpty()) {
+            Surface(
                 shape = RoundedCornerShape(12.dp),
-                minLines = 4,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
                 modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    stringResource(R.string.setup_goals_empty),
+                    fontSize = 12.5.sp,
+                    fontStyle = FontStyle.Italic,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                goals.forEachIndexed { index, goal ->
+                    GoalChipItem(
+                        goal = goal,
+                        canMoveUp = index > 0 && !splitting,
+                        canMoveDown = index < goals.size - 1 && !splitting,
+                        enabled = !splitting,
+                        onMoveUp = { onMoveUp(index) },
+                        onMoveDown = { onMoveDown(index) },
+                        onDelete = { onDelete(index) }
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        LabelledField(stringResource(R.string.setup_add_goal_label), required = false) {
+            OutlinedTextField(
+                value = newGoalText,
+                onValueChange = onNewGoalTextChange,
+                placeholder = { Text(stringResource(R.string.setup_add_goal_placeholder)) },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !splitting,
+                minLines = 2
             )
         }
 
-        if (splitting) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.width(10.dp))
-                Text(stringResource(R.string.setup_ai_splitting_text), fontSize = 13.sp)
+        Button(
+            onClick = onAddGoal,
+            enabled = canAdd && !splitting && newGoalText.isNotBlank(),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (splitting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.setup_ai_splitting_button), fontWeight = FontWeight.SemiBold)
+            } else {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.setup_add_goal_button), fontWeight = FontWeight.SemiBold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun GoalChipItem(
+    goal: String,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    enabled: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = goal,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(vertical = 6.dp)
+            )
+
+            IconButton(
+                onClick = onMoveUp,
+                enabled = canMoveUp && enabled,
+                modifier = Modifier.size(34.dp)
+            ) {
+                Icon(
+                    Icons.Filled.KeyboardArrowUp,
+                    contentDescription = stringResource(R.string.setup_goal_move_up),
+                    tint = if (canMoveUp && enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onMoveDown,
+                enabled = canMoveDown && enabled,
+                modifier = Modifier.size(34.dp)
+            ) {
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    contentDescription = stringResource(R.string.setup_goal_move_down),
+                    tint = if (canMoveDown && enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            IconButton(
+                onClick = onDelete,
+                enabled = enabled,
+                modifier = Modifier.size(34.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = stringResource(R.string.setup_goal_delete),
+                    tint = if (enabled) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
     }
@@ -595,67 +721,6 @@ private fun ProviderPickerDialog(
     )
 }
 
-@Composable
-private fun SplitGoalsDialog(
-    splitDebug: String?,
-    splitEdited: String,
-    onSplitEditedChange: (String) -> Unit,
-    onConfirm: () -> Unit,
-    onKeepOriginal: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                stringResource(
-                    if (splitDebug == null) R.string.split_title_ok else R.string.split_title_fail
-                ),
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (splitDebug != null) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        SelectionContainer {
-                            Text(
-                                splitDebug,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(8.dp)
-                            )
-                        }
-                    }
-                    Text(
-                        stringResource(R.string.split_local_hint),
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    Text(stringResource(R.string.split_check_hint), fontSize = 13.sp)
-                }
-                OutlinedTextField(
-                    value = splitEdited,
-                    onValueChange = onSplitEditedChange,
-                    shape = RoundedCornerShape(12.dp),
-                    minLines = 5,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.split_save)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onKeepOriginal) { Text(stringResource(R.string.split_keep_original)) }
-        }
-    )
-}
 
 // ----------------------------------------------------------------- Modell-Liste (eigener Screen)
 

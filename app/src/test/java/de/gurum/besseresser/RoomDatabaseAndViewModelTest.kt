@@ -302,13 +302,13 @@ class RoomDatabaseAndViewModelTest {
         assertEquals("https://api.openai.com/v1", state.url)
         assertEquals("sk-test", state.key)
         assertEquals("gpt-4o", state.model)
-        assertEquals("Ziel A\nZiel B", state.goals)
+        assertEquals(listOf("Ziel A", "Ziel B"), state.goals)
 
         viewModel.setModel("gpt-4o-mini")
         assertEquals("gpt-4o-mini", viewModel.uiState.value.model)
 
         viewModel.setGoals("Neues Ziel")
-        assertEquals("Neues Ziel", viewModel.uiState.value.goals)
+        assertEquals(listOf("Neues Ziel"), viewModel.uiState.value.goals)
         assertTrue(viewModel.uiState.value.goalsDirty)
     }
 
@@ -647,7 +647,7 @@ class RoomDatabaseAndViewModelTest {
         assertEquals("https://my-custom-proxy.internal", stateAfterRecreate.url)
         assertEquals("sk-secret-key-42", stateAfterRecreate.key)
         assertEquals("claude-3-5-sonnet", stateAfterRecreate.model)
-        assertEquals("Mehr Wasser trinken\nKein Zucker", stateAfterRecreate.goals)
+        assertEquals(listOf("Mehr Wasser trinken", "Kein Zucker"), stateAfterRecreate.goals)
         assertTrue(stateAfterRecreate.goalsDirty)
         assertEquals("24", stateAfterRecreate.retentionWeeks)
         assertTrue(stateAfterRecreate.showModels)
@@ -663,13 +663,13 @@ class RoomDatabaseAndViewModelTest {
         val stateAfterScreenReinit = viewModel2.uiState.value
         assertEquals("https://my-custom-proxy.internal", stateAfterScreenReinit.url)
         assertEquals("sk-secret-key-42", stateAfterScreenReinit.key)
-        assertEquals("Mehr Wasser trinken\nKein Zucker", stateAfterScreenReinit.goals)
+        assertEquals(listOf("Mehr Wasser trinken", "Kein Zucker"), stateAfterScreenReinit.goals)
 
         // Bei explizitem force = true (z.B. nach Backup-Import) wird überschrieben
         viewModel2.init(defaultSettings, listOf("Default Goal"), force = true)
         val stateAfterForcedInit = viewModel2.uiState.value
         assertEquals("https://api.openai.com/v1", stateAfterForcedInit.url)
         assertEquals("sk-old", stateAfterForcedInit.key)
-        assertEquals("Altes Ziel", stateAfterForcedInit.goals)
+        assertEquals(listOf("Altes Ziel"), stateAfterForcedInit.goals)
     }
 }

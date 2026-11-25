@@ -567,13 +567,13 @@ class RepositoriesAndFakesTest {
         assertEquals("https://api.openai.com/v1", vm.uiState.value.url)
         assertEquals("key123", vm.uiState.value.key)
         assertEquals("gpt-4o", vm.uiState.value.model)
+        assertEquals(listOf("Z1"), vm.uiState.value.goals)
 
         vm.startSplitGoals(rawGoals = "Gesund ernähren und viel Wasser trinken")
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.splitting)
-        assertTrue(vm.uiState.value.showSplit)
-        assertEquals("Ziel 1\nZiel 2", vm.uiState.value.splitEdited)
+        assertEquals(listOf("Z1", "Ziel 1", "Ziel 2"), vm.uiState.value.goals)
     }
 
     @Test
@@ -721,8 +721,7 @@ class RepositoriesAndFakesTest {
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.splitting)
-        assertTrue(vm.uiState.value.showSplit)
-        assertEquals("Weniger Salz, mehr Gemüse", vm.uiState.value.splitEdited)
+        assertEquals(listOf("Weniger Salz", "mehr Gemüse"), vm.uiState.value.goals)
         assertEquals("Debug: Unauthorized", vm.uiState.value.splitDebug)
     }
 

@@ -33,6 +33,7 @@ import de.gurum.besseresser.ui.ProfileViewModel
 import de.gurum.besseresser.ui.RecentNotesViewModel
 import de.gurum.besseresser.ui.SetupViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
@@ -47,6 +48,7 @@ import org.koin.dsl.module
 import org.koin.test.KoinTest
 import org.koin.test.get
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class KoinDiTest : KoinTest {
 
     private val testDispatcher = StandardTestDispatcher()

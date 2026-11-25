@@ -26,7 +26,8 @@ data class SetupUiState(
     val url: String = "",
     val key: String = "",
     val model: String = Settings.DEFAULT_MODEL,
-    val goals: String = "",
+    val goals: List<String> = emptyList(),
+    val newGoalText: String = "",
     val goalsDirty: Boolean = false,
     val showModels: Boolean = false,
     val showProviders: Boolean = false,
@@ -51,6 +52,7 @@ class SetupViewModel(
         private const val KEY_KEY = "setup_key"
         private const val KEY_MODEL = "setup_model"
         private const val KEY_GOALS = "setup_goals"
+        private const val KEY_NEW_GOAL_TEXT = "setup_new_goal_text"
         private const val KEY_GOALS_DIRTY = "setup_goals_dirty"
         private const val KEY_SHOW_MODELS = "setup_show_models"
         private const val KEY_SHOW_PROVIDERS = "setup_show_providers"
@@ -59,6 +61,16 @@ class SetupViewModel(
         private const val KEY_SPLIT_RAW = "setup_split_raw"
         private const val KEY_SPLIT_DEBUG = "setup_split_debug"
         private const val KEY_RETENTION_WEEKS = "setup_retention_weeks"
+
+        private fun parseGoalsFromHandle(handle: SavedStateHandle): List<String> {
+            val list = handle.get<ArrayList<String>>(KEY_GOALS)
+            if (list != null) return list.toList()
+            val arr = handle.get<Array<String>>(KEY_GOALS)
+            if (arr != null) return arr.toList()
+            val raw = handle.get<String>(KEY_GOALS)
+            if (raw != null) return raw.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+            return emptyList()
+        }
     }
 
     private val _uiState = MutableStateFlow(
@@ -66,7 +78,8 @@ class SetupViewModel(
             url = savedStateHandle[KEY_URL] ?: "",
             key = savedStateHandle[KEY_KEY] ?: "",
             model = savedStateHandle[KEY_MODEL] ?: Settings.DEFAULT_MODEL,
-            goals = savedStateHandle[KEY_GOALS] ?: "",
+            goals = parseGoalsFromHandle(savedStateHandle),
+            newGoalText = savedStateHandle[KEY_NEW_GOAL_TEXT] ?: "",
             goalsDirty = savedStateHandle[KEY_GOALS_DIRTY] ?: false,
             showModels = savedStateHandle[KEY_SHOW_MODELS] ?: false,
             showProviders = savedStateHandle[KEY_SHOW_PROVIDERS] ?: false,
@@ -92,14 +105,15 @@ class SetupViewModel(
         val url = initial.baseUrl
         val key = initial.apiKey
         val model = initial.model.ifBlank { Settings.DEFAULT_MODEL }
-        val goals = initial.goals.joinToString("\n").ifBlank { defaultGoals.joinToString("\n") }
+        val goals = if (initial.goals.isNotEmpty()) initial.goals else defaultGoals
         val retention = initial.retentionWeeks.toString()
 
         savedStateHandle[KEY_SETUP_INITIALIZED] = true
         savedStateHandle[KEY_URL] = url
         savedStateHandle[KEY_KEY] = key
         savedStateHandle[KEY_MODEL] = model
-        savedStateHandle[KEY_GOALS] = goals
+        savedStateHandle[KEY_GOALS] = ArrayList(goals)
+        savedStateHandle[KEY_NEW_GOAL_TEXT] = ""
         savedStateHandle[KEY_GOALS_DIRTY] = false
         savedStateHandle[KEY_RETENTION_WEEKS] = retention
 
@@ -109,6 +123,7 @@ class SetupViewModel(
                 key = key,
                 model = model,
                 goals = goals,
+                newGoalText = "",
                 goalsDirty = false,
                 retentionWeeks = retention
             )
@@ -133,11 +148,47 @@ class SetupViewModel(
         _uiState.update { it.copy(model = model) }
     }
 
-    fun setGoals(goals: String) {
+    fun setGoals(goals: List<String>) {
         savedStateHandle[KEY_SETUP_INITIALIZED] = true
-        savedStateHandle[KEY_GOALS] = goals
+        savedStateHandle[KEY_GOALS] = ArrayList(goals)
         savedStateHandle[KEY_GOALS_DIRTY] = true
         _uiState.update { it.copy(goals = goals, goalsDirty = true) }
+    }
+
+    fun setGoals(goalsText: String) {
+        val list = goalsText.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+        setGoals(list)
+    }
+
+    fun removeGoal(index: Int) {
+        val current = _uiState.value.goals
+        if (index in current.indices) {
+            val updated = current.toMutableList().apply { removeAt(index) }
+            setGoals(updated)
+        }
+    }
+
+    fun moveGoalUp(index: Int) {
+        val current = _uiState.value.goals
+        if (index in 1 until current.size) {
+            val updated = current.toMutableList()
+            java.util.Collections.swap(updated, index, index - 1)
+            setGoals(updated)
+        }
+    }
+
+    fun moveGoalDown(index: Int) {
+        val current = _uiState.value.goals
+        if (index in 0 until current.size - 1) {
+            val updated = current.toMutableList()
+            java.util.Collections.swap(updated, index, index + 1)
+            setGoals(updated)
+        }
+    }
+
+    fun setNewGoalText(text: String) {
+        savedStateHandle[KEY_NEW_GOAL_TEXT] = text
+        _uiState.update { it.copy(newGoalText = text) }
     }
 
     fun setShowModels(show: Boolean) {
@@ -179,6 +230,84 @@ class SetupViewModel(
         }
     }
 
+    fun addGoalsFromText(
+        splitIntro: String? = null,
+        splitRules: String? = null,
+        customRequest: SplitGoalsRequest? = null,
+        onFinished: ((Result<List<String>>) -> Unit)? = null
+    ) {
+        val raw = _uiState.value.newGoalText.trim()
+        if (raw.isBlank()) return
+
+        _uiState.update { it.copy(splitting = true) }
+        val state = _uiState.value
+        val req = customRequest ?: SplitGoalsRequest(
+            baseUrl = state.url.trim(),
+            apiKey = state.key.trim(),
+            model = state.model.trim(),
+            rawGoals = raw,
+            splitIntro = splitIntro ?: "Split the following free text containing health goals into individual goals.",
+            splitRules = splitRules ?: "Rules: one goal per item, concise (max. 8 words), no numbering."
+        )
+
+        viewModelScope.launch {
+            val result = apiService.splitGoals(request = req)
+            result.onSuccess { splitList ->
+                val newGoals = splitList.map { it.trim() }.filter { it.isNotBlank() }
+                val combined = _uiState.value.goals + newGoals
+                val edited = splitList.joinToString("\n")
+                savedStateHandle[KEY_SETUP_INITIALIZED] = true
+                savedStateHandle[KEY_GOALS] = ArrayList(combined)
+                savedStateHandle[KEY_GOALS_DIRTY] = true
+                savedStateHandle[KEY_NEW_GOAL_TEXT] = ""
+                savedStateHandle[KEY_SPLIT_EDITED] = edited
+                savedStateHandle[KEY_SPLIT_RAW] = raw
+                savedStateHandle.remove<String>(KEY_SPLIT_DEBUG)
+                savedStateHandle[KEY_SHOW_SPLIT] = false
+
+                _uiState.update {
+                    it.copy(
+                        goals = combined,
+                        goalsDirty = true,
+                        newGoalText = "",
+                        splitting = false,
+                        splitEdited = edited,
+                        splitRaw = raw,
+                        splitDebug = null,
+                        showSplit = false
+                    )
+                }
+                onFinished?.invoke(Result.success(newGoals))
+            }.onFailure { err ->
+                val fallbackGoals = ApiClient.splitGoalsLocally(raw).filter { it.isNotBlank() }
+                val combined = if (fallbackGoals.isNotEmpty()) _uiState.value.goals + fallbackGoals else _uiState.value.goals + listOf(raw)
+                val debug = if (err is ApiException) err.debugReport else null
+                savedStateHandle[KEY_SETUP_INITIALIZED] = true
+                savedStateHandle[KEY_GOALS] = ArrayList(combined)
+                savedStateHandle[KEY_GOALS_DIRTY] = true
+                savedStateHandle[KEY_NEW_GOAL_TEXT] = ""
+                savedStateHandle[KEY_SPLIT_EDITED] = raw
+                savedStateHandle[KEY_SPLIT_RAW] = raw
+                if (debug != null) savedStateHandle[KEY_SPLIT_DEBUG] = debug else savedStateHandle.remove<String>(KEY_SPLIT_DEBUG)
+                savedStateHandle[KEY_SHOW_SPLIT] = false
+
+                _uiState.update {
+                    it.copy(
+                        goals = combined,
+                        goalsDirty = true,
+                        newGoalText = "",
+                        splitting = false,
+                        splitEdited = raw,
+                        splitRaw = raw,
+                        splitDebug = debug,
+                        showSplit = false
+                    )
+                }
+                onFinished?.invoke(Result.failure(err))
+            }
+        }
+    }
+
     fun startSplitGoals(
         rawGoals: String,
         splitIntro: String? = null,
@@ -186,52 +315,8 @@ class SetupViewModel(
         splitRequest: SplitGoalsRequest? = null,
         onDone: (Settings) -> Unit = {}
     ) {
-        val state = _uiState.value
-        _uiState.update { it.copy(splitting = true) }
-        val req = splitRequest ?: SplitGoalsRequest(
-            baseUrl = state.url.trim(),
-            apiKey = state.key.trim(),
-            model = state.model.trim(),
-            rawGoals = rawGoals,
-            splitIntro = splitIntro ?: "Split the following free text containing health goals into individual goals.",
-            splitRules = splitRules ?: "Rules: one goal per item, concise (max. 8 words), no numbering."
-        )
-        viewModelScope.launch {
-            val result = apiService.splitGoals(
-                request = req
-            )
-            result.onSuccess { splitList ->
-                val edited = splitList.joinToString("\n")
-                savedStateHandle[KEY_SPLIT_EDITED] = edited
-                savedStateHandle[KEY_SPLIT_RAW] = rawGoals
-                savedStateHandle.remove<String>(KEY_SPLIT_DEBUG)
-                savedStateHandle[KEY_SHOW_SPLIT] = true
-                _uiState.update {
-                    it.copy(
-                        splitting = false,
-                        splitEdited = edited,
-                        splitRaw = rawGoals,
-                        splitDebug = null,
-                        showSplit = true
-                    )
-                }
-            }.onFailure { err ->
-                val debug = if (err is ApiException) err.debugReport else null
-                savedStateHandle[KEY_SPLIT_EDITED] = rawGoals
-                savedStateHandle[KEY_SPLIT_RAW] = rawGoals
-                if (debug != null) savedStateHandle[KEY_SPLIT_DEBUG] = debug else savedStateHandle.remove<String>(KEY_SPLIT_DEBUG)
-                savedStateHandle[KEY_SHOW_SPLIT] = true
-                _uiState.update {
-                    it.copy(
-                        splitting = false,
-                        splitEdited = rawGoals,
-                        splitRaw = rawGoals,
-                        splitDebug = debug,
-                        showSplit = true
-                    )
-                }
-            }
-        }
+        setNewGoalText(rawGoals)
+        addGoalsFromText(splitIntro, splitRules, splitRequest)
     }
 
     suspend fun fetchModels(baseUrl: String, apiKey: String): Result<ApiClient.ModelsResult> =

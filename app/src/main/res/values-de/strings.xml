@@ -104,6 +104,14 @@
     <string name="setup_key_placeholder">sk-…</string>
     <string name="setup_model_label">Modell (mit Bildverstehen, z. B. gpt-4o-mini)</string>
     <string name="setup_goals_label">Deine Ziele</string>
+    <string name="setup_goals_hint">Zu jedem Ziel ermittelt die KI eine Ampel. Sortiere oder lösche Ziele direkt in der Liste.</string>
+    <string name="setup_goals_empty">Keine Ziele definiert. Beim Speichern werden die Standard-Ziele verwendet.</string>
+    <string name="setup_add_goal_label">Neues Ziel oder Freitext</string>
+    <string name="setup_add_goal_placeholder">z. B. Weniger Salz, mehr Gemüse …</string>
+    <string name="setup_add_goal_button">Per KI hinzufügen</string>
+    <string name="setup_goal_move_up">Nach oben</string>
+    <string name="setup_goal_move_down">Nach unten</string>
+    <string name="setup_goal_delete">Ziel entfernen</string>
     <string name="setup_pick_provider">Anbieter wählen</string>
     <string name="setup_models_link">Modelle laden &amp; auswählen</string>
     <string name="setup_save_continue">Speichern &amp; weiter</string>

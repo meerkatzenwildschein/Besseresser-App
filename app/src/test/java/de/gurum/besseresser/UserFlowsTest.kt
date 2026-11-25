@@ -121,11 +121,11 @@ class UserFlowsTest {
         assertFalse(vm.uiState.value.goalsDirty)
         vm.setGoals("Ziel A\nZiel B")
         assertTrue(vm.uiState.value.goalsDirty)
-        assertEquals("Ziel A\nZiel B", vm.uiState.value.goals)
+        assertEquals(listOf("Ziel A", "Ziel B"), vm.uiState.value.goals)
     }
 
     @Test
-    fun `setup flow - startSplitGoals with successful API response sets splitEdited and showSplit`() =
+    fun `setup flow - startSplitGoals with successful API response adds goals directly as chips`() =
         runTest(testDispatcher) {
             val splitResult = listOf("Ziel 1", "Ziel 2", "Ziel 3")
             val fakeApi = FakeApiService(splitGoalsResult = Result.success(splitResult))
@@ -140,10 +140,71 @@ class UserFlowsTest {
             vm.startSplitGoals("Wenig Zucker, viel Eiweiß, keine Fertigprodukte")
             advanceUntilIdle()
 
-            assertTrue(vm.uiState.value.showSplit)
             assertFalse(vm.uiState.value.splitting)
-            assertEquals("Ziel 1\nZiel 2\nZiel 3", vm.uiState.value.splitEdited)
+            assertEquals(listOf("Ziel 1", "Ziel 2", "Ziel 3"), vm.uiState.value.goals)
         }
+
+    @Test
+    fun `setup flow - goal reordering and removal operations`() = runTest(testDispatcher) {
+        val vm = SetupViewModel(
+            apiService = FakeApiService(),
+            backupService = FakeBackupService(),
+            settingsRepository = FakeSettingsRepository()
+        )
+        vm.setGoals(listOf("A", "B", "C"))
+        assertEquals(listOf("A", "B", "C"), vm.uiState.value.goals)
+
+        // Move B up -> [B, A, C]
+        vm.moveGoalUp(1)
+        assertEquals(listOf("B", "A", "C"), vm.uiState.value.goals)
+
+        // Move B down -> [A, B, C]
+        vm.moveGoalDown(0)
+        assertEquals(listOf("A", "B", "C"), vm.uiState.value.goals)
+
+        // Remove item at index 1 (B) -> [A, C]
+        vm.removeGoal(1)
+        assertEquals(listOf("A", "C"), vm.uiState.value.goals)
+
+        // Out of bounds operations are ignored safely
+        vm.moveGoalUp(0)
+        vm.moveGoalDown(1)
+        vm.removeGoal(5)
+        assertEquals(listOf("A", "C"), vm.uiState.value.goals)
+    }
+
+    @Test
+    fun `setup flow - first run populates default goals as explicit chips`() = runTest(testDispatcher) {
+        val vm = SetupViewModel(
+            apiService = FakeApiService(),
+            backupService = FakeBackupService(),
+            settingsRepository = FakeSettingsRepository()
+        )
+        val defaultGoals = listOf("Blutdruck senken", "Weniger Zucker", "Gewicht verlieren", "Gesünder ernähren")
+        vm.init(Settings(), defaultGoals)
+
+        assertEquals(defaultGoals, vm.uiState.value.goals)
+    }
+
+    @Test
+    fun `setup flow - addGoalsFromText appends to existing chips without clearing them`() = runTest(testDispatcher) {
+        val splitResult = listOf("Mehr Wasser", "Kein Alkohol")
+        val fakeApi = FakeApiService(splitGoalsResult = Result.success(splitResult))
+        val vm = SetupViewModel(
+            apiService = fakeApi,
+            backupService = FakeBackupService(),
+            settingsRepository = FakeSettingsRepository()
+        )
+        vm.setGoals(listOf("Bestehendes Ziel"))
+        vm.setNewGoalText("Mehr Wasser trinken und keinen Alkohol mehr")
+
+        vm.addGoalsFromText()
+        advanceUntilIdle()
+
+        assertEquals(listOf("Bestehendes Ziel", "Mehr Wasser", "Kein Alkohol"), vm.uiState.value.goals)
+        assertEquals("", vm.uiState.value.newGoalText)
+        assertFalse(vm.uiState.value.splitting)
+    }
 
     // ----------------------------------------------------------------- 3. History list + detail view
 

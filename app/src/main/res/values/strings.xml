@@ -104,6 +104,14 @@
     <string name="setup_key_placeholder">sk-…</string>
     <string name="setup_model_label">Model (with image understanding, e.g. gpt-4o-mini)</string>
     <string name="setup_goals_label">Your goals</string>
+    <string name="setup_goals_hint">The AI evaluates each goal with a traffic light. Reorder or remove goals directly in the list.</string>
+    <string name="setup_goals_empty">No goals defined. Default goals will be used on save.</string>
+    <string name="setup_add_goal_label">New goal or free text</string>
+    <string name="setup_add_goal_placeholder">e.g. Less salt, more vegetables …</string>
+    <string name="setup_add_goal_button">Add with AI</string>
+    <string name="setup_goal_move_up">Move up</string>
+    <string name="setup_goal_move_down">Move down</string>
+    <string name="setup_goal_delete">Remove goal</string>
     <string name="setup_pick_provider">Choose provider</string>
     <string name="setup_models_link">Load and pick models</string>
     <string name="setup_save_continue">Save &amp; continue</string>
