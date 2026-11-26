@@ -36,6 +36,7 @@ interface HistoryRepository {
     suspend fun updateEvaluation(id: Long, goalResults: List<GoalResult>, summary: String)
     suspend fun reorderEntries(reordered: List<HistoryEntry>)
     suspend fun delete(entry: HistoryEntry)
+    suspend fun deleteEntryOnly(id: Long)
     suspend fun saveAll(entries: List<HistoryEntry>)
     suspend fun duplicateToDate(
         source: HistoryEntry,
@@ -137,6 +138,10 @@ class DefaultHistoryRepository(
         deleteWeekFazitForEntry(entry)
     }
 
+    override suspend fun deleteEntryOnly(id: Long) {
+        historyDao.deleteById(id)
+    }
+
     /** recognizedMeal-Text eines gespeicherten Eintrags userkorrigieren (in Room DB aktualisieren).
      *  Das Tagesfazit bleibt in der DB, wird aber über den Fingerprint als veraltet recognizedMeal. */
     override suspend fun updateRecognizedMeal(id: Long, newText: String) {
@@ -203,6 +208,7 @@ class DefaultHistoryRepository(
         weekFazitDao.deleteAll()
         DayFazitSession.attempted.clear()
         DayFazitSession.attemptedWeekly.clear()
+        DayFazitSession.attemptedOutdated.clear()
     }
 
     /** Löscht alle Einträge (inkl. Fotos) sowie Tages-/Wochenfazits, die älter als [weeks]
@@ -230,7 +236,7 @@ class DefaultHistoryRepository(
                 dayFazitDao.delete(it)
             }
         weekFazitDao.getAll().map { it.weekKey }
-            .filter { it < cutoffWeekKey }
+            .filter { it.removePrefix("week_") < cutoffWeekKey.removePrefix("week_") }
             .forEach {
                 currentCoroutineContext().ensureActive()
                 weekFazitDao.delete(it)
@@ -238,7 +244,8 @@ class DefaultHistoryRepository(
 
         // 3. Session-Guard aufräumen (damit Fazits neuer Tage nicht irrtümlich „versucht" bleiben)
         DayFazitSession.attempted.removeAll { it < cutoffDayKey }
-        DayFazitSession.attemptedWeekly.removeAll { it < cutoffWeekKey }
+        DayFazitSession.attemptedWeekly.removeAll { it.removePrefix("week_") < cutoffWeekKey.removePrefix("week_") }
+        DayFazitSession.attemptedOutdated.removeAll { it.substringBefore(':') < cutoffDayKey }
 
         return stale.size
     }

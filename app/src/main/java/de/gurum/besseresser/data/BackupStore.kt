@@ -329,7 +329,7 @@ class BackupManager(
                         existing.recognizedMeal == rawEntry.recognizedMeal &&
                         existing.note == rawEntry.note
             }.forEach { duplicate ->
-                historyRepository.delete(duplicate)
+                historyRepository.deleteEntryOnly(duplicate.id)
             }
 
             var photoFileName = rawEntry.photoFile

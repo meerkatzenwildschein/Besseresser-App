@@ -206,10 +206,17 @@ class FakeHistoryRepository : HistoryRepository {
         entriesFlow.update { list -> list.filter { it.id != entry.id } }
     }
 
+    override suspend fun deleteEntryOnly(id: Long) {
+        entriesFlow.update { list -> list.filter { it.id != id } }
+    }
+
     override suspend fun clearAll() {
         entriesFlow.value = emptyList()
         dayFazitsFlow.value = emptyMap()
         weekFazitsFlow.value = emptyMap()
+        DayFazitSession.attempted.clear()
+        DayFazitSession.attemptedWeekly.clear()
+        DayFazitSession.attemptedOutdated.clear()
     }
 
     override suspend fun reorderEntries(reordered: List<HistoryEntry>) {
@@ -298,6 +305,7 @@ class FakeHistoryRepository : HistoryRepository {
         weekFazitsFlow.update { map -> map.filterKeys { it >= cutoffWeekKey } }
         staleDayKeys.forEach { DayFazitSession.attempted.remove(it) }
         DayFazitSession.attemptedWeekly.removeIf { it < cutoffWeekKey }
+        DayFazitSession.attemptedOutdated.removeAll { it.substringBefore(':') < dayKeyOf(cutoffMillis) }
         return stale.size
     }
 

@@ -8,7 +8,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private const val FILEPROVIDER_AUTHORITY = "de.gurum.besseresser.fileprovider"
+private const val FILEPROVIDER_SUFFIX = ".fileprovider"
 private const val PHOTO_CACHE_DIR = "photos"
 private const val PHOTO_PREFIX = "essen_"
 private const val PHOTO_SUFFIX = ".jpg"
@@ -45,6 +45,9 @@ interface PhotoCaptureManager {
 
 class DefaultPhotoCaptureManager(private val context: Context) : PhotoCaptureManager {
 
+    private val authority: String
+        get() = "${context.packageName}$FILEPROVIDER_SUFFIX"
+
     init {
         cleanupOrphanedFiles()
     }
@@ -59,7 +62,7 @@ class DefaultPhotoCaptureManager(private val context: Context) : PhotoCaptureMan
         val name = "$PHOTO_PREFIX${SimpleDateFormat(DATE_PATTERN, Locale.US).format(Date())}_${System.nanoTime()}$PHOTO_SUFFIX"
         val file = File(dir, name)
         val uri = runCatching {
-            FileProvider.getUriForFile(context, FILEPROVIDER_AUTHORITY, file)
+            FileProvider.getUriForFile(context, authority, file)
         }.getOrElse {
             Uri.fromFile(file)
         }
@@ -67,7 +70,7 @@ class DefaultPhotoCaptureManager(private val context: Context) : PhotoCaptureMan
     }
 
     override fun copyToCaptureFile(sourceUri: Uri): Pair<File, Uri>? {
-        if (sourceUri.authority == FILEPROVIDER_AUTHORITY) {
+        if (sourceUri.authority == authority) {
             val lastSegment = sourceUri.lastPathSegment
                 ?: sourceUri.path?.substringAfterLast('/')
             if (!lastSegment.isNullOrBlank()) {
