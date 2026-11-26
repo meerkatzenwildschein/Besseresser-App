@@ -152,6 +152,8 @@ Besseresser-App/
 ├── AGENT.md                      ← Diese Architektur- & Kontextdatei
 ├── README.md                     ← Allgemeine Projektübersicht
 ├── REFACTORING.md                ← Abgeschlossene Refactoring-Roadmap & offene Punkte
+├── docs/
+│   └── FEATURE.md                ← Vollständige Funktionsdokumentation aller Features
 ├── build.gradle.kts              ← Root-Build-Skript mit Plugin-Definitionen (KSP, Kotlin, Compose)
 ├── settings.gradle.kts           ← Modul- & Repository-Konfiguration
 ├── gradle.properties
@@ -358,3 +360,5 @@ Die App verwendet durchgängig **englische Bezeichner im Code** und **deutsche b
 4. **Refactoring-Plan beachten:** Geplante Modernisierungen (Coroutines, Room, ViewModels) sind in `REFACTORING.md` priorisiert dokumentiert.
 5. **Dependency Injection über Koin:** Neue Abhängigkeiten (Repositories, Services, ViewModels) in `di/AppModule.kt` registrieren und per Konstruktor injizieren – keine manuelle Instanziierung, kein `Context`-Fallback in ViewModels. ViewModels in Compose über `koinViewModel()` beziehen (mit `parametersOf(...)` für Argumente wie `entryId`).
 6. **Persistenz nur über Repositories:** Datenzugriff (Room, DataStore, Fotos) ausschließlich über die Repository-Interfaces aus `data/Repositories.kt` (suspend/Flow) – keine `XxxStore`-Objekte mehr. Reine, kontextfreie Logik liegt in `RecentNotesLogic`, `HistoryEntryLogic` und `BackupLogic`. Settings/Profil/Theme/Sprache fließen reaktiv über den `AppStateViewModel` in der MainActivity. UI ruft Datenzugriffe ausschließlich über ViewModels auf (kein `koinInject` von Repositories/Services in Composables).
+7. **Feature-Dokumentation pflegen (`docs/FEATURE.md`):** Bei neuen Features oder Anpassungen an bestehenden Funktionen muss immer zwingend auch die zentrale Funktionsdokumentation in `docs/FEATURE.md` angepasst und auf dem aktuellen Stand gehalten werden.
+8. **Keine Realnamen bei Git-Commits:** Bei Git-Commits (Autor, Committer, Co-Authored-By oder Commit-Message) darf niemals ein Realname (Klarname) angegeben oder verwendet werden.
