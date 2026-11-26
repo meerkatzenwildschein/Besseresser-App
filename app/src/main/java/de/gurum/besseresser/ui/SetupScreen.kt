@@ -564,44 +564,14 @@ private fun GoalChipItem(
                     modifier = Modifier.weight(1f)
                 )
 
-                IconButton(
-                    onClick = onMoveUp,
-                    enabled = canMoveUp && enabled,
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowUp,
-                        contentDescription = stringResource(R.string.setup_goal_move_up),
-                        tint = if (canMoveUp && enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onMoveDown,
-                    enabled = canMoveDown && enabled,
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = stringResource(R.string.setup_goal_move_down),
-                        tint = if (canMoveDown && enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = onDelete,
+                GoalChipActionButtons(
+                    canMoveUp = canMoveUp,
+                    canMoveDown = canMoveDown,
                     enabled = enabled,
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        Icons.Filled.Close,
-                        contentDescription = stringResource(R.string.setup_goal_delete),
-                        tint = if (enabled) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+                    onMoveUp = onMoveUp,
+                    onMoveDown = onMoveDown,
+                    onDelete = onDelete
+                )
             }
 
             Spacer(Modifier.height(4.dp))
@@ -618,32 +588,96 @@ private fun GoalChipItem(
                     fontWeight = FontWeight.Normal
                 )
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                GoalWeightSelector(
+                    weight = goal.weight,
+                    enabled = enabled,
+                    onSetWeight = onSetWeight
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GoalChipActionButtons(
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    enabled: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        IconButton(
+            onClick = onMoveUp,
+            enabled = canMoveUp && enabled,
+            modifier = Modifier.size(34.dp)
+        ) {
+            Icon(
+                Icons.Filled.KeyboardArrowUp,
+                contentDescription = stringResource(R.string.setup_goal_move_up),
+                tint = if (canMoveUp && enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        IconButton(
+            onClick = onMoveDown,
+            enabled = canMoveDown && enabled,
+            modifier = Modifier.size(34.dp)
+        ) {
+            Icon(
+                Icons.Filled.KeyboardArrowDown,
+                contentDescription = stringResource(R.string.setup_goal_move_down),
+                tint = if (canMoveDown && enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+
+        IconButton(
+            onClick = onDelete,
+            enabled = enabled,
+            modifier = Modifier.size(34.dp)
+        ) {
+            Icon(
+                Icons.Filled.Close,
+                contentDescription = stringResource(R.string.setup_goal_delete),
+                tint = if (enabled) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
+                modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun GoalWeightSelector(
+    weight: Int,
+    enabled: Boolean,
+    onSetWeight: (Int) -> Unit
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        (WeightedGoal.MIN_WEIGHT..WeightedGoal.MAX_WEIGHT).forEach { w ->
+            val isSelected = weight == w
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                border = if (isSelected) null else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier.size(width = 28.dp, height = 24.dp),
+                onClick = { if (enabled) onSetWeight(w) }
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
                 ) {
-                    (WeightedGoal.MIN_WEIGHT..WeightedGoal.MAX_WEIGHT).forEach { w ->
-                        val isSelected = goal.weight == w
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                            border = if (isSelected) null else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
-                            modifier = Modifier.size(width = 28.dp, height = 24.dp),
-                            onClick = { if (enabled) onSetWeight(w) }
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.fillMaxSize()
-                            ) {
-                                Text(
-                                    text = "$w",
-                                    fontSize = 11.5.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        text = "$w",
+                        fontSize = 11.5.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

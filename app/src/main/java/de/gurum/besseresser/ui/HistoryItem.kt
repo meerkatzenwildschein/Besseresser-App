@@ -104,154 +104,200 @@ fun HistoryItem(
             .scale(scale)
             .shadow(shadowElevation.dp, RoundedCornerShape(16.dp))
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        HistoryItemContent(
+            entry = entry,
+            photoFile = onPhotoFile(entry),
+            isUnrated = isUnrated,
+            amberAccent = amberAccent,
+            amberText = amberText
+        )
+    }
+}
+
+@Composable
+private fun HistoryItemContent(
+    entry: HistoryEntry,
+    photoFile: File?,
+    isUnrated: Boolean,
+    amberAccent: Color,
+    amberText: Color
+) {
+    Row(
+        modifier = Modifier.padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        HistoryItemThumbnail(photoFile)
+        Spacer(Modifier.width(12.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            val photoFile = onPhotoFile(entry)
-            if (photoFile != null) {
-                AsyncImage(
-                    model = photoFile,
-                    contentDescription = stringResource(R.string.photo_of_meal),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .border(
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
-                            RoundedCornerShape(12.dp)
-                        )
+            HistoryItemHeader(entry, isUnrated, amberAccent, amberText)
+            HistoryItemDetails(entry, isUnrated)
+        }
+        Spacer(Modifier.width(8.dp))
+        HistoryItemTrailing(entry, isUnrated, amberAccent, amberText)
+    }
+}
+
+@Composable
+private fun HistoryItemThumbnail(photoFile: File?) {
+    if (photoFile != null) {
+        AsyncImage(
+            model = photoFile,
+            contentDescription = stringResource(R.string.photo_of_meal),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .border(
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    RoundedCornerShape(12.dp)
                 )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.75f))
-                        .border(
-                            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
-                            RoundedCornerShape(12.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("🍽️", fontSize = 24.sp)
-                }
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.75f))
+                .border(
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                    RoundedCornerShape(12.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("🍽️", fontSize = 24.sp)
+        }
+    }
+}
+
+@Composable
+private fun HistoryItemHeader(
+    entry: HistoryEntry,
+    isUnrated: Boolean,
+    amberAccent: Color,
+    amberText: Color
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            if (entry.backdated)
+                stringResource(R.string.nacherfassen_label)
+            else
+                formatTime(entry.dateMillis),
+            fontSize = if (entry.backdated) 12.sp else 14.sp,
+            fontWeight = FontWeight.Bold,
+            fontStyle = if (entry.backdated) FontStyle.Italic else FontStyle.Normal,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        if (isUnrated) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = amberAccent.copy(alpha = 0.22f)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        if (entry.backdated)
-                            stringResource(R.string.nacherfassen_label)
-                        else
-                            formatTime(entry.dateMillis),
-                        fontSize = if (entry.backdated) 12.sp else 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontStyle = if (entry.backdated) FontStyle.Italic else FontStyle.Normal,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    if (isUnrated) {
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = amberAccent.copy(alpha = 0.22f)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.history_unrated_badge),
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = amberText,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    } else if (entry.goalResults.isNotEmpty()) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(3.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            entry.goalResults.take(6).forEach { gr ->
-                                Box(
-                                    modifier = Modifier
-                                        .size(7.dp)
-                                        .clip(CircleShape)
-                                        .background(gr.rating.color())
-                                )
-                            }
-                        }
-                    }
-                }
-                if (entry.recognizedMeal.isNotBlank()) {
-                    Text(
-                        stringResource(R.string.detected_prefix, entry.recognizedMeal),
-                        fontSize = 12.5.sp,
-                        lineHeight = 17.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                } else if (entry.note.isNotBlank()) {
-                    Text(
-                        stringResource(R.string.history_note_prefix, entry.note),
-                        fontSize = 12.5.sp,
-                        lineHeight = 17.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
                 Text(
-                    if (isUnrated) {
-                        stringResource(R.string.history_unrated_hint)
-                    } else {
-                        zielePreview(
-                            entry,
-                            stringResource(R.string.history_no_goals),
-                            stringResource(
-                                R.string.goals_preview_more,
-                                (entry.goalResults.size - 2).coerceAtLeast(0)
-                            )
-                        )
-                    },
-                    fontSize = 11.5.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = stringResource(R.string.history_unrated_badge),
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = amberText,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                 )
             }
-            Spacer(Modifier.width(8.dp))
-            if (isUnrated) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        } else if (entry.goalResults.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                entry.goalResults.take(6).forEach { gr ->
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(7.dp)
                             .clip(CircleShape)
-                            .background(amberAccent.copy(alpha = 0.22f))
-                            .border(BorderStroke(1.5.dp, amberAccent.copy(alpha = 0.65f)), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            AiSparkleIcon,
-                            contentDescription = stringResource(R.string.history_entry_ai_rate),
-                            tint = amberText,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        stringResource(R.string.score_caption),
-                        fontSize = 9.5.sp,
-                        color = Color.Transparent
+                            .background(gr.rating.color())
                     )
                 }
-            } else {
-                ScoreBadge(entry)
             }
         }
+    }
+}
+
+@Composable
+private fun HistoryItemDetails(entry: HistoryEntry, isUnrated: Boolean) {
+    if (entry.recognizedMeal.isNotBlank()) {
+        Text(
+            stringResource(R.string.detected_prefix, entry.recognizedMeal),
+            fontSize = 12.5.sp,
+            lineHeight = 17.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    } else if (entry.note.isNotBlank()) {
+        Text(
+            stringResource(R.string.history_note_prefix, entry.note),
+            fontSize = 12.5.sp,
+            lineHeight = 17.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+    Text(
+        if (isUnrated) {
+            stringResource(R.string.history_unrated_hint)
+        } else {
+            zielePreview(
+                entry,
+                stringResource(R.string.history_no_goals),
+                stringResource(
+                    R.string.goals_preview_more,
+                    (entry.goalResults.size - 2).coerceAtLeast(0)
+                )
+            )
+        },
+        fontSize = 11.5.sp,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+@Composable
+private fun HistoryItemTrailing(
+    entry: HistoryEntry,
+    isUnrated: Boolean,
+    amberAccent: Color,
+    amberText: Color
+) {
+    if (isUnrated) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(amberAccent.copy(alpha = 0.22f))
+                    .border(BorderStroke(1.5.dp, amberAccent.copy(alpha = 0.65f)), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    AiSparkleIcon,
+                    contentDescription = stringResource(R.string.history_entry_ai_rate),
+                    tint = amberText,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(Modifier.height(2.dp))
+            Text(
+                stringResource(R.string.score_caption),
+                fontSize = 9.5.sp,
+                color = Color.Transparent
+            )
+        }
+    } else {
+        ScoreBadge(entry)
     }
 }
 

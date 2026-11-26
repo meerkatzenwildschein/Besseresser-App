@@ -211,14 +211,11 @@ fun HistoryDetailScreen(
     val ctx = LocalContext.current
     val detailState by viewModel.uiState.collectAsStateWithLifecycle()
     val entry = detailState.entry ?: run {
-        // Nur zurück, wenn der erste DB-Load abgeschlossen ist und der Eintrag wirklich fehlt.
-        // Sonst würde das initiale null-State die Navigation sofort zurück auslösen.
         if (detailState.loaded) {
             LaunchedEffect(Unit) { onBack() }
         }
         return
     }
-    // Android-Zurück-Button verhält sich wie der On-Screen-Zurückpfeil
     BackHandler(onBack = onBack)
     var confirmDelete by remember { mutableStateOf(false) }
     var showDuplicateDatePicker by remember { mutableStateOf(false) }
@@ -277,71 +274,13 @@ fun HistoryDetailScreen(
                 formatDateTime(entry.dateMillis),
             onBack = onBack,
             trailing = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (entry.isRated) {
-                        Surface(
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            IconButton(
-                                onClick = { showDuplicateDatePicker = true },
-                                modifier = Modifier.size(48.dp)
-                            ) {
-                                Icon(
-                                    DuplicateCopyIcon,
-                                    contentDescription = stringResource(R.string.history_entry_duplicate),
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
-                        }
-                    } else {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFFF59E0B).copy(alpha = 0.22f),
-                            border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.65f)),
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    if (!detailState.reEvalBusy) {
-                                        triggerAiEvaluation(entry.recognizedMeal.ifBlank { entry.note })
-                                    }
-                                },
-                                enabled = !detailState.reEvalBusy,
-                                modifier = Modifier.size(48.dp)
-                            ) {
-                                Icon(
-                                    AiSparkleIcon,
-                                    contentDescription = stringResource(R.string.history_entry_ai_rate),
-                                    tint = Color(0xFFD97706),
-                                    modifier = Modifier.size(21.dp)
-                                )
-                            }
-                        }
-                    }
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        IconButton(
-                            onClick = { confirmDelete = true },
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Icon(
-                                Icons.Filled.Delete,
-                                contentDescription = stringResource(R.string.history_entry_delete),
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
+                HistoryDetailTopBarActions(
+                    isRated = entry.isRated,
+                    reEvalBusy = detailState.reEvalBusy,
+                    onDuplicate = { showDuplicateDatePicker = true },
+                    onReEvaluate = { triggerAiEvaluation(entry.recognizedMeal.ifBlank { entry.note }) },
+                    onDelete = { confirmDelete = true }
+                )
             }
         )
 
@@ -352,107 +291,47 @@ fun HistoryDetailScreen(
                 .padding(horizontal = 20.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
-        if (photoFile != null) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                AsyncImage(
-                    model = photoFile,
-                    contentDescription = stringResource(R.string.photo_of_meal),
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(240.dp)
-                )
-            }
-        }
-
-        if (detailState.error != null) {
-            detailState.error?.let { msg ->
-                ErrorBanner(msg)
-            }
-        } else if (!entry.isRated && !detailState.reEvalBusy) {
-            ErrorBanner(stringResource(R.string.unrated_entry_banner))
-        }
-
-        if (detailState.reEvalBusy) {
-            // Re-Bewertung durch KI läuft (nach recognizedMeal-Korrektur oder manuellem Klick)
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+            if (photoFile != null) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        stringResource(R.string.reeval_progress),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    AsyncImage(
+                        model = photoFile,
+                        contentDescription = stringResource(R.string.photo_of_meal),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(240.dp)
                     )
                 }
             }
-        }
 
-        val canShare = photoFile != null || entry.recognizedMeal.isNotBlank() || entry.summary.isNotBlank() || entry.note.isNotBlank()
-        // Gleicher antipbarer Block wie in der Auswertung: 🧠 sichtbar, 🍽️/📝 einklappbar,
-        // 🍽️ mit Pencil → recognizedMeal/Beschreibung userkorrigierbar (auch wenn noch unbewertet), unten rechts Teilen-Button
-        CollapsibleSummaryBlock(
-            summary = entry.summary,
-            recognizedMeal = entry.recognizedMeal,
-            note = entry.note,
-            onEditRecognizedMeal = { showRecognizedEdit = true },
-            onShare = if (canShare) ({ shareHistoryEntry(ctx, viewModel.photoFile(), entry) }) else null
-        )
+            if (detailState.error != null) {
+                detailState.error?.let { msg ->
+                    ErrorBanner(msg)
+                }
+            } else if (!entry.isRated && !detailState.reEvalBusy) {
+                ErrorBanner(stringResource(R.string.unrated_entry_banner))
+            }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                stringResource(R.string.my_goals),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+            if (detailState.reEvalBusy) {
+                ReevalProgressBanner()
+            }
+
+            val canShare = photoFile != null || entry.recognizedMeal.isNotBlank() || entry.summary.isNotBlank() || entry.note.isNotBlank()
+            CollapsibleSummaryBlock(
+                summary = entry.summary,
+                recognizedMeal = entry.recognizedMeal,
+                note = entry.note,
+                onEditRecognizedMeal = { showRecognizedEdit = true },
+                onShare = if (canShare) ({ shareHistoryEntry(ctx, viewModel.photoFile(), entry) }) else null
             )
-            if (entry.score >= 0) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        stringResource(R.string.score_caption),
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    ScoreCircle(
-                        score = entry.score,
-                        tooltipRes = R.string.score_tooltip_ok
-                    )
-                }
-            }
-        }
-        if (entry.goalResults.isNotEmpty()) {
-            entry.goalResults.forEach { GoalRow(it.goal, it) }
-        } else {
-            settings.goals.forEach { goal -> GoalRow(goal.text, null) }
-        }
 
-        Spacer(Modifier.height(16.dp))
+            HistoryDetailGoalsSection(entry = entry, settings = settings)
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 
@@ -491,91 +370,264 @@ fun HistoryDetailScreen(
         )
     }
 
-    if (showDuplicateDatePicker) {
-        val initialSelectedMillis = remember { LocalDate.now().toEpochDay() * 86_400_000L }
-        val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = initialSelectedMillis
-        )
-        DatePickerDialog(
-            onDismissRequest = { showDuplicateDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    enabled = pickerState.selectedDateMillis != null,
-                    onClick = {
-                        val ms = pickerState.selectedDateMillis ?: return@TextButton
-                        duplicateTargetDate = LocalDate.ofEpochDay(ms / 86_400_000L)
-                        showDuplicateDatePicker = false
-                    }
-                ) {
-                    Text(stringResource(R.string.profile_ok))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDuplicateDatePicker = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
+    HistoryDetailDuplicateDateDialog(
+        show = showDuplicateDatePicker,
+        onDismiss = { showDuplicateDatePicker = false },
+        onDateSelected = { targetDate ->
+            duplicateTargetDate = targetDate
+            showDuplicateDatePicker = false
+        }
+    )
+
+    HistoryDetailDuplicateTimeDialog(
+        targetDay = duplicateTargetDate,
+        onDismiss = { duplicateTargetDate = null },
+        onConfirm = { targetTime ->
+            val targetDay = duplicateTargetDate ?: return@HistoryDetailDuplicateTimeDialog
+            viewModel.duplicateToDate(targetDay, targetTime) {
+                duplicateTargetDate = null
+                val formattedDateTime = "${targetDay.format(DATE_FORMATTER)}, ${targetTime.format(TIME_FORMATTER)}"
+                Toast.makeText(
+                    ctx,
+                    ctx.getString(R.string.history_duplicate_done, formattedDateTime),
+                    Toast.LENGTH_SHORT
+                ).show()
+                onBack()
             }
-        ) {
-            DatePicker(
-                state = pickerState,
-                title = {
-                    Text(
-                        stringResource(R.string.history_duplicate_pick_date_title),
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 24.dp, end = 12.dp, top = 16.dp)
+        }
+    )
+}
+
+@Composable
+private fun HistoryDetailTopBarActions(
+    isRated: Boolean,
+    reEvalBusy: Boolean,
+    onDuplicate: () -> Unit,
+    onReEvaluate: () -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (isRated) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.75f),
+                modifier = Modifier.size(48.dp)
+            ) {
+                IconButton(
+                    onClick = onDuplicate,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        DuplicateCopyIcon,
+                        contentDescription = stringResource(R.string.history_entry_duplicate),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
+            }
+        } else {
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFFF59E0B).copy(alpha = 0.22f),
+                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.65f)),
+                modifier = Modifier.size(48.dp)
+            ) {
+                IconButton(
+                    onClick = {
+                        if (!reEvalBusy) onReEvaluate()
+                    },
+                    enabled = !reEvalBusy,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        AiSparkleIcon,
+                        contentDescription = stringResource(R.string.history_entry_ai_rate),
+                        tint = Color(0xFFD97706),
+                        modifier = Modifier.size(21.dp)
+                    )
+                }
+            }
+        }
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.65f),
+            modifier = Modifier.size(48.dp)
+        ) {
+            IconButton(
+                onClick = onDelete,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Delete,
+                    contentDescription = stringResource(R.string.history_entry_delete),
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReevalProgressBanner() {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                stringResource(R.string.reeval_progress),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
             )
         }
     }
+}
 
-    duplicateTargetDate?.let { targetDay ->
-        val now = remember { LocalTime.now() }
-        val timePickerState = rememberTimePickerState(
-            initialHour = now.hour,
-            initialMinute = now.minute,
-            is24Hour = true
+@Composable
+private fun HistoryDetailGoalsSection(
+    entry: HistoryEntry,
+    settings: Settings
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            stringResource(R.string.my_goals),
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
         )
-        AlertDialog(
-            onDismissRequest = { duplicateTargetDate = null },
+        if (entry.score >= 0) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    stringResource(R.string.score_caption),
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                ScoreCircle(
+                    score = entry.score,
+                    tooltipRes = R.string.score_tooltip_ok
+                )
+            }
+        }
+    }
+    if (entry.goalResults.isNotEmpty()) {
+        entry.goalResults.forEach { GoalRow(it.goal, it) }
+    } else {
+        settings.goals.forEach { goal -> GoalRow(goal.text, null) }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HistoryDetailDuplicateDateDialog(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    onDateSelected: (LocalDate) -> Unit
+) {
+    if (!show) return
+    val initialSelectedMillis = remember { LocalDate.now().toEpochDay() * 86_400_000L }
+    val pickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialSelectedMillis
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                enabled = pickerState.selectedDateMillis != null,
+                onClick = {
+                    val ms = pickerState.selectedDateMillis ?: return@TextButton
+                    onDateSelected(LocalDate.ofEpochDay(ms / 86_400_000L))
+                }
+            ) {
+                Text(stringResource(R.string.profile_ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    ) {
+        DatePicker(
+            state = pickerState,
             title = {
                 Text(
-                    stringResource(R.string.history_duplicate_pick_time_title),
-                    fontWeight = FontWeight.Bold
+                    stringResource(R.string.history_duplicate_pick_date_title),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 24.dp, end = 12.dp, top = 16.dp)
                 )
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    TimePicker(state = timePickerState)
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val targetTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
-                        viewModel.duplicateToDate(targetDay, targetTime) {
-                            duplicateTargetDate = null
-                            val formattedDateTime = "${targetDay.format(DATE_FORMATTER)}, ${targetTime.format(TIME_FORMATTER)}"
-                            Toast.makeText(
-                                ctx,
-                                ctx.getString(R.string.history_duplicate_done, formattedDateTime),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            onBack()
-                        }
-                    }
-                ) {
-                    Text(stringResource(R.string.profile_ok))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { duplicateTargetDate = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
             }
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HistoryDetailDuplicateTimeDialog(
+    targetDay: LocalDate?,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalTime) -> Unit
+) {
+    if (targetDay == null) return
+    val now = remember { LocalTime.now() }
+    val timePickerState = rememberTimePickerState(
+        initialHour = now.hour,
+        initialMinute = now.minute,
+        is24Hour = true
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                stringResource(R.string.history_duplicate_pick_time_title),
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                TimePicker(state = timePickerState)
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val targetTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
+                    onConfirm(targetTime)
+                }
+            ) {
+                Text(stringResource(R.string.profile_ok))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
 }

@@ -24,43 +24,16 @@ interface ImagePreprocessor {
  */
 class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor {
 
-    /**
-     * Lädt das Bild von der übergebenen URI, skaliert es herunter und kodiert es als Base64 JPEG Data-URI.
-     *
-     * Öffnet den Stream robust: zuerst via ContentResolver (für content://-URIs), dann direkt
-     * als Datei (für file://-URIs und als Fallback, wenn FileProvider keinen Stream liefert).
-     */
     override fun prepareImageDataUri(photoUri: Uri, maxSide: Int): String {
         val resolver = context.contentResolver
-        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        val options = decodeImageBounds(resolver, photoUri, context)
+        val sample = calculateSampleSize(options.outWidth, options.outHeight, maxSide)
+        val originalBitmap = decodeSampledBitmap(resolver, photoUri, context, sample)
 
-        // 1. Abmessungen ermitteln (decodeStream liefert bei inJustDecodeBounds=true immer null)
-        val boundsStream = openStreamRobust(resolver, photoUri, context)
-            ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
-        boundsStream.use { BitmapFactory.decodeStream(it, null, options) }
-        check(options.outWidth > 0 && options.outHeight > 0) { "Foto konnte nicht decodiert werden." }
-
-        var sample = 1
-        while (maxOf(options.outWidth, options.outHeight) / sample > maxSide * 2) {
-            sample *= 2
-        }
-
-        // 2. Bild mit passendem inSampleSize decodieren
-        val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sample }
-        val decodeStream = openStreamRobust(resolver, photoUri, context)
-            ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
-        val originalBitmap = decodeStream.use {
-            BitmapFactory.decodeStream(it, null, decodeOptions)
-        } ?: throw IllegalStateException("Foto konnte nicht decodiert werden.")
-
-        try {
+        return try {
             val scaled = scaleDown(originalBitmap, maxSide)
             try {
-                val jpeg = ByteArrayOutputStream().use { out ->
-                    scaled.compress(Bitmap.CompressFormat.JPEG, COMPRESSION_QUALITY_JPEG, out)
-                    out.toByteArray()
-                }
-                return "data:image/jpeg;base64," + Base64.encodeToString(jpeg, Base64.NO_WRAP)
+                encodeBitmapAsJpegDataUri(scaled)
             } finally {
                 if (scaled !== originalBitmap) {
                     scaled.recycle()
@@ -69,6 +42,40 @@ class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor
         } finally {
             originalBitmap.recycle()
         }
+    }
+
+    private fun decodeImageBounds(resolver: ContentResolver?, uri: Uri, context: Context): BitmapFactory.Options {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        val boundsStream = openStreamRobust(resolver, uri, context)
+            ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
+        boundsStream.use { BitmapFactory.decodeStream(it, null, options) }
+        check(options.outWidth > 0 && options.outHeight > 0) { "Foto konnte nicht decodiert werden." }
+        return options
+    }
+
+    private fun calculateSampleSize(width: Int, height: Int, maxSide: Int): Int {
+        var sample = 1
+        while (maxOf(width, height) / sample > maxSide * 2) {
+            sample *= 2
+        }
+        return sample
+    }
+
+    private fun decodeSampledBitmap(resolver: ContentResolver?, uri: Uri, context: Context, sample: Int): Bitmap {
+        val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sample }
+        val decodeStream = openStreamRobust(resolver, uri, context)
+            ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
+        return decodeStream.use {
+            BitmapFactory.decodeStream(it, null, decodeOptions)
+        } ?: throw IllegalStateException("Foto konnte nicht decodiert werden.")
+    }
+
+    private fun encodeBitmapAsJpegDataUri(bitmap: Bitmap): String {
+        val jpeg = ByteArrayOutputStream().use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, COMPRESSION_QUALITY_JPEG, out)
+            out.toByteArray()
+        }
+        return "data:image/jpeg;base64," + Base64.encodeToString(jpeg, Base64.NO_WRAP)
     }
 
     /**
@@ -89,52 +96,54 @@ class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor
  * 3. Direkter Dateizugriff bei file://-URIs und absoluten Pfaden
  */
 internal fun openStreamRobust(resolver: ContentResolver?, uri: Uri, context: Context? = null): InputStream? {
-    // Versuch 1: Standard ContentResolver (funktioniert für content:// und file://)
-    if (resolver != null) {
-        val stream = runCatching { resolver.openInputStream(uri) }.getOrNull()
-        if (stream != null) return stream
-    }
+    return openContentResolverStream(resolver, uri)
+        ?: openFileProviderStream(context, uri)
+        ?: openFileSchemeStream(uri)
+        ?: openDirectPathStream(uri)
+}
 
-    // Versuch 2: Bei eigenen FileProvider-URIs direkt im Cache-/Files-Ordner nachsehen
-    if (context != null && uri.authority == "de.gurum.besseresser.fileprovider") {
-        val path = uri.path?.removePrefix("/")
-        if (!path.isNullOrBlank()) {
-            val candidateFile = if (path.startsWith("photos/")) {
-                File(context.cacheDir, path)
-            } else if (path.startsWith("history/")) {
-                File(context.filesDir, path)
-            } else {
-                File(context.cacheDir, path)
-            }
-            if (candidateFile.exists() && candidateFile.length() > 0) {
-                val stream = runCatching { candidateFile.inputStream() }.getOrNull()
-                if (stream != null) return stream
-            }
-        }
-    }
+private fun openContentResolverStream(resolver: ContentResolver?, uri: Uri): InputStream? {
+    if (resolver == null) return null
+    return runCatching { resolver.openInputStream(uri) }.getOrNull()
+}
 
-    // Versuch 3: file://-Schema explizit auflösen
-    if (uri.scheme == "file") {
-        val raw = uri.path ?: uri.schemeSpecificPart
-        val filePath = raw?.removePrefix("file://")?.removePrefix("file:")?.removePrefix("//")
-        if (!filePath.isNullOrBlank()) {
-            val file = File(filePath)
-            if (file.exists() && file.length() > 0) {
-                val stream = runCatching { file.inputStream() }.getOrNull()
-                if (stream != null) return stream
-            }
-        }
-    }
+private fun openFileProviderStream(context: Context?, uri: Uri): InputStream? {
+    if (context == null || uri.authority != "de.gurum.besseresser.fileprovider") return null
+    val path = uri.path?.removePrefix("/") ?: return null
+    if (path.isBlank()) return null
 
-    // Versuch 4: Direkter Dateipfad
-    val rawPath = uri.path
-    if (!rawPath.isNullOrBlank()) {
-        val file = File(rawPath)
-        if (file.exists() && file.length() > 0) {
-            val stream = runCatching { file.inputStream() }.getOrNull()
-            if (stream != null) return stream
-        }
+    val candidateFile = when {
+        path.startsWith("photos/") -> File(context.cacheDir, path)
+        path.startsWith("history/") -> File(context.filesDir, path)
+        else -> File(context.cacheDir, path)
     }
+    return if (candidateFile.exists() && candidateFile.length() > 0) {
+        runCatching { candidateFile.inputStream() }.getOrNull()
+    } else {
+        null
+    }
+}
 
-    return null
+private fun openFileSchemeStream(uri: Uri): InputStream? {
+    if (uri.scheme != "file") return null
+    val raw = uri.path ?: uri.schemeSpecificPart ?: return null
+    val filePath = raw.removePrefix("file://").removePrefix("file:").removePrefix("//")
+    if (filePath.isBlank()) return null
+    val file = File(filePath)
+    return if (file.exists() && file.length() > 0) {
+        runCatching { file.inputStream() }.getOrNull()
+    } else {
+        null
+    }
+}
+
+private fun openDirectPathStream(uri: Uri): InputStream? {
+    val rawPath = uri.path ?: return null
+    if (rawPath.isBlank()) return null
+    val file = File(rawPath)
+    return if (file.exists() && file.length() > 0) {
+        runCatching { file.inputStream() }.getOrNull()
+    } else {
+        null
+    }
 }
