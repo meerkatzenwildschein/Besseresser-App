@@ -38,9 +38,7 @@ class AndroidImagePreprocessor(private val context: Context) : ImagePreprocessor
         val boundsStream = openStreamRobust(resolver, photoUri, context)
             ?: throw IllegalStateException("Foto konnte nicht gelesen werden.")
         boundsStream.use { BitmapFactory.decodeStream(it, null, options) }
-        if (options.outWidth <= 0 || options.outHeight <= 0) {
-            throw IllegalStateException("Foto konnte nicht decodiert werden.")
-        }
+        check(options.outWidth > 0 && options.outHeight > 0) { "Foto konnte nicht decodiert werden." }
 
         var sample = 1
         while (maxOf(options.outWidth, options.outHeight) / sample > maxSide * 2) {

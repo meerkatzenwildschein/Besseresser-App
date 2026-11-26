@@ -116,7 +116,7 @@ class HistoryModularUseCasesTest {
             weekPromptsProvider = { FazitPromptBundle("WIntro", "Rules", "de", "Ehrlich") },
             daymealDescriptionsProvider = { it.map { e -> e.recognizedMeal } },
             weekmealDescriptionsProvider = { it.map { e -> e.recognizedMeal } },
-            onGenerateDayFazit = { day, entries, settings, promptContext, mealDescriptions, prompts ->
+            onGenerateDayFazit = { day, entries, _, _, _, _ ->
                 dayFazitTriggered = true
                 assertEquals(pastDay, day)
                 assertEquals(1, entries.size)

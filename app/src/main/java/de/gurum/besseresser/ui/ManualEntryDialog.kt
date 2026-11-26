@@ -261,7 +261,6 @@ fun BackdatedOverlays(
     addPhotoUri: Uri?,
     addNote: String,
     addTargetDay: LocalDate?,
-    settings: Settings,
     onNoteChange: (String) -> Unit,
     onDismissCamera: () -> Unit,
     onDismissReview: () -> Unit,

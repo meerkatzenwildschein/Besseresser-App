@@ -439,9 +439,7 @@ class ApiClient(
             OpenAiChatClient.defaultOkHttpClient.newCall(request).execute().use { response ->
                 httpCode = response.code
                 body = response.body?.string().orEmpty()
-                if (!response.isSuccessful) {
-                    throw IllegalStateException("HTTP $httpCode")
-                }
+                check(response.isSuccessful) { "HTTP $httpCode" }
             }
 
             val arr = parseModelsArray(body)

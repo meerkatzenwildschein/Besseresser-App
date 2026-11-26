@@ -403,8 +403,6 @@ private fun AppNavHost(
         }
         composable<Routes.History> {
             HistoryScreen(
-                settings = appState.settings,
-                profile = appState.profile,
                 onPick = { navController.navigate(Routes.Detail(it.id)) },
                 onBack = { navController.popBackStack() },
                 viewModel = koinViewModel()

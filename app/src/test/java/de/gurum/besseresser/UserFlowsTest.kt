@@ -593,9 +593,9 @@ class UserFlowsTest {
         advanceUntilIdle()
 
         assertEquals(0, apiService.analyzeTextCallCount)
-        assertNotNull(pickedEntry)
-        assertFalse(pickedEntry!!.isRated)
-        assertEquals("Gemüsepfanne", pickedEntry!!.note)
+        val entry = requireNotNull(pickedEntry)
+        assertFalse(entry.isRated)
+        assertEquals("Gemüsepfanne", entry.note)
         assertEquals(1, histRepo.getAll().size)
     }
 
@@ -731,9 +731,9 @@ class UserFlowsTest {
 
         assertEquals(1, failingApi.analyzeTextCallCount)
         assertEquals("API Timeout", vm.uiState.value.addError)
-        assertNotNull(pickedEntry)
-        assertFalse(pickedEntry!!.isRated)
-        assertEquals("Abendbrot", pickedEntry!!.note)
+        val entry = requireNotNull(pickedEntry)
+        assertFalse(entry.isRated)
+        assertEquals("Abendbrot", entry.note)
         assertEquals(1, histRepo.getAll().size)
     }
 
@@ -786,9 +786,9 @@ class UserFlowsTest {
         )
         advanceUntilIdle()
 
-        assertNotNull(pickedEntry)
-        assertTrue(pickedEntry!!.isRated)
-        assertEquals("Griechischer Salat", pickedEntry!!.note)
+        val entry = requireNotNull(pickedEntry)
+        assertTrue(entry.isRated)
+        assertEquals("Griechischer Salat", entry.note)
         assertTrue(fakeCaptureManager.deletedUris.contains(captureUri))
         assertNull(vm.uiState.value.addPhotoFile)
         assertNull(vm.uiState.value.addPhotoUri)

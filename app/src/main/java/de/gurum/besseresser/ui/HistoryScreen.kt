@@ -32,8 +32,6 @@ import de.gurum.besseresser.model.weekKeyOf
 
 @Composable
 fun HistoryScreen(
-    settings: Settings,
-    profile: Profile,
     onPick: (HistoryEntry) -> Unit,
     onBack: () -> Unit,
     photoCaptureManager: PhotoCaptureManager = koinInject(),
@@ -152,7 +150,6 @@ fun HistoryScreen(
             addPhotoUri = uiState.addPhotoUri,
             addNote = uiState.addNote,
             addTargetDay = uiState.addTargetDay,
-            settings = settings,
             onNoteChange = { viewModel.setAddNote(it) },
             onDismissCamera = {
                 viewModel.cancelAddPhotoCapture()
