@@ -25,6 +25,7 @@ import de.gurum.besseresser.model.GoalResult
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.model.TrafficLight
+import de.gurum.besseresser.model.toWeightedGoals
 import de.gurum.besseresser.ui.HistoryDetailViewModel
 import de.gurum.besseresser.ui.HistoryViewModel
 import de.gurum.besseresser.ui.MainViewModel
@@ -67,7 +68,7 @@ class UserFlowsTest {
             baseUrl = "https://api.openai.com/v1",
             apiKey = "sk-test",
             model = "gpt-4o",
-            goals = listOf("Wenig Zucker", "Viel Protein"),
+            goals = listOf("Wenig Zucker", "Viel Protein").toWeightedGoals(),
             retentionWeeks = 4
         )
         val vm = SetupViewModel(
@@ -83,8 +84,8 @@ class UserFlowsTest {
             assertEquals("https://api.openai.com/v1", url)
             assertEquals("sk-test", key)
             assertEquals("gpt-4o", model)
-            assertTrue(goals.contains("Wenig Zucker"))
-            assertTrue(goals.contains("Viel Protein"))
+            assertTrue(goals.any { it.text == "Wenig Zucker" })
+            assertTrue(goals.any { it.text == "Viel Protein" })
             assertEquals("4", retentionWeeks)
         }
     }
@@ -121,7 +122,7 @@ class UserFlowsTest {
         assertFalse(vm.uiState.value.goalsDirty)
         vm.setGoals("Ziel A\nZiel B")
         assertTrue(vm.uiState.value.goalsDirty)
-        assertEquals(listOf("Ziel A", "Ziel B"), vm.uiState.value.goals)
+        assertEquals(listOf("Ziel A", "Ziel B").toWeightedGoals(), vm.uiState.value.goals)
     }
 
     @Test
@@ -141,7 +142,7 @@ class UserFlowsTest {
             advanceUntilIdle()
 
             assertFalse(vm.uiState.value.splitting)
-            assertEquals(listOf("Ziel 1", "Ziel 2", "Ziel 3"), vm.uiState.value.goals)
+            assertEquals(listOf("Ziel 1", "Ziel 2", "Ziel 3").toWeightedGoals(), vm.uiState.value.goals)
         }
 
     @Test
@@ -152,25 +153,61 @@ class UserFlowsTest {
             settingsRepository = FakeSettingsRepository()
         )
         vm.setGoals(listOf("A", "B", "C"))
-        assertEquals(listOf("A", "B", "C"), vm.uiState.value.goals)
+        assertEquals(listOf("A", "B", "C").toWeightedGoals(), vm.uiState.value.goals)
 
         // Move B up -> [B, A, C]
         vm.moveGoalUp(1)
-        assertEquals(listOf("B", "A", "C"), vm.uiState.value.goals)
+        assertEquals(listOf("B", "A", "C").toWeightedGoals(), vm.uiState.value.goals)
 
         // Move B down -> [A, B, C]
         vm.moveGoalDown(0)
-        assertEquals(listOf("A", "B", "C"), vm.uiState.value.goals)
+        assertEquals(listOf("A", "B", "C").toWeightedGoals(), vm.uiState.value.goals)
 
         // Remove item at index 1 (B) -> [A, C]
         vm.removeGoal(1)
-        assertEquals(listOf("A", "C"), vm.uiState.value.goals)
+        assertEquals(listOf("A", "C").toWeightedGoals(), vm.uiState.value.goals)
 
         // Out of bounds operations are ignored safely
         vm.moveGoalUp(0)
         vm.moveGoalDown(1)
         vm.removeGoal(5)
-        assertEquals(listOf("A", "C"), vm.uiState.value.goals)
+        assertEquals(listOf("A", "C").toWeightedGoals(), vm.uiState.value.goals)
+    }
+
+    @Test
+    fun `setup flow - setGoalWeight updates individual goal weight while keeping text and other goals intact`() = runTest(testDispatcher) {
+        val vm = SetupViewModel(
+            apiService = FakeApiService(),
+            backupService = FakeBackupService(),
+            settingsRepository = FakeSettingsRepository()
+        )
+        vm.setGoals(listOf("Ziel 1", "Ziel 2", "Ziel 3"))
+        assertEquals(listOf(3, 3, 3), vm.uiState.value.goals.map { it.weight })
+
+        // Set weight of Ziel 2 to 5 (Sehr hoch)
+        vm.setGoalWeight(1, 5)
+        assertEquals(5, vm.uiState.value.goals[1].weight)
+        assertEquals(3, vm.uiState.value.goals[0].weight)
+        assertEquals(3, vm.uiState.value.goals[2].weight)
+        assertEquals(listOf("Ziel 1", "Ziel 2", "Ziel 3"), vm.uiState.value.goals.map { it.text })
+
+        // Set weight of Ziel 1 to 1 (Sehr niedrig)
+        vm.setGoalWeight(0, 1)
+        assertEquals(1, vm.uiState.value.goals[0].weight)
+
+        // Out-of-bounds weight clamped to 1..5
+        vm.setGoalWeight(2, 99)
+        assertEquals(5, vm.uiState.value.goals[2].weight)
+
+        vm.setGoalWeight(2, -10)
+        assertEquals(1, vm.uiState.value.goals[2].weight)
+
+        // Reordering maintains weights
+        vm.moveGoalUp(1) // Ziel 2 (weight 5) moves to index 0
+        assertEquals("Ziel 2", vm.uiState.value.goals[0].text)
+        assertEquals(5, vm.uiState.value.goals[0].weight)
+        assertEquals("Ziel 1", vm.uiState.value.goals[1].text)
+        assertEquals(1, vm.uiState.value.goals[1].weight)
     }
 
     @Test
@@ -183,7 +220,7 @@ class UserFlowsTest {
         val defaultGoals = listOf("Blutdruck senken", "Weniger Zucker", "Gewicht verlieren", "Gesünder ernähren")
         vm.init(Settings(), defaultGoals)
 
-        assertEquals(defaultGoals, vm.uiState.value.goals)
+        assertEquals(defaultGoals.toWeightedGoals(), vm.uiState.value.goals)
     }
 
     @Test
@@ -201,7 +238,7 @@ class UserFlowsTest {
         vm.addGoalsFromText()
         advanceUntilIdle()
 
-        assertEquals(listOf("Bestehendes Ziel", "Mehr Wasser", "Kein Alkohol"), vm.uiState.value.goals)
+        assertEquals(listOf("Bestehendes Ziel", "Mehr Wasser", "Kein Alkohol").toWeightedGoals(), vm.uiState.value.goals)
         assertEquals("", vm.uiState.value.newGoalText)
         assertFalse(vm.uiState.value.splitting)
     }
@@ -360,7 +397,7 @@ class UserFlowsTest {
         val testUri = TestUri("content://de.gurum.besseresser.fileprovider/photos/temp2.jpg")
         vm.onPhotoTaken(testUri)
         vm.analyze(
-            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel").toWeightedGoals()),
             PromptBundle("", "", "", "", "", "", "", "")
         )
         advanceUntilIdle()
@@ -433,7 +470,7 @@ class UserFlowsTest {
         vm.pushRecentNote(vm.uiState.value.note)
         vm.onPhotoTaken(vm.uiState.value.photoPreviewUri!!)
         vm.analyze(
-            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel").toWeightedGoals()),
             PromptBundle("", "", "", "", "", "", "", "")
         )
         advanceUntilIdle()
@@ -502,7 +539,7 @@ class UserFlowsTest {
         vm.setNote("Linseneintopf")
         vm.onPhotoTaken(captureUri)
         vm.analyze(
-            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel").toWeightedGoals()),
             PromptBundle("", "", "", "", "", "", "", "")
         )
         advanceUntilIdle()
@@ -548,7 +585,7 @@ class UserFlowsTest {
         var pickedEntry: HistoryEntry? = null
         vm.submitBackdated(
             photoUri = null,
-            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel").toWeightedGoals()),
             promptBundle = null,
             textPrompt = "Prompt",
             onPick = { pickedEntry = it }
@@ -589,7 +626,7 @@ class UserFlowsTest {
         // Try rating while still offline
         detailVm.reEvaluate(
             correctedText = "Haferflocken mit Beeren",
-            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Z1")),
+            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Z1").toWeightedGoals()),
             photoPromptBundle = null,
             textPrompt = "Evaluate Haferflocken"
         )
@@ -602,7 +639,7 @@ class UserFlowsTest {
         online = true
         detailVm.reEvaluate(
             correctedText = "Haferflocken mit Beeren",
-            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Z1")),
+            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Z1").toWeightedGoals()),
             photoPromptBundle = null,
             textPrompt = "Evaluate Haferflocken"
         )
@@ -640,7 +677,7 @@ class UserFlowsTest {
         vm.setNote("Kürbissuppe")
         vm.onPhotoTaken(captureUri)
         vm.analyze(
-            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel").toWeightedGoals()),
             PromptBundle("", "", "", "", "", "", "", "")
         )
         advanceUntilIdle()
@@ -685,7 +722,7 @@ class UserFlowsTest {
         var pickedEntry: HistoryEntry? = null
         vm.submitBackdated(
             photoUri = null,
-            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel")),
+            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Ziel").toWeightedGoals()),
             promptBundle = null,
             textPrompt = "Prompt",
             onPick = { pickedEntry = it }
@@ -742,7 +779,7 @@ class UserFlowsTest {
         var pickedEntry: HistoryEntry? = null
         vm.submitBackdated(
             photoUri = vm.uiState.value.addPhotoUri,
-            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Z1")),
+            settings = Settings(baseUrl = "https://test.api", apiKey = "key", model = "m", goals = listOf("Z1").toWeightedGoals()),
             promptBundle = PromptBundle("", "", "", "", "", "", "", ""),
             textPrompt = null,
             onPick = { pickedEntry = it }

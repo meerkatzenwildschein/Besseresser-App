@@ -6,9 +6,18 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.descriptors.element
+import kotlinx.serialization.encoding.CompositeDecoder
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /** Zentral vorkonfigurierte Json-Instanz mit toleranten Defaults. */
 val AppJson = Json {
@@ -167,6 +176,86 @@ enum class AppLanguage(val rawValue: String) {
 
 // ----------------------------------------------------------------- Einstellungen & Bewertungen
 
+object WeightedGoalSerializer : KSerializer<WeightedGoal> {
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("WeightedGoal") {
+            element<String>("text")
+            element<Int>("weight", isOptional = true)
+        }
+
+    override fun serialize(encoder: Encoder, value: WeightedGoal) {
+        val composite = encoder.beginStructure(descriptor)
+        composite.encodeStringElement(descriptor, 0, value.text)
+        composite.encodeIntElement(descriptor, 1, value.weight.coerceIn(WeightedGoal.MIN_WEIGHT, WeightedGoal.MAX_WEIGHT))
+        composite.endStructure(descriptor)
+    }
+
+    override fun deserialize(decoder: Decoder): WeightedGoal {
+        val jsonInput = decoder as? JsonDecoder
+        if (jsonInput != null) {
+            val element = jsonInput.decodeJsonElement()
+            return when (element) {
+                is JsonPrimitive -> {
+                    if (element is kotlinx.serialization.json.JsonNull) {
+                        WeightedGoal("", WeightedGoal.DEFAULT_WEIGHT)
+                    } else {
+                        WeightedGoal(element.content, WeightedGoal.DEFAULT_WEIGHT)
+                    }
+                }
+                is JsonObject -> {
+                    val text = (element["text"] as? JsonPrimitive)?.contentOrNull
+                        ?: (element["ziel"] as? JsonPrimitive)?.contentOrNull
+                        ?: ""
+                    val rawWeight = (element["weight"] as? JsonPrimitive)?.intOrNull
+                        ?: (element["gewicht"] as? JsonPrimitive)?.intOrNull
+                    val weight = rawWeight?.coerceIn(WeightedGoal.MIN_WEIGHT, WeightedGoal.MAX_WEIGHT)
+                        ?: WeightedGoal.DEFAULT_WEIGHT
+                    WeightedGoal(text, weight)
+                }
+                else -> WeightedGoal("", WeightedGoal.DEFAULT_WEIGHT)
+            }
+        }
+        var text = ""
+        var weight = WeightedGoal.DEFAULT_WEIGHT
+        val composite = decoder.beginStructure(descriptor)
+        loop@ while (true) {
+            when (val index = composite.decodeElementIndex(descriptor)) {
+                CompositeDecoder.DECODE_DONE -> break@loop
+                0 -> text = composite.decodeStringElement(descriptor, 0)
+                1 -> weight = composite.decodeIntElement(descriptor, 1).coerceIn(WeightedGoal.MIN_WEIGHT, WeightedGoal.MAX_WEIGHT)
+                else -> break@loop
+            }
+        }
+        composite.endStructure(descriptor)
+        return WeightedGoal(text, weight.coerceIn(WeightedGoal.MIN_WEIGHT, WeightedGoal.MAX_WEIGHT))
+    }
+}
+
+/** Einzelnes Ernährungsziel mit Wichtung (1 = sehr niedrig bis 5 = sehr hoch, Default = 3). */
+@Immutable
+@Serializable(with = WeightedGoalSerializer::class)
+data class WeightedGoal(
+    val text: String = "",
+    val weight: Int = DEFAULT_WEIGHT
+) {
+    init {
+        require(weight in MIN_WEIGHT..MAX_WEIGHT) {
+            "Weight must be between $MIN_WEIGHT and $MAX_WEIGHT, got $weight"
+        }
+    }
+
+    companion object {
+        const val MIN_WEIGHT = 1
+        const val MAX_WEIGHT = 5
+        const val DEFAULT_WEIGHT = 3
+    }
+}
+
+fun List<WeightedGoal>.toGoalTextList(): List<String> = map { it.text }
+
+fun List<String>.toWeightedGoals(defaultWeight: Int = WeightedGoal.DEFAULT_WEIGHT): List<WeightedGoal> =
+    map { WeightedGoal(it, defaultWeight) }
+
 /** Einstellungen (Setup): URL/Key/Modell + Ziele. */
 @Immutable
 @Serializable
@@ -174,7 +263,7 @@ data class Settings(
     val baseUrl: String = "",
     val apiKey: String = "",
     val model: String = DEFAULT_MODEL,
-    val goals: List<String> = emptyList(),
+    val goals: List<WeightedGoal> = emptyList(),
     // true = Ziele sind bereits als saubere Ein-Zeile-ein-Ziel-Liste gespeichert (KI-Aufteilung bestätigt)
     val goalsWereSplit: Boolean = false,
     // Historien-Begrenzung: Einträge (inkl. Tages-/Wochenfazits & Fotos) werden nach so vielen
@@ -183,6 +272,8 @@ data class Settings(
 ) {
     val isComplete: Boolean
         get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && model.isNotBlank() && goals.isNotEmpty()
+
+    fun toGoalTextList(): List<String> = goals.map { it.text }
 
     companion object {
         const val DEFAULT_MODEL = "gpt-4o-mini"
@@ -217,4 +308,7 @@ data class Evaluation(
         if (goalResults.size != goals.size) return false
         return goals.all { g -> goalResults.any { it.goal.equals(g, ignoreCase = true) } }
     }
+
+    fun matchesWeightedGoals(goals: List<WeightedGoal>): Boolean =
+        matchesGoals(goals.map { it.text })
 }

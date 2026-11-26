@@ -13,6 +13,7 @@ import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.RecentNote
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.model.TrafficLight
+import de.gurum.besseresser.model.toWeightedGoals
 import de.gurum.besseresser.ui.ConfigViewModel
 import de.gurum.besseresser.ui.HistoryDetailViewModel
 import de.gurum.besseresser.ui.HistoryViewModel
@@ -79,7 +80,7 @@ class ViewModelCoverageTest {
             savedStateHandle = handle
         )
         vm1.onPhotoTaken(TestUri("content://media/photo.jpg"))
-        vm1.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Low Carb")), PromptBundle("", "", "", "", "", "", "", ""))
+        vm1.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Low Carb").toWeightedGoals()), PromptBundle("", "", "", "", "", "", "", ""))
         advanceUntilIdle()
 
         assertEquals(testEv, vm1.uiState.value.evaluation)
@@ -106,7 +107,7 @@ class ViewModelCoverageTest {
     fun `analyze returns early when no photoUri set`() = runTest(testDispatcher) {
         val vm = MainViewModel(FakeApiService(), FakeHistoryRepository(), FakeSettingsRepository(), FakeImagePreprocessor(), testDispatchers)
         // photoPreviewUri is null → analyze() returns immediately without touching isBusy
-        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), PromptBundle("", "", "", "", "", "", "", ""))
+        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), PromptBundle("", "", "", "", "", "", "", ""))
         advanceUntilIdle()
         assertFalse("isBusy must stay false when no photo was taken", vm.uiState.value.isBusy)
         assertNull("error must stay null when no photo was taken", vm.uiState.value.error)
@@ -120,7 +121,7 @@ class ViewModelCoverageTest {
         }
         val vm = MainViewModel(FakeApiService(), FakeHistoryRepository(), FakeSettingsRepository(), failPreprocessor, testDispatchers)
         vm.onPhotoTaken(TestUri("content://media/photo.jpg"))
-        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), PromptBundle("", "", "", "", "", "", "", ""))
+        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), PromptBundle("", "", "", "", "", "", "", ""))
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.isBusy)
@@ -140,7 +141,7 @@ class ViewModelCoverageTest {
         val vm = MainViewModel(apiService, FakeHistoryRepository(), setRepo, FakeImagePreprocessor(), testDispatchers)
         vm.onPhotoTaken(TestUri("content://media/photo.jpg"))
         vm.setNote("Mittags-Salat")
-        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), PromptBundle("", "", "", "", "", "", "", ""))
+        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), PromptBundle("", "", "", "", "", "", "", ""))
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.isBusy)
@@ -154,7 +155,7 @@ class ViewModelCoverageTest {
         val apiService = FakeApiService(analyzeResult = Result.failure(RuntimeException("Timeout bei KI-Anfrage")))
         val vm = MainViewModel(apiService, FakeHistoryRepository(), FakeSettingsRepository(), FakeImagePreprocessor(), testDispatchers)
         vm.onPhotoTaken(TestUri("content://media/photo.jpg"))
-        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), PromptBundle("", "", "", "", "", "", "", ""))
+        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), PromptBundle("", "", "", "", "", "", "", ""))
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.isBusy)
@@ -180,7 +181,7 @@ class ViewModelCoverageTest {
         val vm = MainViewModel(apiService, FakeHistoryRepository(), setRepo, FakeImagePreprocessor(), testDispatchers)
         vm.onPhotoTaken(TestUri("content://media/photo.jpg"))
         vm.setNote("Gemüse")
-        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Gesund")), PromptBundle("", "", "", "", "", "", "", ""))
+        vm.analyze(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Gesund").toWeightedGoals()), PromptBundle("", "", "", "", "", "", "", ""))
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.isBusy)
@@ -198,7 +199,7 @@ class ViewModelCoverageTest {
         vm.setAddTargetDay(LocalDate.now())
         vm.setAddTargetTime(LocalTime.NOON)
         vm.setAddNote("Test")
-        vm.submitBackdated(null, Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), null, "bewerte")
+        vm.submitBackdated(null, Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), null, "bewerte")
         advanceUntilIdle()
         assertNotNull("error must be set after API failure", vm.uiState.value.addError)
         assertTrue(vm.uiState.value.addError!!.contains("Netzwerkfehler"))
@@ -277,7 +278,7 @@ class ViewModelCoverageTest {
         val vm = HistoryViewModel(api, histRepo, FakeSettingsRepository(), FakeImagePreprocessor(), testDispatchers)
         advanceUntilIdle()
 
-        val settings = Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z"))
+        val settings = Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals())
         val prompts = de.gurum.besseresser.data.FazitPromptBundle("", "", "", "")
 
         // First call
@@ -301,7 +302,7 @@ class ViewModelCoverageTest {
         advanceUntilIdle()
 
         val key = de.gurum.besseresser.model.dayKeyOf(day)
-        vm.generateFazit(day, listOf(entry), Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), null, listOf(), de.gurum.besseresser.data.FazitPromptBundle("", "", "", ""))
+        vm.generateFazit(day, listOf(entry), Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), null, listOf(), de.gurum.besseresser.data.FazitPromptBundle("", "", "", ""))
         advanceUntilIdle()
 
         assertFalse("loadingFazits must be cleared after API failure", vm.uiState.value.loadingFazits.contains(key))
@@ -315,7 +316,7 @@ class ViewModelCoverageTest {
         advanceUntilIdle()
 
         val weekKey = de.gurum.besseresser.model.weekKeyOf(System.currentTimeMillis())
-        val settings = Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z"))
+        val settings = Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals())
         vm.generateWeekFazit(settings, null, weekKey, listOf("Salat"), de.gurum.besseresser.data.FazitPromptBundle("", "", "", ""))
         advanceUntilIdle()
 
@@ -330,7 +331,7 @@ class ViewModelCoverageTest {
         advanceUntilIdle()
 
         val weekKey = de.gurum.besseresser.model.weekKeyOf(System.currentTimeMillis())
-        vm.generateWeekFazit(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), null, weekKey, listOf(), de.gurum.besseresser.data.FazitPromptBundle("", "", "", ""))
+        vm.generateWeekFazit(Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), null, weekKey, listOf(), de.gurum.besseresser.data.FazitPromptBundle("", "", "", ""))
         advanceUntilIdle()
 
         assertFalse("loadingWeeks must be cleared after failure", vm.uiState.value.loadingWeeks.contains(weekKey))
@@ -342,7 +343,7 @@ class ViewModelCoverageTest {
         val api = FakeApiService()
         val vm = HistoryViewModel(api, FakeHistoryRepository(), FakeSettingsRepository(), FakeImagePreprocessor(), testDispatchers)
         val weekKey = de.gurum.besseresser.model.weekKeyOf(System.currentTimeMillis())
-        val settings = Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z"))
+        val settings = Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals())
         val prompts = de.gurum.besseresser.data.FazitPromptBundle("", "", "", "")
         vm.generateWeekFazit(settings, null, weekKey, listOf(), prompts)
         vm.generateWeekFazit(settings, null, weekKey, listOf(), prompts) // second call while first in-flight
@@ -446,7 +447,7 @@ class ViewModelCoverageTest {
         vm.setAddTargetDay(LocalDate.now())
         vm.setAddTargetTime(LocalTime.NOON)
         vm.setAddNote("Pasta")
-        vm.submitBackdated(null, Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), null, "text prompt")
+        vm.submitBackdated(null, Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), null, "text prompt")
         advanceUntilIdle()
         assertNotNull(vm.uiState.value.addError)
         assertFalse(vm.uiState.value.showAddBusyCard)
@@ -460,7 +461,7 @@ class ViewModelCoverageTest {
         advanceUntilIdle()
         assertNull(vm.uiState.value.entry)
 
-        vm.reEvaluate("corrected", Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), null, "text")
+        vm.reEvaluate("corrected", Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), null, "text")
         advanceUntilIdle()
 
         assertFalse("reEvalBusy must stay false when entry is null", vm.uiState.value.reEvalBusy)
@@ -476,7 +477,7 @@ class ViewModelCoverageTest {
         advanceUntilIdle()
         assertNotNull(vm.uiState.value.entry)
 
-        vm.reEvaluate("Neu", Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), null, "bewerte: Pasta")
+        vm.reEvaluate("Neu", Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), null, "bewerte: Pasta")
         advanceUntilIdle()
 
         assertFalse("reEvalBusy must be false after success", vm.uiState.value.reEvalBusy)
@@ -492,7 +493,7 @@ class ViewModelCoverageTest {
         val vm = HistoryDetailViewModel(entry.id, histRepo, FakeSettingsRepository(), failApi, FakeImagePreprocessor(), testDispatchers)
         advanceUntilIdle()
 
-        vm.reEvaluate("x", Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), null, "bewerte")
+        vm.reEvaluate("x", Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), null, "bewerte")
         advanceUntilIdle()
 
         assertFalse("reEvalBusy must be cleared on failure", vm.uiState.value.reEvalBusy)
@@ -510,7 +511,7 @@ class ViewModelCoverageTest {
         advanceUntilIdle()
 
         val notesBefore = setRepo.loadRecentNotes().size
-        vm.reEvaluate("x", Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z")), null, "bewerte")
+        vm.reEvaluate("x", Settings(baseUrl = "x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()), null, "bewerte")
         advanceUntilIdle()
 
         assertEquals("updateRecentNoteEvaluation must not add entries for noteless entries", notesBefore, setRepo.loadRecentNotes().size)

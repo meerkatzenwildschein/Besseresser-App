@@ -317,7 +317,7 @@ class HistoryViewModel(
     ) {
         val note = _uiState.value.addNote.trim()
         viewModelScope.launch {
-            val cached = settingsRepository.findCachedEvaluation(note, settings.goals)
+            val cached = settingsRepository.findCachedEvaluation(note, settings.toGoalTextList())
             if (cached != null) {
                 settingsRepository.pushRecentNote(note, cached)
                 saveBackdatedEntry(cached, photoUri, onPick)
@@ -365,7 +365,7 @@ class HistoryViewModel(
         onPick: (HistoryEntry) -> Unit = {}
     ): Boolean {
         val note = _uiState.value.addNote.trim()
-        val cachedEv = settingsRepository.findCachedEvaluation(note, settings.goals) ?: return false
+        val cachedEv = settingsRepository.findCachedEvaluation(note, settings.toGoalTextList()) ?: return false
         saveBackdatedEntry(cachedEv, photoUriIn, onPick)
         return true
     }

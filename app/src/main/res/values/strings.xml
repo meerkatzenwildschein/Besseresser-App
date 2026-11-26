@@ -112,6 +112,8 @@
     <string name="setup_goal_move_up">Move up</string>
     <string name="setup_goal_move_down">Move down</string>
     <string name="setup_goal_delete">Remove goal</string>
+    <string name="setup_goal_weight_label">Priority: %1$d/5</string>
+    <string name="setup_goal_weight_desc">Set priority to %1$d of 5</string>
     <string name="setup_pick_provider">Choose provider</string>
     <string name="setup_models_link">Load and pick models</string>
     <string name="setup_save_continue">Save &amp; continue</string>
@@ -142,7 +144,7 @@
     <string name="prompt_eval_intro">I sent a photo of my meal.\nEvaluate this meal with respect to each of the following goals:</string>
     <string name="prompt_eval_format">Answer ONLY with a JSON object (no text before or after) in exactly this format:</string>
     <string name="prompt_eval_recognized">In the field "erkannt", state in one short sentence what food or dishes you recognize on the photo – each WITH an estimated quantity (grams, milliliters, pieces or portions), e.g. "100 g of pasta with tomato sauce and one apple". Do not use introductory phrases such as "visible on the photo", "the photo shows" or "you can see" – start directly with the food. Take the user notes above into account (including portion sizes) and resolve them to concrete food items.</string>
-    <string name="prompt_eval_ampel_meaning">ampel means: gruen = harmless or beneficial for this goal, gelb = acceptable with limitations, rot = generally bad for this goal.</string>
+    <string name="prompt_eval_ampel_meaning">ampel means: gruen = harmless or beneficial for this goal, gelb = acceptable with limitations, rot = generally bad for this goal. The priority tag [Priorität X/5] (1=very low to 5=very high) determines how much a goal shapes the overall impression (zusatz): violations of high-priority goals (4–5) weigh heavily, while low-priority goals (1–2) are evaluated more leniently.</string>
     <string name="prompt_eval_exactly_one">There must be exactly one rating per goal, using the exact goal wording.</string>
     <string name="prompt_eval_language">Answer in English.</string>
     <string name="prompt_split_intro">Split the following free text containing health goals into individual, self-contained goals.</string>
@@ -195,7 +197,7 @@
     <string name="dayfazit_line_note">Note: %1$s</string>
     <string name="prompt_dayfazit_intro">Here are all meals of one day (format: time · recognized food with estimated quantity · user note). Rate the day as a WHOLE with respect to these goals:</string>
     <string name="prompt_weekfazit_intro">Here are all meals of ONE week (calendar week %1$d, format: date · recognized food with estimated quantity · user note), Monday through Sunday chronologically. Rate the week as a WHOLE with respect to these goals:</string>
-    <string name="prompt_dayfazit_rules">Weigh small pleasure snacks in their context: a single candy should not disproportionately downgrade a day that is otherwise wholesome. The rating reflects the overall balance across all meals of the day.</string>
+    <string name="prompt_dayfazit_rules">Weigh small pleasure snacks in their context: a single candy should not disproportionately downgrade a day that is otherwise wholesome. The rating and overall summary reflect the overall balance across all meals. High-priority goals ([Priorität 4/5] or [Priorität 5/5]) significantly shape the overall summary, while low-priority goals ([Priorität 1/5] or [Priorität 2/5]) are evaluated more leniently.</string>
     <string name="prompt_dayfazit_language">Answer in English.</string>
     <string name="score_tooltip_ok">Average of the rated goals: 🟢 100 · 🟡 50 · 🔴 0</string>
     <string name="score_tooltip_unknown">No average: no rating received</string>

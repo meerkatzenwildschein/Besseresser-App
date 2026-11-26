@@ -10,6 +10,7 @@ import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.model.TrafficLight
 import de.gurum.besseresser.model.dayKeyOf
+import de.gurum.besseresser.model.toWeightedGoals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -109,7 +110,7 @@ class HistoryModularUseCasesTest {
             loadingFazits = emptySet(),
             weekFazitMap = emptyMap(),
             loadingWeeks = emptySet(),
-            settings = Settings("", "", "", listOf("Ziel 1")),
+            settings = Settings("", "", "", listOf("Ziel 1").toWeightedGoals()),
             promptContext = null,
             dayPrompts = FazitPromptBundle("Intro", "Rules", "de", "Ehrlich"),
             weekPromptsProvider = { FazitPromptBundle("WIntro", "Rules", "de", "Ehrlich") },

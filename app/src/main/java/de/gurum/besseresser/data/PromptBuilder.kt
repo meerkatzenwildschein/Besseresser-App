@@ -1,5 +1,8 @@
 package de.gurum.besseresser.data
 
+import de.gurum.besseresser.model.WeightedGoal
+import de.gurum.besseresser.model.toWeightedGoals
+
 /**
  * Erstellung und Zusammenstellung lokalisierter Prompt-Templates für die KI-Kommunikation.
  * Rein logikorientiert ohne Android-Context-Abhängigkeiten.
@@ -7,11 +10,11 @@ package de.gurum.besseresser.data
 object PromptBuilder {
 
     /**
-     * Erstellt den Prompt für die Foto-Bewertung anhand der Nutzer-Ziele und des Prompt-Bundles.
+     * Erstellt den Prompt für die Foto-Bewertung anhand der gewichteten Nutzer-Ziele und des Prompt-Bundles.
      */
-    fun createAnalyzePrompt(goals: List<String>, promptBundle: PromptBundle): String = buildString {
+    fun createAnalyzePrompt(goals: List<WeightedGoal>, promptBundle: PromptBundle): String = buildString {
         appendLine(promptBundle.intro)
-        goals.forEachIndexed { i, g -> appendLine("${i + 1}. $g") }
+        goals.forEachIndexed { i, g -> appendLine("${i + 1}. [Priorität ${g.weight}/5] ${g.text}") }
         if (promptBundle.noteHeader.isNotBlank()) {
             appendLine("")
             appendLine(promptBundle.noteHeader)
@@ -28,17 +31,21 @@ object PromptBuilder {
         appendLine(promptBundle.responseLanguage)
     }
 
+    @JvmName("createAnalyzePromptStrings")
+    fun createAnalyzePrompt(goals: List<String>, promptBundle: PromptBundle): String =
+        createAnalyzePrompt(goals.toWeightedGoals(), promptBundle)
+
     /**
      * Erstellt den Prompt für das textbasierte Tages- oder Wochenfazit.
      */
     fun createDayFazitPrompt(
-        goals: List<String>,
+        goals: List<WeightedGoal>,
         promptContext: String?,
         mealDescriptions: List<String>,
         prompts: FazitPromptBundle
     ): String = buildString {
         appendLine(prompts.promptIntro)
-        goals.forEachIndexed { i, g -> appendLine("${i + 1}. $g") }
+        goals.forEachIndexed { i, g -> appendLine("${i + 1}. [Priorität ${g.weight}/5] ${g.text}") }
         promptContext?.takeIf { it.isNotBlank() }?.let {
             appendLine("")
             appendLine(it)
@@ -54,16 +61,24 @@ object PromptBuilder {
         appendLine(prompts.promptLanguage)
     }
 
+    @JvmName("createDayFazitPromptStrings")
+    fun createDayFazitPrompt(
+        goals: List<String>,
+        promptContext: String?,
+        mealDescriptions: List<String>,
+        prompts: FazitPromptBundle
+    ): String = createDayFazitPrompt(goals.toWeightedGoals(), promptContext, mealDescriptions, prompts)
+
     /**
      * Erstellt den Prompt für die reine Textanalyse (Nacherfassung ohne Foto).
      */
     fun createAnalyzeTextPrompt(
-        goals: List<String>,
+        goals: List<WeightedGoal>,
         promptBundle: PromptBundle,
         textOnlyContext: String
     ): String = buildString {
         appendLine(promptBundle.intro)
-        goals.forEachIndexed { i, g -> appendLine("${i + 1}. $g") }
+        goals.forEachIndexed { i, g -> appendLine("${i + 1}. [Priorität ${g.weight}/5] ${g.text}") }
         appendLine("")
         appendLine(textOnlyContext)
         appendLine("")
@@ -74,6 +89,13 @@ object PromptBuilder {
         if (promptBundle.honesty.isNotBlank()) appendLine(promptBundle.honesty)
         appendLine(promptBundle.responseLanguage)
     }
+
+    @JvmName("createAnalyzeTextPromptStrings")
+    fun createAnalyzeTextPrompt(
+        goals: List<String>,
+        promptBundle: PromptBundle,
+        textOnlyContext: String
+    ): String = createAnalyzeTextPrompt(goals.toWeightedGoals(), promptBundle, textOnlyContext)
 
     /**
      * Erstellt den Prompt für die KI-gestützte Zerlegung von Zielen.

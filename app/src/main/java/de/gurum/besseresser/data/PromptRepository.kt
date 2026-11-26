@@ -5,7 +5,9 @@ import de.gurum.besseresser.R
 import de.gurum.besseresser.model.Gender
 import de.gurum.besseresser.model.HistoryEntry
 import de.gurum.besseresser.model.Profile
+import de.gurum.besseresser.model.WeightedGoal
 import de.gurum.besseresser.model.calendarWeekOf
+import de.gurum.besseresser.model.toWeightedGoals
 import de.gurum.besseresser.ui.DATE_FORMATTER
 import de.gurum.besseresser.ui.formatTime
 import java.time.Instant
@@ -15,7 +17,7 @@ import kotlin.math.abs
 
 interface PromptRepository {
     fun createAnalyzePromptBundle(trimmedNote: String = ""): PromptBundle
-    fun createAnalyzeTextPrompt(goals: List<String>, description: String): String
+    fun createAnalyzeTextPrompt(goals: List<WeightedGoal>, description: String): String
     fun createDayFazitPrompts(): FazitPromptBundle
     fun createWeekFazitPrompts(calendarWeek: Int = calendarWeekOf()): FazitPromptBundle
     fun dayFazitMealDescriptions(entriesOfDay: List<HistoryEntry>): List<String>
@@ -24,6 +26,9 @@ interface PromptRepository {
     fun noInternetSavedUnratedMessage(): String = "Keine Internetverbindung – ohne KI-Bewertung fortgefahren."
     fun noInternetCannotRateMessage(): String = "Keine Internetverbindung – KI-Bewertung ist aktuell nicht möglich."
 }
+
+fun PromptRepository.createAnalyzeTextPrompt(goals: List<String>, description: String): String =
+    createAnalyzeTextPrompt(goals.toWeightedGoals(), description)
 
 class DefaultPromptRepository(
     private val context: Context
@@ -42,7 +47,7 @@ class DefaultPromptRepository(
         else ""
     )
 
-    override fun createAnalyzeTextPrompt(goals: List<String>, description: String): String {
+    override fun createAnalyzeTextPrompt(goals: List<WeightedGoal>, description: String): String {
         val textBundle = PromptBundle(
             intro = context.getString(R.string.prompt_eval_intro_textonly),
             formatIntro = context.getString(R.string.prompt_eval_format),

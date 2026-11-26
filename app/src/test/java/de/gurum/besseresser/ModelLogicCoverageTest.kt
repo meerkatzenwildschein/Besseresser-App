@@ -16,7 +16,9 @@ import de.gurum.besseresser.model.RecentNote
 import de.gurum.besseresser.model.RecentNotesLogic
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.model.TrafficLight
+import de.gurum.besseresser.model.WeightedGoal
 import de.gurum.besseresser.model.retentionCutoffMillis
+import de.gurum.besseresser.model.toWeightedGoals
 
 /**
  * Coverage for model-layer logic branches that were previously untested.
@@ -28,17 +30,17 @@ class ModelLogicCoverageTest {
 
     @Test
     fun `Settings isComplete false when baseUrl blank`() {
-        assertFalse(Settings(baseUrl = "", apiKey = "k", model = "m", goals = listOf("Z")).isComplete)
+        assertFalse(Settings(baseUrl = "", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()).isComplete)
     }
 
     @Test
     fun `Settings isComplete false when apiKey blank`() {
-        assertFalse(Settings(baseUrl = "https://x", apiKey = "", model = "m", goals = listOf("Z")).isComplete)
+        assertFalse(Settings(baseUrl = "https://x", apiKey = "", model = "m", goals = listOf("Z").toWeightedGoals()).isComplete)
     }
 
     @Test
     fun `Settings isComplete false when model blank`() {
-        assertFalse(Settings(baseUrl = "https://x", apiKey = "k", model = "", goals = listOf("Z")).isComplete)
+        assertFalse(Settings(baseUrl = "https://x", apiKey = "k", model = "", goals = listOf("Z").toWeightedGoals()).isComplete)
     }
 
     @Test
@@ -48,7 +50,7 @@ class ModelLogicCoverageTest {
 
     @Test
     fun `Settings isComplete true when all fields present`() {
-        assertTrue(Settings(baseUrl = "https://x", apiKey = "k", model = "m", goals = listOf("Z")).isComplete)
+        assertTrue(Settings(baseUrl = "https://x", apiKey = "k", model = "m", goals = listOf("Z").toWeightedGoals()).isComplete)
     }
 
     // ----------------------------------------------------------------- Evaluation.matchesGoals

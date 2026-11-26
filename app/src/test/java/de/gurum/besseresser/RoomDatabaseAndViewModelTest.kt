@@ -45,6 +45,7 @@ import de.gurum.besseresser.model.RecentNote
 import de.gurum.besseresser.model.TrafficLight
 import de.gurum.besseresser.model.Profile
 import de.gurum.besseresser.model.Settings
+import de.gurum.besseresser.model.toWeightedGoals
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -295,20 +296,20 @@ class RoomDatabaseAndViewModelTest {
             baseUrl = "https://api.openai.com/v1",
             apiKey = "sk-test",
             model = "gpt-4o",
-            goals = listOf("Ziel A", "Ziel B")
+            goals = listOf("Ziel A", "Ziel B").toWeightedGoals()
         )
         viewModel.init(settings, listOf("Default Goal"))
         val state = viewModel.uiState.value
         assertEquals("https://api.openai.com/v1", state.url)
         assertEquals("sk-test", state.key)
         assertEquals("gpt-4o", state.model)
-        assertEquals(listOf("Ziel A", "Ziel B"), state.goals)
+        assertEquals(listOf("Ziel A", "Ziel B").toWeightedGoals(), state.goals)
 
         viewModel.setModel("gpt-4o-mini")
         assertEquals("gpt-4o-mini", viewModel.uiState.value.model)
 
         viewModel.setGoals("Neues Ziel")
-        assertEquals(listOf("Neues Ziel"), viewModel.uiState.value.goals)
+        assertEquals(listOf("Neues Ziel").toWeightedGoals(), viewModel.uiState.value.goals)
         assertTrue(viewModel.uiState.value.goalsDirty)
     }
 
@@ -466,7 +467,7 @@ class RoomDatabaseAndViewModelTest {
 
         viewModel.setThemeMode(AppThemeMode.DARK)
         viewModel.setLanguage(AppLanguage.EN)
-        val newSettings = Settings(baseUrl = "https://custom.api", apiKey = "sk-custom", model = "gpt-4o", goals = listOf("Goal 1"))
+        val newSettings = Settings(baseUrl = "https://custom.api", apiKey = "sk-custom", model = "gpt-4o", goals = listOf("Goal 1").toWeightedGoals())
         viewModel.saveSettings(newSettings)
         val newProfile = Profile(birthDate = "1990-01-01", weightKg = 70.0, heightCm = 175, gender = Gender.MALE)
         profileRepo.save(newProfile)
@@ -647,7 +648,7 @@ class RoomDatabaseAndViewModelTest {
         assertEquals("https://my-custom-proxy.internal", stateAfterRecreate.url)
         assertEquals("sk-secret-key-42", stateAfterRecreate.key)
         assertEquals("claude-3-5-sonnet", stateAfterRecreate.model)
-        assertEquals(listOf("Mehr Wasser trinken", "Kein Zucker"), stateAfterRecreate.goals)
+        assertEquals(listOf("Mehr Wasser trinken", "Kein Zucker").toWeightedGoals(), stateAfterRecreate.goals)
         assertTrue(stateAfterRecreate.goalsDirty)
         assertEquals("24", stateAfterRecreate.retentionWeeks)
         assertTrue(stateAfterRecreate.showModels)
@@ -657,19 +658,19 @@ class RoomDatabaseAndViewModelTest {
 
         // Wenn SetupScreen bei Neuerstellung LaunchedEffect(initial) { init(...) } aufruft,
         // dürfen ungespeicherte Benutzereingaben nicht durch alte Settings überschrieben werden!
-        val defaultSettings = Settings("https://api.openai.com/v1", "sk-old", "gpt-4o", listOf("Altes Ziel"))
+        val defaultSettings = Settings("https://api.openai.com/v1", "sk-old", "gpt-4o", listOf("Altes Ziel").toWeightedGoals())
         viewModel2.init(defaultSettings, listOf("Default Goal"))
 
         val stateAfterScreenReinit = viewModel2.uiState.value
         assertEquals("https://my-custom-proxy.internal", stateAfterScreenReinit.url)
         assertEquals("sk-secret-key-42", stateAfterScreenReinit.key)
-        assertEquals(listOf("Mehr Wasser trinken", "Kein Zucker"), stateAfterScreenReinit.goals)
+        assertEquals(listOf("Mehr Wasser trinken", "Kein Zucker").toWeightedGoals(), stateAfterScreenReinit.goals)
 
         // Bei explizitem force = true (z.B. nach Backup-Import) wird überschrieben
         viewModel2.init(defaultSettings, listOf("Default Goal"), force = true)
         val stateAfterForcedInit = viewModel2.uiState.value
         assertEquals("https://api.openai.com/v1", stateAfterForcedInit.url)
         assertEquals("sk-old", stateAfterForcedInit.key)
-        assertEquals(listOf("Altes Ziel"), stateAfterForcedInit.goals)
+        assertEquals(listOf("Altes Ziel").toWeightedGoals(), stateAfterForcedInit.goals)
     }
 }

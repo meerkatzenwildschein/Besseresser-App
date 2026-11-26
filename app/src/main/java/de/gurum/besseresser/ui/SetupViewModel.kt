@@ -19,6 +19,8 @@ import de.gurum.besseresser.data.NetworkSecurity
 import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.data.UrlSecurityStatus
 import de.gurum.besseresser.model.Settings
+import de.gurum.besseresser.model.WeightedGoal
+import de.gurum.besseresser.model.toWeightedGoals
 import de.gurum.besseresser.data.SplitGoalsRequest
 
 @Immutable
@@ -26,7 +28,7 @@ data class SetupUiState(
     val url: String = "",
     val key: String = "",
     val model: String = Settings.DEFAULT_MODEL,
-    val goals: List<String> = emptyList(),
+    val goals: List<WeightedGoal> = emptyList(),
     val newGoalText: String = "",
     val goalsDirty: Boolean = false,
     val showModels: Boolean = false,
@@ -52,6 +54,7 @@ class SetupViewModel(
         private const val KEY_KEY = "setup_key"
         private const val KEY_MODEL = "setup_model"
         private const val KEY_GOALS = "setup_goals"
+        private const val KEY_GOALS_JSON = "setup_goals_json"
         private const val KEY_NEW_GOAL_TEXT = "setup_new_goal_text"
         private const val KEY_GOALS_DIRTY = "setup_goals_dirty"
         private const val KEY_SHOW_MODELS = "setup_show_models"
@@ -62,13 +65,15 @@ class SetupViewModel(
         private const val KEY_SPLIT_DEBUG = "setup_split_debug"
         private const val KEY_RETENTION_WEEKS = "setup_retention_weeks"
 
-        private fun parseGoalsFromHandle(handle: SavedStateHandle): List<String> {
-            val list = handle.get<ArrayList<String>>(KEY_GOALS)
+        private fun parseGoalsFromHandle(handle: SavedStateHandle): List<WeightedGoal> {
+            val rawJson = handle.get<String>(KEY_GOALS_JSON)
+            if (rawJson != null) {
+                return SettingsRepository.decodeGoalsFromString(rawJson)
+            }
+            val list = handle.get<ArrayList<WeightedGoal>>(KEY_GOALS)
             if (list != null) return list.toList()
-            val arr = handle.get<Array<String>>(KEY_GOALS)
-            if (arr != null) return arr.toList()
             val raw = handle.get<String>(KEY_GOALS)
-            if (raw != null) return raw.split("\n").map { it.trim() }.filter { it.isNotBlank() }
+            if (raw != null) return SettingsRepository.decodeGoalsFromString(raw)
             return emptyList()
         }
     }
@@ -105,14 +110,14 @@ class SetupViewModel(
         val url = initial.baseUrl
         val key = initial.apiKey
         val model = initial.model.ifBlank { Settings.DEFAULT_MODEL }
-        val goals = if (initial.goals.isNotEmpty()) initial.goals else defaultGoals
+        val goals = if (initial.goals.isNotEmpty()) initial.goals else defaultGoals.toWeightedGoals()
         val retention = initial.retentionWeeks.toString()
 
         savedStateHandle[KEY_SETUP_INITIALIZED] = true
         savedStateHandle[KEY_URL] = url
         savedStateHandle[KEY_KEY] = key
         savedStateHandle[KEY_MODEL] = model
-        savedStateHandle[KEY_GOALS] = ArrayList(goals)
+        savedStateHandle[KEY_GOALS_JSON] = SettingsRepository.encodeGoalsToString(goals)
         savedStateHandle[KEY_NEW_GOAL_TEXT] = ""
         savedStateHandle[KEY_GOALS_DIRTY] = false
         savedStateHandle[KEY_RETENTION_WEEKS] = retention
@@ -148,16 +153,31 @@ class SetupViewModel(
         _uiState.update { it.copy(model = model) }
     }
 
-    fun setGoals(goals: List<String>) {
+    fun setGoals(goals: List<WeightedGoal>) {
         savedStateHandle[KEY_SETUP_INITIALIZED] = true
-        savedStateHandle[KEY_GOALS] = ArrayList(goals)
+        savedStateHandle[KEY_GOALS_JSON] = SettingsRepository.encodeGoalsToString(goals)
         savedStateHandle[KEY_GOALS_DIRTY] = true
         _uiState.update { it.copy(goals = goals, goalsDirty = true) }
     }
 
+    @JvmName("setGoalsStrings")
+    fun setGoals(goals: List<String>) {
+        setGoals(goals.toWeightedGoals())
+    }
+
     fun setGoals(goalsText: String) {
         val list = goalsText.split("\n").map { it.trim() }.filter { it.isNotBlank() }
-        setGoals(list)
+        setGoals(list.toWeightedGoals())
+    }
+
+    fun setGoalWeight(index: Int, weight: Int) {
+        val validWeight = weight.coerceIn(WeightedGoal.MIN_WEIGHT, WeightedGoal.MAX_WEIGHT)
+        val current = _uiState.value.goals
+        if (index in current.indices) {
+            val updated = current.toMutableList()
+            updated[index] = updated[index].copy(weight = validWeight)
+            setGoals(updated)
+        }
     }
 
     fun removeGoal(index: Int) {
@@ -253,11 +273,11 @@ class SetupViewModel(
         viewModelScope.launch {
             val result = apiService.splitGoals(request = req)
             result.onSuccess { splitList ->
-                val newGoals = splitList.map { it.trim() }.filter { it.isNotBlank() }
+                val newGoals = splitList.map { it.trim() }.filter { it.isNotBlank() }.map { WeightedGoal(it, WeightedGoal.DEFAULT_WEIGHT) }
                 val combined = _uiState.value.goals + newGoals
                 val edited = splitList.joinToString("\n")
                 savedStateHandle[KEY_SETUP_INITIALIZED] = true
-                savedStateHandle[KEY_GOALS] = ArrayList(combined)
+                savedStateHandle[KEY_GOALS_JSON] = SettingsRepository.encodeGoalsToString(combined)
                 savedStateHandle[KEY_GOALS_DIRTY] = true
                 savedStateHandle[KEY_NEW_GOAL_TEXT] = ""
                 savedStateHandle[KEY_SPLIT_EDITED] = edited
@@ -277,13 +297,13 @@ class SetupViewModel(
                         showSplit = false
                     )
                 }
-                onFinished?.invoke(Result.success(newGoals))
+                onFinished?.invoke(Result.success(splitList))
             }.onFailure { err ->
-                val fallbackGoals = ApiClient.splitGoalsLocally(raw).filter { it.isNotBlank() }
-                val combined = if (fallbackGoals.isNotEmpty()) _uiState.value.goals + fallbackGoals else _uiState.value.goals + listOf(raw)
+                val fallbackGoals = ApiClient.splitGoalsLocally(raw).filter { it.isNotBlank() }.map { WeightedGoal(it, WeightedGoal.DEFAULT_WEIGHT) }
+                val combined = if (fallbackGoals.isNotEmpty()) _uiState.value.goals + fallbackGoals else _uiState.value.goals + listOf(WeightedGoal(raw, WeightedGoal.DEFAULT_WEIGHT))
                 val debug = if (err is ApiException) err.debugReport else null
                 savedStateHandle[KEY_SETUP_INITIALIZED] = true
-                savedStateHandle[KEY_GOALS] = ArrayList(combined)
+                savedStateHandle[KEY_GOALS_JSON] = SettingsRepository.encodeGoalsToString(combined)
                 savedStateHandle[KEY_GOALS_DIRTY] = true
                 savedStateHandle[KEY_NEW_GOAL_TEXT] = ""
                 savedStateHandle[KEY_SPLIT_EDITED] = raw

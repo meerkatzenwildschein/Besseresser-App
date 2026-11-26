@@ -26,6 +26,7 @@ import de.gurum.besseresser.data.PromptBuilder
 import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.data.SplitGoalsRequest
 import de.gurum.besseresser.model.TrafficLight
+import de.gurum.besseresser.model.WeightedGoal
 
 class ApiClientTest {
 
@@ -82,10 +83,30 @@ class ApiClientTest {
         )
         val prompt = PromptBuilder.createAnalyzePrompt(goals, bundle)
         assertTrue(prompt.contains("Bewerte Mahlzeit"))
-        assertTrue(prompt.contains("1. Kein Zucker"))
-        assertTrue(prompt.contains("2. 2l Wasser"))
+        assertTrue(prompt.contains("1. [Priorität 3/5] Kein Zucker"))
+        assertTrue(prompt.contains("2. [Priorität 3/5] 2l Wasser"))
         assertTrue(prompt.contains("Notiz:"))
         assertTrue(prompt.contains("Sprache: Deutsch"))
+    }
+
+    @Test
+    fun testPromptBuilderCreateAnalyzePromptWithWeightedGoals() {
+        val goals = listOf(
+            WeightedGoal("Blutdruck senken", 5),
+            WeightedGoal("Weniger Zucker", 1),
+            WeightedGoal("Mehr Proteine", 4)
+        )
+        val bundle = PromptBundle(
+            intro = "Bewerte Mahlzeit",
+            formatIntro = "Format:",
+            ampelMeaning = "ampel",
+            exactlyOne = "Genau eine Ampel",
+            responseLanguage = "Deutsch"
+        )
+        val prompt = PromptBuilder.createAnalyzePrompt(goals, bundle)
+        assertTrue(prompt.contains("1. [Priorität 5/5] Blutdruck senken"))
+        assertTrue(prompt.contains("2. [Priorität 1/5] Weniger Zucker"))
+        assertTrue(prompt.contains("3. [Priorität 4/5] Mehr Proteine"))
     }
 
     @Test
@@ -104,8 +125,8 @@ class ApiClientTest {
             mealDescriptions = mealDescriptions,
             prompts = bundle
         )
-        assertTrue(promptWithCtx.contains("1. Blutdruck senken"))
-        assertTrue(promptWithCtx.contains("2. Weniger Zucker"))
+        assertTrue(promptWithCtx.contains("1. [Priorität 3/5] Blutdruck senken"))
+        assertTrue(promptWithCtx.contains("2. [Priorität 3/5] Weniger Zucker"))
         assertTrue(promptWithCtx.contains("Nutzerprofil: 35 Jahre · 75 kg"))
         assertTrue(promptWithCtx.contains("08:00 · Haferflocken"))
         assertTrue(promptWithCtx.contains("12:30 · Gemüse-Curry"))
@@ -120,6 +141,52 @@ class ApiClientTest {
             prompts = bundle
         )
         assertFalse(promptWithoutCtx.contains("Nutzerprofil"))
+    }
+
+    @Test
+    fun testPromptBuilderCreateDayFazitPromptWithWeightedGoals() {
+        val goals = listOf(
+            WeightedGoal("Ziel A", 2),
+            WeightedGoal("Ziel B", 5)
+        )
+        val bundle = FazitPromptBundle(
+            promptIntro = "Intro",
+            promptRules = "Rules",
+            promptLanguage = "Language"
+        )
+        val prompt = PromptBuilder.createDayFazitPrompt(
+            goals = goals,
+            promptContext = null,
+            mealDescriptions = listOf("12:00 · Salat"),
+            prompts = bundle
+        )
+        assertTrue(prompt.contains("1. [Priorität 2/5] Ziel A"))
+        assertTrue(prompt.contains("2. [Priorität 5/5] Ziel B"))
+    }
+
+    @Test
+    fun testPromptBuilderCreateAnalyzeTextPrompt() {
+        val goals = listOf(
+            WeightedGoal("Gewicht halten", 3),
+            WeightedGoal("Kein Fast Food", 4)
+        )
+        val bundle = PromptBundle(
+            intro = "Intro Text",
+            formatIntro = "Format",
+            ampelMeaning = "Ampel Bedeutung",
+            exactlyOne = "Genau eins",
+            responseLanguage = "Deutsch",
+            honesty = "Ehrlich sein"
+        )
+        val prompt = PromptBuilder.createAnalyzeTextPrompt(
+            goals = goals,
+            promptBundle = bundle,
+            textOnlyContext = "Mahlzeit: Apfel und Quark"
+        )
+        assertTrue(prompt.contains("1. [Priorität 3/5] Gewicht halten"))
+        assertTrue(prompt.contains("2. [Priorität 4/5] Kein Fast Food"))
+        assertTrue(prompt.contains("Mahlzeit: Apfel und Quark"))
+        assertTrue(prompt.contains("Ampel Bedeutung"))
     }
 
     @Test

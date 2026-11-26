@@ -157,8 +157,8 @@ internal fun MainReportView(
         }
 
         settings.goals.forEach { goal ->
-            val res = results?.firstOrNull { it.goal.equals(goal, ignoreCase = true) }
-            GoalRow(goal, res)
+            val res = results?.firstOrNull { it.goal.equals(goal.text, ignoreCase = true) }
+            GoalRow(goal.text, res)
         }
 
         if (reportShown && !savedToHistory) {

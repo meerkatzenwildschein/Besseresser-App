@@ -449,7 +449,7 @@ fun HistoryDetailScreen(
         if (entry.goalResults.isNotEmpty()) {
             entry.goalResults.forEach { GoalRow(it.goal, it) }
         } else {
-            settings.goals.forEach { goal -> GoalRow(goal, null) }
+            settings.goals.forEach { goal -> GoalRow(goal.text, null) }
         }
 
         Spacer(Modifier.height(16.dp))

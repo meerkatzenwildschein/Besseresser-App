@@ -210,7 +210,7 @@ class MainViewModel(
      *  vorliegt, die zu [settings.goals] passt. Falls ja, wird sie direkt übernommen (ohne KI-Aufruf). */
     suspend fun tryUseCachedEvaluation(settings: Settings): Boolean {
         val currentNote = _uiState.value.note.trim()
-        val cachedEv = settingsRepository.findCachedEvaluation(currentNote, settings.goals) ?: return false
+        val cachedEv = settingsRepository.findCachedEvaluation(currentNote, settings.toGoalTextList()) ?: return false
         analyzeJob?.cancel()
         settingsRepository.pushRecentNote(currentNote, cachedEv)
         savedStateHandle[KEY_EVALUATION] = AppJson.encodeToString(cachedEv)

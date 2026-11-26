@@ -15,9 +15,11 @@ import de.gurum.besseresser.model.Evaluation
 import de.gurum.besseresser.model.RecentNote
 import de.gurum.besseresser.model.RecentNotesLogic
 import de.gurum.besseresser.model.Settings
+import de.gurum.besseresser.model.WeightedGoal
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 
 // ----------------------------------------------------------------- DataStore (mit SharedPreferences-Migration)
@@ -44,6 +46,32 @@ interface SettingsRepository {
     suspend fun updateRecentNoteEvaluation(note: String, evaluation: Evaluation)
     suspend fun findCachedEvaluation(note: String, goals: List<String>): Evaluation?
     suspend fun saveRecentNotes(notes: List<RecentNote>)
+
+    companion object {
+        fun encodeGoalsToString(goals: List<WeightedGoal>): String {
+            val validGoals = goals.filter { it.text.isNotBlank() }
+            return AppJson.encodeToString(ListSerializer(WeightedGoal.serializer()), validGoals)
+        }
+
+        fun decodeGoalsFromString(raw: String?): List<WeightedGoal> {
+            if (raw.isNullOrBlank()) return emptyList()
+            val trimmed = raw.trim()
+            if (trimmed.startsWith("[")) {
+                return runCatching {
+                    AppJson.decodeFromString(ListSerializer(WeightedGoal.serializer()), trimmed)
+                        .filter { it.text.isNotBlank() }
+                }.getOrElse { fallbackDecode(trimmed) }
+            }
+            return fallbackDecode(raw)
+        }
+
+        private fun fallbackDecode(raw: String): List<WeightedGoal> {
+            return raw.lines()
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .map { WeightedGoal(it, WeightedGoal.DEFAULT_WEIGHT) }
+        }
+    }
 }
 
 // ----------------------------------------------------------------- Implementation
@@ -64,9 +92,7 @@ class DefaultSettingsRepository(private val dataStore: DataStore<Preferences>) :
     override val settings: Flow<Settings> = dataStore.data.map { p -> p.toSettings() }
 
     private fun Preferences.toSettings(): Settings {
-        val goals = (this[Keys.GOALS] ?: "").split("\n")
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
+        val goals = SettingsRepository.decodeGoalsFromString(this[Keys.GOALS])
         return Settings(
             baseUrl = this[Keys.BASE_URL] ?: "",
             apiKey = this[Keys.API_KEY]?.let { raw -> KeyVault.decrypt(raw).getOrDefault("") } ?: "",
@@ -85,7 +111,7 @@ class DefaultSettingsRepository(private val dataStore: DataStore<Preferences>) :
             p[Keys.BASE_URL] = settings.baseUrl.trim()
             p[Keys.API_KEY] = encryptedKey
             p[Keys.MODEL] = settings.model.trim()
-            p[Keys.GOALS] = settings.goals.joinToString("\n")
+            p[Keys.GOALS] = SettingsRepository.encodeGoalsToString(settings.goals)
             p[Keys.GOALS_WERE_SPLIT] = settings.goalsWereSplit
             p[Keys.RETENTION_WEEKS] = settings.retentionWeeks
         }

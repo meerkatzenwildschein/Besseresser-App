@@ -68,6 +68,8 @@ import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.model.RecentNote
 import de.gurum.besseresser.model.RecentNotesLogic
 import de.gurum.besseresser.model.Settings
+import de.gurum.besseresser.model.WeightedGoal
+import de.gurum.besseresser.model.toWeightedGoals
 import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.ui.SetupViewModel
 import de.gurum.besseresser.data.SplitGoalsRequest
@@ -81,7 +83,7 @@ import de.gurum.besseresser.R
 // ----------------------------------------------------------------- In-Memory Test Fakes
 
 class FakeSettingsRepository(
-    initialSettings: Settings = Settings("https://api.openai.com/v1", "test-key", "gpt-4o-mini", listOf("Ziel 1")),
+    initialSettings: Settings = Settings("https://api.openai.com/v1", "test-key", "gpt-4o-mini", listOf("Ziel 1").toWeightedGoals()),
     initialRecentNotes: List<RecentNote> = emptyList()
 ) : SettingsRepository {
     private val settingsFlow = MutableStateFlow(initialSettings)
@@ -336,7 +338,7 @@ class FakeApiService(
 
     override suspend fun dayFazit(
         settings: Settings,
-        goals: List<String>,
+        goals: List<WeightedGoal>,
         promptContext: String?,
         mealDescriptions: List<String>,
         prompts: FazitPromptBundle
@@ -562,18 +564,18 @@ class RepositoriesAndFakesTest {
         val api = FakeApiService(splitResult = Result.success(listOf("Ziel 1", "Ziel 2")))
         val vm = SetupViewModel(apiService = api, backupService = FakeBackupService(), settingsRepository = FakeSettingsRepository())
 
-        val initial = Settings("https://api.openai.com/v1", "key123", "gpt-4o", listOf("Z1"))
+        val initial = Settings("https://api.openai.com/v1", "key123", "gpt-4o", listOf("Z1").toWeightedGoals())
         vm.init(initial, listOf("Default Ziel"))
         assertEquals("https://api.openai.com/v1", vm.uiState.value.url)
         assertEquals("key123", vm.uiState.value.key)
         assertEquals("gpt-4o", vm.uiState.value.model)
-        assertEquals(listOf("Z1"), vm.uiState.value.goals)
+        assertEquals(listOf("Z1").toWeightedGoals(), vm.uiState.value.goals)
 
         vm.startSplitGoals(rawGoals = "Gesund ernähren und viel Wasser trinken")
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.splitting)
-        assertEquals(listOf("Z1", "Ziel 1", "Ziel 2"), vm.uiState.value.goals)
+        assertEquals(listOf("Z1", "Ziel 1", "Ziel 2").toWeightedGoals(), vm.uiState.value.goals)
     }
 
     @Test
@@ -651,7 +653,7 @@ class RepositoriesAndFakesTest {
         vm.setAddNote("  150 g Skyr mit Beeren  ")
         var reusedEntry: HistoryEntry? = null
         val usedCache = vm.trySaveCachedBackdated(
-            settings = Settings("", "", "", listOf("Z")),
+            settings = Settings("", "", "", listOf("Z").toWeightedGoals()),
             photoUriIn = null
         ) { reusedEntry = it }
         advanceUntilIdle()
@@ -665,7 +667,7 @@ class RepositoriesAndFakesTest {
         vm.setAddTargetDay(day2)
         vm.setAddNote("150 g Skyr mit Beeren")
         val usedCacheWithChangedGoals = vm.trySaveCachedBackdated(
-            settings = Settings("", "", "", listOf("Z", "Neues Ziel")),
+            settings = Settings("", "", "", listOf("Z", "Neues Ziel").toWeightedGoals()),
             photoUriIn = null
         )
         assertFalse(usedCacheWithChangedGoals)
@@ -687,7 +689,7 @@ class RepositoriesAndFakesTest {
 
         // Exact match with matching goals -> uses cached evaluation immediately without AI call
         vm.setNote("  Haferflocken ")
-        val usedCache = vm.tryUseCachedEvaluation(settings = Settings(goals = listOf("Ziel 1")))
+        val usedCache = vm.tryUseCachedEvaluation(settings = Settings(goals = listOf("Ziel 1").toWeightedGoals()))
         assertTrue(usedCache)
         assertFalse(vm.uiState.value.isBusy)
         assertEquals(cachedEv, vm.uiState.value.evaluation)
@@ -703,11 +705,11 @@ class RepositoriesAndFakesTest {
 
         // Modified note text -> does not match cached entry -> returns false
         vm.setNote("Haferflocken mit Schoko")
-        assertFalse(vm.tryUseCachedEvaluation(settings = Settings(goals = listOf("Ziel 1"))))
+        assertFalse(vm.tryUseCachedEvaluation(settings = Settings(goals = listOf("Ziel 1").toWeightedGoals())))
 
         // Changed goals -> cached evaluation does not match new goals -> returns false
         vm.setNote("Haferflocken")
-        assertFalse(vm.tryUseCachedEvaluation(settings = Settings(goals = listOf("Ziel 1", "Ziel 2"))))
+        assertFalse(vm.tryUseCachedEvaluation(settings = Settings(goals = listOf("Ziel 1", "Ziel 2").toWeightedGoals())))
     }
 
     @Test
@@ -721,7 +723,7 @@ class RepositoriesAndFakesTest {
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.splitting)
-        assertEquals(listOf("Weniger Salz", "mehr Gemüse"), vm.uiState.value.goals)
+        assertEquals(listOf("Weniger Salz", "mehr Gemüse").toWeightedGoals(), vm.uiState.value.goals)
         assertEquals("Debug: Unauthorized", vm.uiState.value.splitDebug)
     }
 
@@ -947,7 +949,7 @@ class RepositoriesAndFakesTest {
 
         DayFazitSession.attempted.clear()
         vm.checkAndTriggerAutoFazits(
-            settings = Settings("", "", "", listOf("Ziel 1")),
+            settings = Settings("", "", "", listOf("Ziel 1").toWeightedGoals()),
             promptContext = null,
             dayPrompts = FazitPromptBundle("Intro", "Rules", "de", "Ehrlich"),
             weekPromptsProvider = { FazitPromptBundle("WeekIntro", "Rules", "de", "Ehrlich") },

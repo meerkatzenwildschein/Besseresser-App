@@ -21,6 +21,10 @@ import de.gurum.besseresser.model.RecentNote
 import de.gurum.besseresser.model.RecentNotesLogic
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.model.TrafficLight
+import de.gurum.besseresser.model.WeightedGoal
+import de.gurum.besseresser.model.toGoalTextList
+import de.gurum.besseresser.model.toWeightedGoals
+import de.gurum.besseresser.data.SettingsRepository
 
 class DataSerializationTest {
 
@@ -289,7 +293,7 @@ class DataSerializationTest {
                 baseUrl = "https://openrouter.ai/api/v1",
                 apiKey = "sk-or-v1-secret-key",
                 model = "google/gemini-2.5-flash",
-                goals = listOf("Weniger Zucker", "Mehr Gemüse"),
+                goals = listOf("Weniger Zucker", "Mehr Gemüse").toWeightedGoals(),
                 goalsWereSplit = true
             ),
             profile = Profile(
@@ -354,19 +358,176 @@ class DataSerializationTest {
     }
 
     @Test
+    fun testWeightedGoalModelAndClamping() {
+        assertEquals(1, WeightedGoal.MIN_WEIGHT)
+        assertEquals(5, WeightedGoal.MAX_WEIGHT)
+        assertEquals(3, WeightedGoal.DEFAULT_WEIGHT)
+
+        val defaultGoal = WeightedGoal("Trink mehr Wasser")
+        assertEquals("Trink mehr Wasser", defaultGoal.text)
+        assertEquals(3, defaultGoal.weight)
+
+        val normalGoal = WeightedGoal("Normal", 4)
+        assertEquals(4, normalGoal.weight)
+
+        // Validation test
+        try {
+            WeightedGoal("Invalid", 0)
+            org.junit.Assert.fail("Expected IllegalArgumentException for weight 0")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
+        try {
+            WeightedGoal("Invalid", 6)
+            org.junit.Assert.fail("Expected IllegalArgumentException for weight 6")
+        } catch (e: IllegalArgumentException) {
+            // expected
+        }
+
+        val json = AppJson.encodeToString(WeightedGoal.serializer(), normalGoal)
+        val decoded = AppJson.decodeFromString(WeightedGoal.serializer(), json)
+        assertEquals(normalGoal, decoded)
+    }
+
+    @Test
+    fun testWeightedGoalConvertersAndSettings() {
+        val strings = listOf("Ziel A", "Ziel B", "Ziel C")
+        val weighted = strings.toWeightedGoals(4)
+        assertEquals(3, weighted.size)
+        assertEquals("Ziel A", weighted[0].text)
+        assertEquals(4, weighted[0].weight)
+
+        val texts = weighted.toGoalTextList()
+        assertEquals(strings, texts)
+
+        val settings = Settings(
+            baseUrl = "https://openrouter.ai/api/v1",
+            apiKey = "key",
+            model = "gemini",
+            goals = listOf(WeightedGoal("Z1", 1), WeightedGoal("Z2", 5)),
+            goalsWereSplit = true
+        )
+        assertEquals(listOf("Z1", "Z2"), settings.toGoalTextList())
+
+        // Test JSON roundtrip of Settings with WeightedGoalSerializer
+        val json = AppJson.encodeToString(Settings.serializer(), settings)
+        val decoded = AppJson.decodeFromString(Settings.serializer(), json)
+        assertEquals(settings, decoded)
+        assertEquals(1, decoded.goals[0].weight)
+        assertEquals(5, decoded.goals[1].weight)
+    }
+
+    @Test
+    fun testSettingsRepositoryEncodingAndDecoding() {
+        val goals = listOf(
+            WeightedGoal("Weniger Zucker", 5),
+            WeightedGoal("Mehr Protein: Eier & Quark", 4),
+            WeightedGoal("3:::Drei Doppelpunkte im Text\nmit Zeilenumbruch", 2),
+            WeightedGoal("Standardziel", 3)
+        )
+
+        val encoded = SettingsRepository.encodeGoalsToString(goals)
+        assertTrue(encoded.startsWith("["))
+        val decoded = SettingsRepository.decodeGoalsFromString(encoded)
+
+        assertEquals(goals.size, decoded.size)
+        assertEquals(goals, decoded)
+
+        // Test decoding legacy unweighted plain text format
+        val legacyText = "Kein Fastfood\nMindestens 2 Liter Wasser\n"
+        val decodedLegacy = SettingsRepository.decodeGoalsFromString(legacyText)
+        assertEquals(2, decodedLegacy.size)
+        assertEquals("Kein Fastfood", decodedLegacy[0].text)
+        assertEquals(3, decodedLegacy[0].weight)
+        assertEquals("Mindestens 2 Liter Wasser", decodedLegacy[1].text)
+        assertEquals(3, decodedLegacy[1].weight)
+
+        // Test legacy text format (treated literally with weight 3)
+        val legacyTextWithColons = "Altes Ziel ohne Gewicht\nVerhältnis 1:::2\nNeues Ziel: Protein\n"
+        val decodedColons = SettingsRepository.decodeGoalsFromString(legacyTextWithColons)
+        assertEquals(3, decodedColons.size)
+        assertEquals(WeightedGoal("Altes Ziel ohne Gewicht", 3), decodedColons[0])
+        assertEquals(WeightedGoal("Verhältnis 1:::2", 3), decodedColons[1])
+        assertEquals(WeightedGoal("Neues Ziel: Protein", 3), decodedColons[2])
+
+        // Empty and blank strings handling
+        assertTrue(SettingsRepository.decodeGoalsFromString("").isEmpty())
+        assertTrue(SettingsRepository.decodeGoalsFromString("   \n\n  ").isEmpty())
+        assertTrue(SettingsRepository.decodeGoalsFromString("[]").isEmpty())
+        assertTrue(SettingsRepository.decodeGoalsFromString("[{\"text\":\"\"}]").isEmpty())
+    }
+
+    @Test
+    fun testWeightedGoalSerializerEdgeCasesAndMalformedJson() {
+        val jsonWithOutOfRange = """[{"text":"High","weight":10},{"text":"Low","weight":-5},{"text":"Normal","weight":3}]"""
+        val decoded = AppJson.decodeFromString<List<WeightedGoal>>(jsonWithOutOfRange)
+        assertEquals(3, decoded.size)
+        assertEquals(5, decoded[0].weight)
+        assertEquals(1, decoded[1].weight)
+        assertEquals(3, decoded[2].weight)
+
+        val jsonWithAliases = """[{"ziel":"AliasZiel","gewicht":4}]"""
+        val decodedAliases = AppJson.decodeFromString<List<WeightedGoal>>(jsonWithAliases)
+        assertEquals(1, decodedAliases.size)
+        assertEquals("AliasZiel", decodedAliases[0].text)
+        assertEquals(4, decodedAliases[0].weight)
+
+        val jsonWithNullAndMissing = """[null, {"weight":4}, {"text":"Valid","weight":null}]"""
+        val decodedNulls = AppJson.decodeFromString<List<WeightedGoal>>(jsonWithNullAndMissing)
+        assertEquals(3, decodedNulls.size)
+        assertEquals("", decodedNulls[0].text)
+        assertEquals("", decodedNulls[1].text)
+        assertEquals(4, decodedNulls[1].weight)
+        assertEquals("Valid", decodedNulls[2].text)
+        assertEquals(3, decodedNulls[2].weight)
+    }
+
+    @Test
+    fun testAppBackupLegacyGoalsBackwardCompatibility() {
+        // Legacy backup JSON where goals was List<String> instead of List<WeightedGoal>
+        val legacyJson = """
+            {
+                "version": 1,
+                "exportiertAm": 1730900000000,
+                "einstellungen": {
+                    "baseUrl": "https://api.openai.com/v1",
+                    "apiKey": "test-key",
+                    "model": "gpt-4o",
+                    "goals": [
+                        "Kein Zucker",
+                        "Mehr Gemüse"
+                    ],
+                    "goalsWereSplit": true
+                },
+                "profil": {},
+                "notizen": [],
+                "verlauf": [],
+                "tagesfazits": [],
+                "wochenfazits": []
+            }
+        """.trimIndent()
+
+        val restored = BackupLogic.deserializeBackup(legacyJson)
+        assertEquals(2, restored.settings.goals.size)
+        assertEquals(WeightedGoal("Kein Zucker", 3), restored.settings.goals[0])
+        assertEquals(WeightedGoal("Mehr Gemüse", 3), restored.settings.goals[1])
+    }
+
+    @Test
     fun testBackupMergeOverwritesDuplicates() {
         val existingSettings = Settings(
             baseUrl = "https://api.openai.com/v1",
             apiKey = "old-key",
             model = "gpt-4o-mini",
-            goals = listOf("Altes Ziel"),
+            goals = listOf("Altes Ziel").toWeightedGoals(),
             goalsWereSplit = false
         )
         val importedSettings = Settings(
             baseUrl = "https://openrouter.ai/api/v1",
             apiKey = "new-imported-key",
             model = "google/gemini-2.5-flash",
-            goals = listOf("Neues Ziel 1", "Neues Ziel 2"),
+            goals = listOf("Neues Ziel 1", "Neues Ziel 2").toWeightedGoals(),
             goalsWereSplit = true
         )
         val mergedSettings = BackupLogic.mergeSettings(existingSettings, importedSettings)
@@ -414,5 +575,69 @@ class DataSerializationTest {
         val restored = BackupLogic.deserializeBackup(json)
         assertEquals(AppThemeMode.DARK, restored.themeMode)
         assertEquals(AppLanguage.DE, restored.language)
+    }
+
+    @Test
+    fun testAppBackupMixedWeightsRoundTrip() {
+        val backup = AppBackup(
+            settings = Settings(
+                baseUrl = "https://api.openai.com/v1",
+                apiKey = "test-key-123",
+                model = "gpt-4o",
+                goals = listOf(
+                    WeightedGoal("Ziel Sehr Niedrig", 1),
+                    WeightedGoal("Ziel Sehr Hoch", 5),
+                    WeightedGoal("Ziel Niedrig", 2),
+                    WeightedGoal("Ziel Normal", 3)
+                ),
+                goalsWereSplit = true
+            )
+        )
+
+        val json = BackupLogic.serializeBackup(backup)
+        val restored = BackupLogic.deserializeBackup(json)
+
+        assertEquals(4, restored.settings.goals.size)
+        assertEquals(WeightedGoal("Ziel Sehr Niedrig", 1), restored.settings.goals[0])
+        assertEquals(WeightedGoal("Ziel Sehr Hoch", 5), restored.settings.goals[1])
+        assertEquals(WeightedGoal("Ziel Niedrig", 2), restored.settings.goals[2])
+        assertEquals(WeightedGoal("Ziel Normal", 3), restored.settings.goals[3])
+        assertEquals(backup.settings, restored.settings)
+    }
+
+    @Test
+    fun testBackupMergeSettingsBlankGoalsHandling() {
+        val existing = Settings(
+            baseUrl = "https://api.openai.com/v1",
+            apiKey = "existing-key",
+            model = "gpt-4o-mini",
+            goals = listOf(WeightedGoal("Bestehendes Ziel A", 4), WeightedGoal("Bestehendes Ziel B", 2)),
+            goalsWereSplit = true
+        )
+
+        // Case 1: Imported settings have only blank/empty goals -> keep existing goals & goalsWereSplit
+        val importedAllBlank = Settings(
+            baseUrl = "https://api.openai.com/v1",
+            apiKey = "new-key",
+            model = "gpt-4o",
+            goals = listOf(WeightedGoal("", 5), WeightedGoal("   ", 1)),
+            goalsWereSplit = false
+        )
+        val mergedAllBlank = BackupLogic.mergeSettings(existing, importedAllBlank)
+        assertEquals(existing.goals, mergedAllBlank.goals)
+        assertTrue(mergedAllBlank.goalsWereSplit)
+        assertEquals("new-key", mergedAllBlank.apiKey)
+
+        // Case 2: Imported settings have mixed blank and valid goals -> drop blanks, use valid goals & imported goalsWereSplit
+        val importedMixed = Settings(
+            baseUrl = "https://api.openai.com/v1",
+            apiKey = "new-key",
+            model = "gpt-4o",
+            goals = listOf(WeightedGoal("", 5), WeightedGoal("Importiertes Ziel", 5), WeightedGoal("   ", 1)),
+            goalsWereSplit = false
+        )
+        val mergedMixed = BackupLogic.mergeSettings(existing, importedMixed)
+        assertEquals(listOf(WeightedGoal("Importiertes Ziel", 5)), mergedMixed.goals)
+        org.junit.Assert.assertFalse(mergedMixed.goalsWereSplit)
     }
 }

@@ -24,6 +24,9 @@ import de.gurum.besseresser.model.Evaluation
 import de.gurum.besseresser.model.GoalResult
 import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.model.TrafficLight
+import de.gurum.besseresser.model.WeightedGoal
+import de.gurum.besseresser.model.toGoalTextList
+import de.gurum.besseresser.model.toWeightedGoals
 
 /** KI-Anweisungstexte, lokalisiert vom Aufrufer erzeugt (App-/Systemsprache). */
 data class PromptBundle(
@@ -102,7 +105,7 @@ interface BesseresserApiService {
 
     suspend fun dayFazit(
         settings: Settings,
-        goals: List<String>,
+        goals: List<WeightedGoal>,
         promptContext: String?,
         mealDescriptions: List<String>,
         prompts: FazitPromptBundle
@@ -117,6 +120,14 @@ interface BesseresserApiService {
         apiKey: String
     ): Result<ApiClient.ModelsResult>
 }
+
+suspend fun BesseresserApiService.dayFazit(
+    settings: Settings,
+    goals: List<String>,
+    promptContext: String?,
+    mealDescriptions: List<String>,
+    prompts: FazitPromptBundle
+): Result<DayFazitResult> = dayFazit(settings, goals.toWeightedGoals(), promptContext, mealDescriptions, prompts)
 
 /** Kommunikation mit der OpenAI-kompatiblen API: Foto-Bewertung, Modell-Liste, Ziele-Aufteilung. */
 class ApiClient(
@@ -184,7 +195,7 @@ class ApiClient(
                 throw buildAnalyzeMissingContentException(resp, text)
             }
 
-            parseEvaluation(rawContent, settings.goals)
+            parseEvaluation(rawContent, settings.toGoalTextList())
         }
     }
 
@@ -245,7 +256,7 @@ class ApiClient(
 
     override suspend fun dayFazit(
         settings: Settings,
-        goals: List<String>,
+        goals: List<WeightedGoal>,
         promptContext: String?,
         mealDescriptions: List<String>,
         prompts: FazitPromptBundle
@@ -343,7 +354,7 @@ class ApiClient(
                 throw IllegalStateException("Die KI hat keinen Text geliefert. Roh-Antwort: ${text.take(300)}")
             }
 
-            parseEvaluation(rawContent, settings.goals)
+            parseEvaluation(rawContent, settings.toGoalTextList())
         }
     }
 

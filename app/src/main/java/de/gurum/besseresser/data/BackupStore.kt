@@ -94,14 +94,17 @@ object BackupLogic {
         BackupJson.decodeFromString<AppBackup>(rawJson)
 
     /** Importierte Einstellungen überschreiben vorhandene Werte (inkl. API-Key und Ziele). */
-    fun mergeSettings(existing: Settings, imported: Settings): Settings = Settings(
-        baseUrl = imported.baseUrl.trim().ifBlank { existing.baseUrl },
-        apiKey = imported.apiKey.trim().ifBlank { existing.apiKey },
-        model = imported.model.trim().ifBlank { existing.model },
-        goals = if (imported.goals.isNotEmpty()) imported.goals else existing.goals,
-        goalsWereSplit = if (imported.goals.isNotEmpty()) imported.goalsWereSplit else existing.goalsWereSplit,
-        retentionWeeks = imported.retentionWeeks
-    )
+    fun mergeSettings(existing: Settings, imported: Settings): Settings {
+        val importedGoals = imported.goals.map { it.copy(text = it.text.trim()) }.filter { it.text.isNotBlank() }
+        return Settings(
+            baseUrl = imported.baseUrl.trim().ifBlank { existing.baseUrl },
+            apiKey = imported.apiKey.trim().ifBlank { existing.apiKey },
+            model = imported.model.trim().ifBlank { existing.model },
+            goals = if (importedGoals.isNotEmpty()) importedGoals else existing.goals,
+            goalsWereSplit = if (importedGoals.isNotEmpty()) imported.goalsWereSplit else existing.goalsWereSplit,
+            retentionWeeks = imported.retentionWeeks
+        )
+    }
 
     /** Importierte Profildaten überschreiben vorhandene Felder. */
     fun mergeProfile(existing: Profile, imported: Profile): Profile {

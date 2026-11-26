@@ -10,6 +10,7 @@ import de.gurum.besseresser.data.PromptBundle
 import de.gurum.besseresser.data.SplitGoalsRequest
 import de.gurum.besseresser.data.UrlSecurityStatus
 import de.gurum.besseresser.model.Settings
+import de.gurum.besseresser.model.toWeightedGoals
 import de.gurum.besseresser.ui.SetupViewModel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -146,7 +147,7 @@ class NetworkSecurityTest {
         // 3. analyze
         val analyzeResult = apiClient.analyze(
             imageDataUri = "data:image/jpeg;base64,1234",
-            settings = Settings(baseUrl = "http://api.openai.com/v1", apiKey = "key", model = "m", goals = listOf("G1")),
+            settings = Settings(baseUrl = "http://api.openai.com/v1", apiKey = "key", model = "m", goals = listOf("G1").toWeightedGoals()),
             promptBundle = PromptBundle("intro", "format", "ampel", "exactlyOne", "lang", "rec", "honesty", "note")
         )
         assertTrue(analyzeResult.isFailure)

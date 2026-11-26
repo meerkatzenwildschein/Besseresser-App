@@ -71,6 +71,8 @@ import de.gurum.besseresser.data.ApiException
 import de.gurum.besseresser.data.NetworkSecurity
 import de.gurum.besseresser.data.UrlSecurityStatus
 import de.gurum.besseresser.model.Settings
+import de.gurum.besseresser.model.WeightedGoal
+import de.gurum.besseresser.model.toWeightedGoals
 
 // ----------------------------------------------------------------- Gängige Anbieter
 
@@ -155,12 +157,13 @@ fun SetupScreen(
 
     val valid = NetworkSecurity.isPermittedUrl(uiState.url) && uiState.key.isNotBlank() && uiState.model.isNotBlank() && !uiState.splitting
 
-    val doSave: (List<String>, Boolean) -> Unit = { liste, wasSplit ->
-        onDone(Settings(uiState.url.trim(), uiState.key.trim(), uiState.model.trim(), liste.ifEmpty { defaultGoals }, wasSplit, uiState.retentionWeeks.trim().toIntOrNull() ?: Settings.DEFAULT_RETENTION_WEEKS))
+    val doSave: (List<WeightedGoal>, Boolean) -> Unit = { liste, wasSplit ->
+        val finalGoals = liste.ifEmpty { defaultGoals.toWeightedGoals() }
+        onDone(Settings(uiState.url.trim(), uiState.key.trim(), uiState.model.trim(), finalGoals, wasSplit, uiState.retentionWeeks.trim().toIntOrNull() ?: Settings.DEFAULT_RETENTION_WEEKS))
     }
 
     val save: () -> Unit = {
-        val currentGoals = uiState.goals.ifEmpty { defaultGoals }
+        val currentGoals = uiState.goals.ifEmpty { defaultGoals.toWeightedGoals() }
         doSave(currentGoals, true)
     }
 
@@ -221,7 +224,8 @@ fun SetupScreen(
                     },
                     onMoveUp = { viewModel.moveGoalUp(it) },
                     onMoveDown = { viewModel.moveGoalDown(it) },
-                    onDelete = { viewModel.removeGoal(it) }
+                    onDelete = { viewModel.removeGoal(it) },
+                    onSetWeight = { index, weight -> viewModel.setGoalWeight(index, weight) }
                 )
 
                 SetupRetentionSection(
@@ -432,7 +436,7 @@ private fun SetupApiSection(
 
 @Composable
 private fun SetupGoalsSection(
-    goals: List<String>,
+    goals: List<WeightedGoal>,
     newGoalText: String,
     splitting: Boolean,
     canAdd: Boolean,
@@ -440,7 +444,8 @@ private fun SetupGoalsSection(
     onAddGoal: () -> Unit,
     onMoveUp: (Int) -> Unit,
     onMoveDown: (Int) -> Unit,
-    onDelete: (Int) -> Unit
+    onDelete: (Int) -> Unit,
+    onSetWeight: (Int, Int) -> Unit
 ) {
     SectionCard(title = stringResource(R.string.setup_section_goals)) {
         Text(
@@ -477,7 +482,8 @@ private fun SetupGoalsSection(
                         enabled = !splitting,
                         onMoveUp = { onMoveUp(index) },
                         onMoveDown = { onMoveDown(index) },
-                        onDelete = { onDelete(index) }
+                        onDelete = { onDelete(index) },
+                        onSetWeight = { w -> onSetWeight(index, w) }
                     )
                 }
             }
@@ -526,13 +532,14 @@ private fun SetupGoalsSection(
 
 @Composable
 private fun GoalChipItem(
-    goal: String,
+    goal: WeightedGoal,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     enabled: Boolean,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onSetWeight: (Int) -> Unit
 ) {
     Surface(
         shape = RoundedCornerShape(12.dp),
@@ -540,59 +547,104 @@ private fun GoalChipItem(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(start = 12.dp, end = 6.dp, top = 8.dp, bottom = 8.dp)
         ) {
-            Text(
-                text = goal,
-                fontSize = 13.5.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(vertical = 6.dp)
-            )
-
-            IconButton(
-                onClick = onMoveUp,
-                enabled = canMoveUp && enabled,
-                modifier = Modifier.size(34.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Filled.KeyboardArrowUp,
-                    contentDescription = stringResource(R.string.setup_goal_move_up),
-                    tint = if (canMoveUp && enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                    modifier = Modifier.size(18.dp)
+                Text(
+                    text = goal.text,
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
                 )
+
+                IconButton(
+                    onClick = onMoveUp,
+                    enabled = canMoveUp && enabled,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.KeyboardArrowUp,
+                        contentDescription = stringResource(R.string.setup_goal_move_up),
+                        tint = if (canMoveUp && enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onMoveDown,
+                    enabled = canMoveDown && enabled,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = stringResource(R.string.setup_goal_move_down),
+                        tint = if (canMoveDown && enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onDelete,
+                    enabled = enabled,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = stringResource(R.string.setup_goal_delete),
+                        tint = if (enabled) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
 
-            IconButton(
-                onClick = onMoveDown,
-                enabled = canMoveDown && enabled,
-                modifier = Modifier.size(34.dp)
-            ) {
-                Icon(
-                    Icons.Filled.KeyboardArrowDown,
-                    contentDescription = stringResource(R.string.setup_goal_move_down),
-                    tint = if (canMoveDown && enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+            Spacer(Modifier.height(4.dp))
 
-            IconButton(
-                onClick = onDelete,
-                enabled = enabled,
-                modifier = Modifier.size(34.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    Icons.Filled.Close,
-                    contentDescription = stringResource(R.string.setup_goal_delete),
-                    tint = if (enabled) MaterialTheme.colorScheme.error.copy(alpha = 0.85f) else MaterialTheme.colorScheme.error.copy(alpha = 0.3f),
-                    modifier = Modifier.size(18.dp)
+                Text(
+                    text = stringResource(R.string.setup_goal_weight_label, goal.weight),
+                    fontSize = 11.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Normal
                 )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    (WeightedGoal.MIN_WEIGHT..WeightedGoal.MAX_WEIGHT).forEach { w ->
+                        val isSelected = goal.weight == w
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            border = if (isSelected) null else BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier.size(width = 28.dp, height = 24.dp),
+                            onClick = { if (enabled) onSetWeight(w) }
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                Text(
+                                    text = "$w",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }
