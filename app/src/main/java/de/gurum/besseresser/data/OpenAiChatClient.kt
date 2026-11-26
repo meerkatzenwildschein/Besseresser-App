@@ -36,8 +36,10 @@ class ChatHttpException(val code: Int, val bodyText: String) :
  * Schnittstelle für OpenAI-kompatible Chat-Completions-Anfragen.
  */
 interface ChatCompletionClient {
+    val boostedBudgetModels: MutableSet<String>
     fun markModelNeedsBoostedBudget(model: String)
     fun hasBoostedBudget(model: String): Boolean
+    fun clearBoostedBudgets()
     suspend fun postChat(
         url: String,
         apiKey: String,
@@ -87,8 +89,12 @@ class DefaultChatCompletionClient(
     private val dispatchers: AppDispatchers = AppDispatchers()
 ) : ChatCompletionClient {
 
-    private val boostedBudgetModels: MutableSet<String> =
+    override val boostedBudgetModels: MutableSet<String> =
         Collections.synchronizedSet(mutableSetOf<String>())
+
+    override fun clearBoostedBudgets() {
+        boostedBudgetModels.clear()
+    }
 
     override fun markModelNeedsBoostedBudget(model: String) {
         val key = model.trim().lowercase()

@@ -33,6 +33,7 @@ import de.gurum.besseresser.data.SettingsRepository
 import de.gurum.besseresser.data.TriggerAutoFazitUseCase
 import de.gurum.besseresser.data.UiPrefsRepository
 import de.gurum.besseresser.data.appDataStore
+import okhttp3.OkHttpClient
 import de.gurum.besseresser.ui.AppStateViewModel
 import de.gurum.besseresser.ui.ConfigViewModel
 import de.gurum.besseresser.ui.HistoryDetailViewModel
@@ -58,7 +59,7 @@ val databaseModule = module {
 }
 
 val networkModule = module {
-    single { OpenAiChatClient.defaultOkHttpClient }
+    single<OkHttpClient> { OpenAiChatClient.defaultOkHttpClient }
     single<ChatCompletionClient> { DefaultChatCompletionClient(defaultClient = get(), dispatchers = get()) }
     single<NetworkConnectivityChecker> { AndroidNetworkConnectivityChecker(androidContext()) }
     single<BesseresserApiService> { ApiClient(chatClient = get(), httpClient = get(), dispatchers = get()) }
