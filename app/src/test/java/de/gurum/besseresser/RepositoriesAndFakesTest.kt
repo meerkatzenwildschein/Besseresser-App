@@ -645,7 +645,7 @@ class RepositoriesAndFakesTest {
         val backdated = pickedBackdated
         assertNotNull(backdated)
         val backdatedEntry = checkNotNull(backdated)
-        assertFalse(backdatedEntry.backdated)
+        assertTrue(backdatedEntry.backdated)
         val expectedMillis = targetDay.atTime(14, 20).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
         assertEquals(expectedMillis, backdatedEntry.dateMillis)
         assertEquals("150 g Skyr mit Beeren", backdatedEntry.recognizedMeal)
@@ -1010,6 +1010,14 @@ class RepositoriesAndFakesTest {
         assertEquals("custom_photo.jpg", histFile.name)
         assertEquals("content://de.gurum.besseresser.fileprovider/photos/custom_photo.jpg", histUri.toString())
         assertEquals(2, fakeManager.callCount)
+
+        // Gallery selection
+        val galleryUri = TestUri("content://media/gallery/123.jpg")
+        historyVm.onGalleryPhotoSelected(galleryUri)
+        assertTrue(fakeManager.copiedSourceUris.contains(galleryUri))
+        assertTrue(historyVm.uiState.value.showAddReview)
+        assertEquals(fakeManager.uri, historyVm.uiState.value.addPhotoUri)
+        assertEquals(fakeManager.file, historyVm.uiState.value.addPhotoFile)
 
         // Deletion methods
         mainVm.deleteCaptureFile(mainFile)

@@ -28,6 +28,7 @@ object LlmResponseParser {
     private val AMP_KEYS = listOf("ampel", "ampelfarbe", "farbe", "color", "status", "rating", "trafficlight")
     private val ZIEL_KEYS = listOf("ziel", "goal", "zielname", "name", "thema", "title")
     private val BEG_KEYS = listOf("begruendung", "reason", "erklaerung", "beschreibung", "kommentar", "text", "note")
+    private val TIPP_KEYS = listOf("tipp", "tip", "hinweis", "optimierung", "suggestion", "advice", "verbesserung", "action", "empfehlung")
     private val RESULT_ARRAY_KEYS = listOf("bewertung", "bewertungen", "results", "ampeln", "ratings", "ziele", "goals")
 
     private val RECOGNIZED_MEAL_INTRO_PATTERNS = listOf(
@@ -90,11 +91,13 @@ object LlmResponseParser {
         for ((goalIndex, goal) in goals.withIndex()) {
             val m = findItemForGoal(arr, goal, goals.size, goalIndex)
             if (m != null) {
+                val tipp = pick(m, TIPP_KEYS).takeIf { it.isNotBlank() }
                 list.add(
                     GoalResult(
                         goal = goal,
                         rating = TrafficLight.fromString(pick(m, AMP_KEYS)),
-                        reason = pick(m, BEG_KEYS)
+                        reason = pick(m, BEG_KEYS),
+                        tipp = tipp
                     )
                 )
             } else {

@@ -56,7 +56,7 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
   - Fallback auf Systemkamera (`TakePicture`), falls Kamera-Berechtigung fehlt oder Fehler auftreten.
 
 ### 5. Ergebnis & Auswertung (`ui/MainScreen.kt`, `ui/CommonUi.kt`)
-- Pro Ziel eine Ampel-Zeile (🟢 Grün / 🟡 Gelb / 🔴 Rot / ⚪ Unbekannt) mit kurzer Begründung.
+- Pro Ziel eine Ampel-Zeile (🟢 Grün / 🟡 Gelb / 🔴 Rot / ⚪ Unbekannt) mit kurzer Begründung und bei Gelb/Rot einem konkreten Optimierungstipp („Wie mache ich es grün?", 💡).
 - `CollapsibleSummaryBlock`: Gesamteindruck-Satz, erkannte Mahlzeit mit Portionsschätzung (🍽️) und Nutzer-Notiz (📝).
 - `ErkanntEditDialog`: Nachträgliche Korrektur des erkannten Essens per Stift-Icon.
 
@@ -90,7 +90,7 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
 ```json
 {
   "bewertung": [
-    { "ziel": "<Zieltext>", "ampel": "gruen|gelb|rot", "begruendung": "..." }
+    { "ziel": "<Zieltext>", "ampel": "gruen|gelb|rot", "begruendung": "...", "tipp": "..." }
   ],
   "zusatz": "<Gesamteindruck-Satz>",
   "erkannt": "<Was die KI erkannt hat mit Mengenschätzung>"
@@ -98,7 +98,7 @@ Der Name ist sprachneutral (Markenwort), `app_name` in beiden Locale-Dateien ist
 ```
 
 - **Tolerantes Parsing:**
-  - Unterstützt Alias-Keys (`results`, `summary`, `reason`, `detected`, `food`, `meal`).
+  - Unterstützt Alias-Keys (`results`, `summary`, `reason`, `tipp`/`tip`/`hinweis`/`optimierung`, `detected`, `food`, `meal`).
   - Bereinigt Markdown-Codeblöcke (`stripCodeFences`), repariert unvollständiges JSON heuristisch (`closeJson`).
   - Normalisiert Ampelfarben tolerant (`gruen`, `grün`, `green`, `gelb`, `yellow`, `rot`, `red`, Emojis).
 - **Lokalisierung:**
@@ -114,7 +114,7 @@ Das Projekt nutzt `kotlinx.serialization` mit einer zentralen `AppJson`-Instanz 
 |---|---|---|
 | `TrafficLight` | Enum (`GREEN`, `YELLOW`, `RED`, `UNKNOWN`) | Eigener `TrafficLightSerializer`; UI-Farben/Labels als Compose-Extensions in `ui/AmpelUi.kt` |
 | `Gender` | Enum (`MALE`, `FEMALE`, `DIVERSE`, `NONE`) | `GenderSerializer` mit String-Fallback |
-| `GoalResult` | Ziel-Bewertung | Serialisiert mit `@SerialName("ziel")`, `@SerialName("ampel")`, `@SerialName("begruendung")` |
+| `GoalResult` | Ziel-Bewertung | Serialisiert mit `@SerialName("ziel")`, `@SerialName("ampel")`, `@SerialName("begruendung")`, optional `@SerialName("tipp")` |
 | `Evaluation` | Gesamtbewertung einer Mahlzeit | Liste von `GoalResult`, `summary`, `erkannt` |
 | `Settings` | Setup-Einstellungen | URL, verschlüsselter Key, Modell, Ziele-Liste, `goalsWereSplit`, `retentionWeeks` |
 | `Profile` | Nutzerdaten | `birthDate` (ISO), `weightKg`, `heightCm`, `notes`, `gender`, dynamisches `ageYears` |

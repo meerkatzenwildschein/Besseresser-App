@@ -604,6 +604,43 @@ class ViewModelCoverageTest {
         assertNull("FakeHistoryRepository returns null", thumb)
     }
 
+    @Test
+    fun `HistoryViewModel onGalleryPhotoSelected and cancelAddPhotoCapture manage lifecycle and state`() = runTest(testDispatcher) {
+        val fakeManager = FakePhotoCaptureManager(
+            uri = TestUri("content://de.gurum.besseresser.fileprovider/photos/gallery_target.jpg"),
+            file = java.io.File("gallery_target.jpg")
+        )
+        val handle = androidx.lifecycle.SavedStateHandle()
+        val vm = HistoryViewModel(
+            apiService = FakeApiService(),
+            historyRepository = FakeHistoryRepository(),
+            settingsRepository = FakeSettingsRepository(),
+            imagePreprocessor = FakeImagePreprocessor(),
+            dispatchers = testDispatchers,
+            savedStateHandle = handle,
+            photoCaptureManager = fakeManager
+        )
+
+        val sourceGalleryUri = TestUri("content://media/external/images/media/42")
+        vm.onGalleryPhotoSelected(sourceGalleryUri)
+
+        assertTrue("PhotoCaptureManager should copy source uri", fakeManager.copiedSourceUris.contains(sourceGalleryUri))
+        assertTrue("UI state showAddReview should be true", vm.uiState.value.showAddReview)
+        assertEquals(fakeManager.uri, vm.uiState.value.addPhotoUri)
+        assertEquals(fakeManager.file, vm.uiState.value.addPhotoFile)
+        assertEquals(true, handle.get<Boolean>("history_show_add_review"))
+
+        // Now cancel
+        vm.cancelAddPhotoCapture()
+        assertFalse(vm.uiState.value.showAddReview)
+        assertFalse(vm.uiState.value.showAddCamera)
+        assertNull(vm.uiState.value.addPhotoFile)
+        assertNull(vm.uiState.value.addPhotoUri)
+        assertEquals(false, handle.get<Boolean>("history_show_add_review"))
+        assertEquals(false, handle.get<Boolean>("history_show_add_camera"))
+        assertTrue("Capture file should be deleted on cancel", fakeManager.deletedFiles.contains(fakeManager.file))
+    }
+
     // ----------------------------------------------------------------- ConfigViewModel
 
     @Test

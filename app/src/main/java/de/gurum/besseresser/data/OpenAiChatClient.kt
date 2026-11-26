@@ -85,7 +85,7 @@ suspend fun Call.awaitResponse(): Response = suspendCancellableCoroutine { conti
  * Standard-Implementierung des ChatCompletionClient mit asynchronem OkHttp-Netzwerkzugriff.
  */
 class DefaultChatCompletionClient(
-    private val defaultClient: OkHttpClient = OpenAiChatClient.defaultOkHttpClient,
+    private val defaultClient: OkHttpClient? = null,
     private val dispatchers: AppDispatchers = AppDispatchers()
 ) : ChatCompletionClient {
 
@@ -122,7 +122,7 @@ class DefaultChatCompletionClient(
             .header("Authorization", "Bearer ${apiKey.trim()}")
             .build()
 
-        val effectiveClient = client ?: defaultClient
+        val effectiveClient = client ?: defaultClient ?: OpenAiChatClient.defaultOkHttpClient
         val response = effectiveClient.newCall(request).awaitResponse()
         response.use { resp ->
             val code = resp.code

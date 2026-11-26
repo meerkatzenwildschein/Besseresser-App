@@ -85,6 +85,7 @@ class ApiClientTest {
         assertTrue(prompt.contains("Bewerte Mahlzeit"))
         assertTrue(prompt.contains("1. [Priorität 3/5] Kein Zucker"))
         assertTrue(prompt.contains("2. [Priorität 3/5] 2l Wasser"))
+        assertTrue(prompt.contains("\"tipp\":"))
         assertTrue(prompt.contains("Notiz:"))
         assertTrue(prompt.contains("Sprache: Deutsch"))
     }
@@ -186,6 +187,7 @@ class ApiClientTest {
         assertTrue(prompt.contains("1. [Priorität 3/5] Gewicht halten"))
         assertTrue(prompt.contains("2. [Priorität 4/5] Kein Fast Food"))
         assertTrue(prompt.contains("Mahlzeit: Apfel und Quark"))
+        assertTrue(prompt.contains("\"tipp\":"))
         assertTrue(prompt.contains("Ampel Bedeutung"))
     }
 

@@ -281,7 +281,7 @@ data class Settings(
     }
 }
 
-/** Bewertung fuer EIN Ziel: Ampel + reason. */
+/** Bewertung fuer EIN Ziel: Ampel + reason + optionaler Optimierungs-Tipp ("Wie mache ich es gruen?"). */
 @Immutable
 @Serializable
 data class GoalResult(
@@ -290,7 +290,9 @@ data class GoalResult(
     @SerialName("ampel")
     val rating: TrafficLight = TrafficLight.UNKNOWN,
     @SerialName("begruendung")
-    val reason: String = ""
+    val reason: String = "",
+    @SerialName("tipp")
+    val tipp: String? = null
 )
 
 /** Ergebnis einer Foto-Bewertung durch die KI. */

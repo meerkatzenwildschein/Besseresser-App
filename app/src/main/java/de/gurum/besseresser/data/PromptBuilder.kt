@@ -20,10 +20,10 @@ object PromptBuilder {
             appendLine(promptBundle.noteHeader)
         }
         appendLine("")
-        // JSON-Schlüssel (bewertung/ziel/ampel/reason/zusatz/recognizedMeal) sind bewusst
+        // JSON-Schlüssel (bewertung/ziel/ampel/reason/tipp/zusatz/recognizedMeal) sind bewusst
         // fest verdrahtet – der Parser kennt diese Namen; nur die Anweisungssprache variiert.
         appendLine(promptBundle.formatIntro)
-        appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","reason":"<short reason>"}],"zusatz":"<one-sentence overall impression>","recognizedMeal":"<one short sentence: food with estimated quantities, e.g. '100 g pasta with sauce, one apple'>"}""")
+        appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","reason":"<short reason>","tipp":"<nur bei gelb/rot: 1 konkreter Satz wie dieses Ziel grün wird, sonst weglassen oder null>"}],"zusatz":"<one-sentence overall impression>","recognizedMeal":"<one short sentence: food with estimated quantities, e.g. '100 g pasta with sauce, one apple'>"}""")
         appendLine(promptBundle.ampelMeaning)
         appendLine(promptBundle.exactlyOne)
         if (promptBundle.recognized.isNotBlank()) appendLine(promptBundle.recognized)
@@ -83,7 +83,7 @@ object PromptBuilder {
         appendLine(textOnlyContext)
         appendLine("")
         appendLine(promptBundle.formatIntro)
-        appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","reason":"<short reason>"}],"zusatz":"<one-sentence overall impression>","recognizedMeal":"<one short sentence: what the description says the meal was, with quantities>"}""")
+        appendLine("""{"bewertung":[{"ziel":"<exaktes Ziel>","ampel":"gruen|gelb|rot","reason":"<short reason>","tipp":"<nur bei gelb/rot: 1 konkreter Satz wie dieses Ziel grün wird, sonst weglassen oder null>"}],"zusatz":"<one-sentence overall impression>","recognizedMeal":"<one short sentence: what the description says the meal was, with quantities>"}""")
         appendLine(promptBundle.ampelMeaning)
         appendLine(promptBundle.exactlyOne)
         if (promptBundle.honesty.isNotBlank()) appendLine(promptBundle.honesty)

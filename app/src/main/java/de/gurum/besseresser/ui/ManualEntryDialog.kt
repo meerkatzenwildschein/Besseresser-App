@@ -108,19 +108,26 @@ fun BackdatedBusyDialog() {
     }
 }
 
+enum class NacherfassenChoice {
+    CAMERA,
+    GALLERY,
+    TEXT
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NacherfassenChoiceDialog(
     day: LocalDate?,
     onDismiss: () -> Unit,
     onSelectWithPhoto: (LocalDate, LocalTime) -> Unit,
+    onSelectFromGallery: (LocalDate, LocalTime) -> Unit,
     onSelectWithoutPhoto: (LocalDate, LocalTime) -> Unit
 ) {
     day?.let { targetDay ->
         val isPastDay = targetDay.isBefore(LocalDate.now())
-        var pendingWithPhoto by remember(targetDay) { mutableStateOf<Boolean?>(null) }
+        var pendingChoice by remember(targetDay) { mutableStateOf<NacherfassenChoice?>(null) }
 
-        if (pendingWithPhoto != null) {
+        if (pendingChoice != null) {
             val now = remember { LocalTime.now() }
             val timePickerState = rememberTimePickerState(
                 initialHour = now.hour,
@@ -147,12 +154,12 @@ fun NacherfassenChoiceDialog(
                     TextButton(
                         onClick = {
                             val chosenTime = LocalTime.of(timePickerState.hour, timePickerState.minute)
-                            val withPhoto = pendingWithPhoto == true
-                            pendingWithPhoto = null
-                            if (withPhoto) {
-                                onSelectWithPhoto(targetDay, chosenTime)
-                            } else {
-                                onSelectWithoutPhoto(targetDay, chosenTime)
+                            val choice = pendingChoice
+                            pendingChoice = null
+                            when (choice) {
+                                NacherfassenChoice.CAMERA -> onSelectWithPhoto(targetDay, chosenTime)
+                                NacherfassenChoice.GALLERY -> onSelectFromGallery(targetDay, chosenTime)
+                                NacherfassenChoice.TEXT, null -> onSelectWithoutPhoto(targetDay, chosenTime)
                             }
                         }
                     ) {
@@ -187,7 +194,7 @@ fun NacherfassenChoiceDialog(
                         Surface(
                             onClick = {
                                 if (isPastDay) {
-                                    pendingWithPhoto = true
+                                    pendingChoice = NacherfassenChoice.CAMERA
                                 } else {
                                     onSelectWithPhoto(targetDay, LocalTime.now())
                                 }
@@ -214,7 +221,34 @@ fun NacherfassenChoiceDialog(
                         Surface(
                             onClick = {
                                 if (isPastDay) {
-                                    pendingWithPhoto = false
+                                    pendingChoice = NacherfassenChoice.GALLERY
+                                } else {
+                                    onSelectFromGallery(targetDay, LocalTime.now())
+                                }
+                            },
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary.copy(alpha = 0.35f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)
+                            ) {
+                                Text("🖼️", fontSize = 20.sp)
+                                Spacer(Modifier.width(12.dp))
+                                Text(
+                                    stringResource(R.string.nacherfassen_from_gallery),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
+                        Surface(
+                            onClick = {
+                                if (isPastDay) {
+                                    pendingChoice = NacherfassenChoice.TEXT
                                 } else {
                                     onSelectWithoutPhoto(targetDay, LocalTime.now())
                                 }

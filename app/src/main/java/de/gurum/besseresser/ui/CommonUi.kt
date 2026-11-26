@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -573,6 +574,26 @@ fun GoalRow(goal: String, res: GoalResult?) {
                         fontSize = 12.5.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
                     )
+                }
+                if (res != null && !res.tipp.isNullOrBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.Top,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "💡",
+                            fontSize = 12.5.sp,
+                            modifier = Modifier.padding(end = 4.dp, top = 1.dp)
+                        )
+                        Text(
+                            text = res.tipp,
+                            fontSize = 12.5.sp,
+                            lineHeight = 17.sp,
+                            fontStyle = FontStyle.Italic,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
+                        )
+                    }
                 }
             }
         }

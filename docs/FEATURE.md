@@ -142,13 +142,14 @@
 * **Animierter Auswertungs-Status (`ReportLoadingCard`):** Während die KI das Foto analysiert, visualisiert eine moderne Karte mit pulsierendem Lade-Spinner den laufenden Vorgang (*„KI bewertet Mahlzeit …“*).
 * **Navigations-Sperre:** Während der Bewertung sind Navigationselemente gesperrt, um Race Conditions oder Datenverlust zu verhindern.
 
-### 4.2 Ampel-Bewertungssystem (Traffic-Light Rating)
+### 4.2 Ampel-Bewertungssystem (Traffic-Light Rating) & Handlungsorientierte Optimierungstipps („Wie mache ich es grün?“)
 * **Zielbezogene Ampelstufen (`AmpelColor`):**
   * 🟢 **Grün (`GRUEN`):** Speise fördert das Ziel oder ist völlig unbedenklich.
   * 🟡 **Gelb (`GELB`):** Speise ist akzeptabel, weist aber moderate Einschränkungen auf (z. B. etwas zu salzig, mäßiger Zuckergehalt).
   * 🔴 **Rot (`ROT`):** Speise steht im deutlichen Widerspruch zum gesetzten Ziel.
   * ⚪ **Unbekannt / Weiß (`UNKNOWN`):** Aus dem Foto/Text nicht bestimmbar.
 * **Prägnante Begründung (`reason`):** Zu jedem Ziel liefert die KI eine ein- bis zweisätzige, leicht verständliche Erklärung.
+* **💡 Handlungsorientierter Optimierungstipp (`tipp`):** Bei gelben oder roten Ampeln generiert die KI direkt an der Zielkarte genau einen kurzen, praxistauglichen Satz, wie der Nutzer das Ziel bei diesem Gericht durch Tauschen oder Ergänzen von Zutaten grün machen kann. Bei grünen Ampeln entfällt der Tipp, um die Ansicht aufgeräumt zu halten.
 
 ### 4.3 Gesamter Mahlzeiten-Score (Ampelschnitt)
 * **Mathematischer Score (0–100 %):** Berechnet aus allen Zielampeln (🟢 = 100 Punkte, 🟡 = 50 Punkte, 🔴 = 0 Punkte).
@@ -188,11 +189,11 @@
 * **Formatiertes Tagesdatum:** Anzeige im Format *„Heute, 26. November“*, *„Gestern, 25. November“* oder Wochentag mit Datum.
 * **Tages-Ampelschnitt-Badge:** Durchschnittlicher Score aller Mahlzeiten des jeweiligen Tages auf einen Blick.
 * **Tages-Ziele-Vorschau:** Kompakte farbige Punkte für alle bewerteten Ziele des Tages.
-* **Schnell-Nacherfassungs-Button (+):** Erlaubt das direkte Nachtragen einer Mahlzeit für genau diesen Kalendertag.
+* **Schnell-Nacherfassungs-Button (+):** Erlaubt das direkte Nachtragen einer Mahlzeit für genau diesen Kalendertag über einen modalen Auswahldialog (Kamera, Fotogalerie oder Nur-Text).
 
 ### 5.3 Mahlzeiteneintrag in der Liste (`HistoryItem`)
 * **Foto-Thumbnail:** Scharfe, speichereffizient skalierte Vorschau des Mahlzeitenfotos (oder Besteck-Icon bei Nur-Text-Einträgen).
-* **Zeitangabe:** Uhrzeit der Aufnahme sowie ggf. der dezente Hinweis *„(nachträglich erfasst)“*.
+* **Zeitangabe:** Uhrzeit der Aufnahme bzw. der gewählten Nacherfassungszeit sowie der dezente Hinweis *„(nachträglich erfasst)“*.
 * **Erkannte Speise & Notiz:** Titelzeile mit den erkannten Speisen und optionaler Notiz darunter.
 * **Kompakte Ampel-Punkte & Score:** Übersichtliche Reihe von farbigen Ampel-Punkten für die individuellen Ziele sowie das Gesamtergebnis.
 
@@ -205,24 +206,40 @@
 * **Reordering innerhalb eines Tages (`HistoryReorderUseCase`):** Durch langes Drücken und Ziehen (Drag & Drop) oder Sortierpfeile können Mahlzeiten innerhalb eines Kalendertages beliebig verschoben werden.
 * **Persistente Reihenfolge:** Das Feld `sortOrder` in `HistoryEntry` sichert die benutzerdefinierte Reihenfolge dauerhaft.
 
-### 5.6 Nacherfassung von Mahlzeiten (Retro Capture)
-* **Dialog „Essen nachtragen“ (`ManualEntryDialog`):**
-  * **Option A (Mit Foto):** Ermöglicht die Aufnahme oder Auswahl eines Fotos für einen vergangenen Tag.
-  * **Option B (Nur Text):** Ermöglicht die Erfassung einer Mahlzeit rein über die Textbeschreibung (z. B. *„Kantine: Rindergulasch mit Spätzle und Beilagensalat“*).
-* **Kennzeichnung:** Nachträglich erfasste Mahlzeiten werden mit `backdated = true` markiert.
-
-### 5.7 Notiz-Cache & Zero-Token-Wiederverwendung
-* **Wiederverwendungs-Cache:** Das vollständige KI-Ergebnis (`Evaluation`) wird an `RecentNote`-Einträgen zwischengespeichert.
-* **Zero-Token-Bewertung:** Gibt der Nutzer bei einer Text-Nacherfassung exakt denselben Text ein wie bei einer früheren bewerteten Notiz und haben sich die Ziele nicht geändert, wird das gecachte Ergebnis sofort ohne erneuten API-Aufruf übernommen (spart Zeit, Kosten und Token).
+### 5.6 Nacherfassung von Mahlzeiten (+ Feature / Retro Capture)
+* **Auslöser & Dialog „Essen nachtragen“ (`NacherfassenChoiceDialog` / `ManualEntryDialog`):**
+  Durch Tippen auf das **Plus-Symbol (+)** im Gruppenkopf eines beliebigen Kalendertags öffnet sich ein strukturierter, modal geführter Auswahldialog mit drei flexiblen Erfassungswegen:
+  * 📸 **Mit Foto (`NacherfassenChoice.CAMERA`):** Startet unmittelbar den integrierten Kamerasucher (`CameraCaptureScreen`) mit Zentrierungsrahmen, Live-Vorschau und Notizfeld (inkl. automatischem Fallback auf die Systemkamera `TakePicture`), um Speisen direkt für den Zieltag zu fotografieren.
+  * 🖼️ **Aus Fotogalerie (`NacherfassenChoice.GALLERY`):** Öffnet den nativen Android Photo-Picker (`ActivityResultContracts.PickVisualMedia`) zur Auswahl eines bereits auf dem Gerät gespeicherten Mahlzeitenfotos. Das gewählte Bild wird atomar in den privaten Speicherbereich kopiert (`PhotoCaptureManager.copyToCaptureFile`), um Datenverlust bei externen Galerie-Änderungen zu verhindern, und für Analyse und Anzeige aufbereitet.
+  * ✍️ **Ohne Foto / Nur Text (`NacherfassenChoice.TEXT` / `AddMealNoPhotoScreen`):** Öffnet einen dedizierten Eingabebildschirm für reine Textbeschreibungen (z. B. *„Kantine: 200g Rindergulasch mit Spätzle und grünem Beilagensalat“*). Das Textfeld ist hierbei ein Pflichtfeld – die Senden-Schaltfläche wird reaktiv erst aktiv, sobald eine aussagekräftige Beschreibung eingegeben wurde.
+* **Präzise Zeitstempel-Steuerung & Uhrzeit-Auswahl (Time Picker):**
+  * Handelt es sich beim Zieltag um einen vergangenen Kalendertag (`isPastDay`), öffnet sich nach der Wahl der Erfassungsmodalität automatisch ein Material 3 `TimePickerDialog` (initial mit der aktuellen Uhrzeit vorbelegt), über den der Nutzer die exakte Uhrzeit der Mahlzeit einstellen kann.
+  * Bei einer Nacherfassung für den heutigen Kalendertag wird zur Beschleunigung des Workflows unmittelbar die aktuelle Systemuhrzeit (`LocalTime.now()`) übernommen.
+* **Review- & Bewertungs-Overlay (`AddMealReviewScreen` & `AddMealNoPhotoScreen`):**
+  * **Opakes Vollbild-Overlay:** Nacherfassungs- und Review-Screens besitzen einen vollständig deckenden Hintergrund, wodurch die darunterliegende Verlaufsliste visuell sauber verdeckt wird.
+  * **Tastatur-Mitfahrverhalten (`imePadding`):** Die fixierten Aktions-Buttons (*„Jetzt bewerten“* bzw. *„Essen erfassen“*) passen sich dynamisch an geöffnete Bildschirmtastaturen an und bleiben zu jedem Zeitpunkt sichtbar und bedienbar.
+  * **Notiz-Schnellzugriff & Favoriten:** Sowohl im Foto-Review als auch im Text-Screen steht die `RecentNotesButton`-Schaltfläche mit Zugriff auf MRU-Notizen und ⭐-Favoriten zur Verfügung.
+  * **Fortschrittsanzeige & Sperre:** Während der KI-Analyse visualisieren ein `LinearProgressIndicator` sowie der modale `BackdatedBusyDialog` den laufenden Vorgang und sperren Fehleingaben.
+* **Resilienz & Fehlerbehandlung bei Nacherfassung:**
+  * **Offline- & Verbindungsresilienz:** Ist das Gerät offline oder schlägt die KI-Kommunikation fehl, speichert die App die Mahlzeit dennoch zuverlässig mit dem Status *„unbewertet“* und dem gewählten Zeitstempel im Verlauf. Ein Fehlerhinweis (`addError`) informiert den Nutzer transparent.
+  * **Zero-Token-Wiederverwendung:** Bei reinen Texteingaben prüft die App, ob im lokalen Cache bereits eine identische Notiz mit gültiger Bewertung für die aktuellen Ziele vorliegt. Ist dies der Fall, wird die Bewertung sofort ohne Netzwerk- und Tokenkosten übernommen.
+  * **Sichere Speicherbereinigung & Prozess-Sicherheit:** Alle Zustände (`addTargetDay`, `addTargetTime`, `addNote`, Overlays) sind über `SavedStateHandle` gegen Prozess-Terminierungen abgesichert. Temporäre Foto-Caches werden bei Abbruch (`cancelAddPhotoCapture`) oder erfolgreicher Persistierung rückstandslos gelöscht.
+* **Kennzeichnung & Transparenz (`backdated`):**
+  * Nachträglich erfasste Mahlzeiten werden in der Datenbank mit `backdated = true` und dem gewählten Zeitstempel markiert.
+  * In der Verlaufsliste (`HistoryItem`), in der Detailansicht (`HistoryDetailScreen`) sowie in den KI-Prompts wird die Mahlzeit transparent als *„(nachträglich erfasst)“* bzw. *„nachträglich erfasst“* ausgewiesen.
+* **Automatische Fazit-Invalidierung (Stale-Status):**
+  * Das Hinzufügen einer nacherfassten Mahlzeit verändert die Datenbasis des Tages und der Kalenderwoche.
+  * Bereits vorhandene Tages- und Wochenfazits werden über `deleteDayFazitForEntry` und `deleteWeekFazitForEntry` invalidiert und im UI sofort als veraltet (`isStale = true` / *„⟳ Neu bewerten“*) markiert, damit der Nutzer die Gesamtbewertung per Fingertipp aktualisieren kann.
 
 ---
 
 ## 6. Mahlzeiten-Detailansicht, Duplizieren & Teilen
 
 ### 6.1 Vollständige Detailansicht (`HistoryDetailScreen`)
-* **Großes Mahlzeitenfoto:** Hochauflösende Darstellung des aufgenommenen Fotos mit Zoom-Möglichkeit.
+* **Großes Mahlzeitenfoto:** Hochauflösende Darstellung des aufgenommenen Fotos mit Zoom-Möglichkeit (bzw. Besteck-Icon bei Nur-Text-Einträgen).
 * **Ausführliche Ampel-Karten:** Jedes Ziel wird in einer eigenen Karte mit Ampelfarbe (🟢/🟡/🔴), Wichtungstag und der vollständigen Begründung der KI dargestellt.
-* **Erweiterte Metadaten:** Anzeige von exaktem Erfassungsdatum, Uhrzeit, Nacherfassungsstatus und vergebenem Gesamt-Score.
+* **💡 Handlungsorientierte Optimierungstipps:** Liegt bei einem Ziel eine gelbe oder rote Ampel vor, wird direkt unter der Begründung eine kursive Tippzeile mit Glühbirnen-Symbol (`💡`) angezeigt, die konkrete Zutatentausche oder -ergänzungen vorschlägt.
+* **Erweiterte Metadaten:** Anzeige von exaktem Erfassungsdatum, Uhrzeit, Nacherfassungsstatus (`(nachträglich erfasst)`) und vergebenem Gesamt-Score.
 
 ### 6.2 Mahlzeit duplizieren
 * **Duplizieren-Aktion:** Ermöglicht das Kopieren einer bestehenden Mahlzeit auf einen beliebigen anderen Tag (z. B. bei Mahlzeiten-Wiederholungen wie Meal-Prep).
@@ -368,8 +385,9 @@
     "results": [
       {
         "goal": "Blutdruck senken",
-        "color": "gruen",
-        "reason": "Sehr kaliumreich und natriumarm zubereitet."
+        "color": "gelb",
+        "reason": "Erhöhter Natriumgehalt durch Sojasoße.",
+        "tipp": "Sojasoße durch natriumarme Variante ersetzen oder mit Wasser/Zitrone strecken."
       }
     ],
     "zusatz": "Ausgewogene Mahlzeit mit hohem Gemüseanteil.",

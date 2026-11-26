@@ -3,6 +3,7 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
@@ -46,6 +47,16 @@ fun HistoryScreen(
     ) { ok ->
         if (ok) {
             viewModel.setShowAddReview(true)
+        } else {
+            viewModel.cancelAddPhotoCapture()
+        }
+    }
+
+    val addGalleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.onGalleryPhotoSelected(uri)
         } else {
             viewModel.cancelAddPhotoCapture()
         }
@@ -123,6 +134,14 @@ fun HistoryScreen(
                 viewModel.setAddTargetTime(targetTime)
                 viewModel.setAddDialogForDay(null)
                 viewModel.setShowAddCamera(true)
+            },
+            onSelectFromGallery = { targetDay, targetTime ->
+                viewModel.setAddTargetDay(targetDay)
+                viewModel.setAddTargetTime(targetTime)
+                viewModel.setAddDialogForDay(null)
+                addGalleryLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
             },
             onSelectWithoutPhoto = { targetDay, targetTime ->
                 viewModel.setAddTargetDay(targetDay)

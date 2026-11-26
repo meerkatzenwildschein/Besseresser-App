@@ -69,16 +69,32 @@ class DataSerializationTest {
         val result = GoalResult(
             goal = "2l Wasser trinken",
             rating = TrafficLight.GREEN,
-            reason = "Genug Wasser getrunken."
+            reason = "Genug Wasser getrunken.",
+            tipp = "Weiter so beibehalten."
         )
 
         val json = AppJson.encodeToString(result)
         assertTrue(json.contains("\"ziel\":\"2l Wasser trinken\""))
         assertTrue(json.contains("\"ampel\":\"gruen\""))
         assertTrue(json.contains("\"begruendung\":\"Genug Wasser getrunken.\""))
+        assertTrue(json.contains("\"tipp\":\"Weiter so beibehalten.\""))
 
         val decoded = AppJson.decodeFromString<GoalResult>(json)
         assertEquals(result, decoded)
+    }
+
+    @Test
+    fun testGoalResultSerializationWithoutTipp() {
+        val result = GoalResult(
+            goal = "Wenig Zucker",
+            rating = TrafficLight.RED,
+            reason = "Sehr viel Zucker enthalten."
+        )
+
+        val json = AppJson.encodeToString(result)
+        val decoded = AppJson.decodeFromString<GoalResult>(json)
+        assertEquals(result, decoded)
+        assertEquals(null, decoded.tipp)
     }
 
     @Test

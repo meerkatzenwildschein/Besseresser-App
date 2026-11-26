@@ -253,6 +253,20 @@ class HistoryViewModel(
         return fresh
     }
 
+    fun onGalleryPhotoSelected(uri: Uri) {
+        val copiedPair = photoCaptureManager?.copyToCaptureFile(uri)
+        val file = copiedPair?.first
+        val targetUri = copiedPair?.second ?: uri
+        savedStateHandle[KEY_SHOW_ADD_REVIEW] = true
+        _uiState.update {
+            it.copy(
+                addPhotoFile = file,
+                addPhotoUri = targetUri,
+                showAddReview = true
+            )
+        }
+    }
+
     fun cancelAddPhotoCapture() {
         val fileToDelete = _uiState.value.addPhotoFile
         val uriToDelete = _uiState.value.addPhotoUri
