@@ -53,10 +53,10 @@ class AppStateViewModel(
                 AppState(loaded = true, settings = settings, profile = profile, themeMode = themeMode, language = language)
             }.collect { _uiState.value = it }
         }
-        // Historien-Begrenzung: einmalig beim App-Start im Hintergrund alte Einträge löschen
-        // (Einträge inkl. Fotos sowie Tages-/Wochenfazits, die älter als retentionWeeks sind).
+        // Historien-Begrenzung & Migration: einmalig beim App-Start im Hintergrund
         viewModelScope.launch(dispatchers.io) {
             runCatching {
+                historyRepository.migrateLegacyIfNeeded()
                 val weeks = settingsRepository.currentSettings().retentionWeeks
                 if (weeks > 0) historyRepository.purgeOlderThanWeeks(weeks)
                 historyRepository.purgeOrphanedPhotos()

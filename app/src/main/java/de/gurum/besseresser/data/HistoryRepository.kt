@@ -60,6 +60,8 @@ interface HistoryRepository {
     /** Löscht Foto-Dateien im Speicherverzeichnis, denen kein DB-Eintrag mehr entspricht.
      *  Schützt vor verwaisten Dateien nach Abstürzen oder fehlgeschlagenen Migrationen. */
     suspend fun purgeOrphanedPhotos(): Int
+    /** Führt bei Bedarf eine strukturierte Datenmigration von Alt-JSON-Dateien durch. */
+    suspend fun migrateLegacyIfNeeded()
     fun photoFileOf(entry: HistoryEntry): File?
     suspend fun decodeThumbnail(entry: HistoryEntry, target: Int = 200): Bitmap?
 }
@@ -72,14 +74,12 @@ class DefaultHistoryRepository(
     private val dayFazitDao: DayFazitDao,
     private val weekFazitDao: WeekFazitDao,
     private val dispatchers: AppDispatchers = AppDispatchers(),
-    autoMigrateLegacyData: Boolean = true
+    private val autoMigrateLegacyData: Boolean = true
 ) : HistoryRepository {
 
-    init {
+    override suspend fun migrateLegacyIfNeeded() = withContext(dispatchers.io) {
         if (autoMigrateLegacyData) {
-            CoroutineScope(dispatchers.io).launch {
-                LegacyJsonMigrator.migrate(photoStorage.dir(), historyDao, dayFazitDao, weekFazitDao, dispatchers.io)
-            }
+            LegacyJsonMigrator.migrate(photoStorage.dir(), historyDao, dayFazitDao, weekFazitDao, dispatchers.io)
         }
     }
 
