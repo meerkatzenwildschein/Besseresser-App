@@ -21,20 +21,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
-import org.koin.compose.koinInject
 import java.io.File
 import de.gurum.besseresser.R
-import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.model.HistoryEntry
-import de.gurum.besseresser.model.Profile
-import de.gurum.besseresser.model.Settings
 import de.gurum.besseresser.model.weekKeyOf
 
 @Composable
 fun HistoryScreen(
     onPick: (HistoryEntry) -> Unit,
     onBack: () -> Unit,
-    photoCaptureManager: PhotoCaptureManager = koinInject(),
     viewModel: HistoryViewModel = koinViewModel()
 ) {
     val ctx = LocalContext.current
