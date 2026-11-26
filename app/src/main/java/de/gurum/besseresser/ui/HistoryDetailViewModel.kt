@@ -53,7 +53,7 @@ class HistoryDetailViewModel(
         viewModelScope.launch {
             historyRepository.getByIdFlow(entryId).collect { entry ->
                 _uiState.update { it.copy(
-                    entry = entry ?: it.entry,
+                    entry = entry,
                     loaded = true
                 ) }
             }

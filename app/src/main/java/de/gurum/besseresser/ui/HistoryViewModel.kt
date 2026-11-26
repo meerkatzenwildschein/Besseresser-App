@@ -392,7 +392,7 @@ class HistoryViewModel(
         viewModelScope.launch {
             val entry = historyRepository.add(
                 photoUri = photoUriIn, ev = ev,
-                note = note, dateOverride = millis, backdated = false
+                note = note, dateOverride = millis, backdated = true
             )
             if (photoUriIn != null) {
                 photoCaptureManager?.deleteCaptureFile(photoUriIn)

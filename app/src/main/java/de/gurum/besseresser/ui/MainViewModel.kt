@@ -252,7 +252,7 @@ class MainViewModel(
                 savedStateHandle[KEY_OFFLINE_NO_RATING] = true
                 _uiState.update {
                     it.copy(
-                        error = e.message ?: "Foto konnte nicht gelesen werden.",
+                        error = ErrorMapper.toUserMessage(e),
                         isBusy = false,
                         evaluation = null,
                         offlineNoRating = true
@@ -274,7 +274,7 @@ class MainViewModel(
                 savedStateHandle[KEY_OFFLINE_NO_RATING] = true
                 _uiState.update {
                     it.copy(
-                        error = e.message ?: "Analyse fehlgeschlagen.",
+                        error = ErrorMapper.toUserMessage(e),
                         isBusy = false,
                         evaluation = null,
                         offlineNoRating = true
