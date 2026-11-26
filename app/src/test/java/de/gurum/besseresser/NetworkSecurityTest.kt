@@ -117,7 +117,7 @@ class NetworkSecurityTest {
     }
 
     @Test
-    fun testOpenAiChatClient_rejectsInsecureEndpoint() {
+    fun testOpenAiChatClient_rejectsInsecureEndpoint() = runTest {
         val dummyBody = buildJsonObject { put("model", "test") }
         try {
             OpenAiChatClient.postChat("http://api.openai.com/v1/chat/completions", "key", dummyBody)
@@ -130,7 +130,7 @@ class NetworkSecurityTest {
     @Test
     fun testApiClient_rejectsInsecureEndpoints() = runTest {
         val testDispatcher = StandardTestDispatcher(testScheduler)
-        val apiClient = ApiClient(AppDispatchers(main = testDispatcher, io = testDispatcher, default = testDispatcher))
+        val apiClient = ApiClient(dispatchers = AppDispatchers(main = testDispatcher, io = testDispatcher, default = testDispatcher))
 
         // 1. fetchModels
         val fetchResult = apiClient.fetchModels("http://api.openai.com/v1", "key")
