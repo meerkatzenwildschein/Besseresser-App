@@ -1,5 +1,8 @@
 package de.gurum.besseresser
 
+import de.gurum.besseresser.data.AutoFazitCallbacks
+import de.gurum.besseresser.data.AutoFazitHistoryContext
+import de.gurum.besseresser.data.AutoFazitPromptConfig
 import de.gurum.besseresser.data.FazitManager
 import de.gurum.besseresser.data.FazitPromptBundle
 import de.gurum.besseresser.data.HistoryDeleteManager
@@ -105,23 +108,29 @@ class HistoryModularUseCasesTest {
 
         var dayFazitTriggered = false
         useCase.checkAndTriggerAutoFazits(
-            entries = listOf(entry),
-            fazitMap = emptyMap(),
-            loadingFazits = emptySet(),
-            weekFazitMap = emptyMap(),
-            loadingWeeks = emptySet(),
-            settings = Settings("", "", "", listOf("Ziel 1").toWeightedGoals()),
-            promptContext = null,
-            dayPrompts = FazitPromptBundle("Intro", "Rules", "de", "Ehrlich"),
-            weekPromptsProvider = { FazitPromptBundle("WIntro", "Rules", "de", "Ehrlich") },
-            daymealDescriptionsProvider = { it.map { e -> e.recognizedMeal } },
-            weekmealDescriptionsProvider = { it.map { e -> e.recognizedMeal } },
-            onGenerateDayFazit = { day, entries, _, _, _, _ ->
-                dayFazitTriggered = true
-                assertEquals(pastDay, day)
-                assertEquals(1, entries.size)
-            },
-            onGenerateWeekFazit = { _, _, _, _, _ -> }
+            historyContext = AutoFazitHistoryContext(
+                entries = listOf(entry),
+                fazitMap = emptyMap(),
+                loadingFazits = emptySet(),
+                weekFazitMap = emptyMap(),
+                loadingWeeks = emptySet()
+            ),
+            promptConfig = AutoFazitPromptConfig(
+                settings = Settings("", "", "", listOf("Ziel 1").toWeightedGoals()),
+                promptContext = null,
+                dayPrompts = FazitPromptBundle("Intro", "Rules", "de", "Ehrlich"),
+                weekPromptsProvider = { FazitPromptBundle("WIntro", "Rules", "de", "Ehrlich") },
+                daymealDescriptionsProvider = { it.map { e -> e.recognizedMeal } },
+                weekmealDescriptionsProvider = { it.map { e -> e.recognizedMeal } }
+            ),
+            callbacks = AutoFazitCallbacks(
+                onGenerateDayFazit = { day, entries, _, _, _, _ ->
+                    dayFazitTriggered = true
+                    assertEquals(pastDay, day)
+                    assertEquals(1, entries.size)
+                },
+                onGenerateWeekFazit = { _, _, _, _, _ -> }
+            )
         )
 
         assertTrue(dayFazitTriggered)

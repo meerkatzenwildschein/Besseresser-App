@@ -17,6 +17,8 @@ import de.gurum.besseresser.data.DefaultPromptRepository
 import de.gurum.besseresser.data.DefaultSettingsRepository
 import de.gurum.besseresser.data.DefaultUiPrefsRepository
 import de.gurum.besseresser.data.FazitManager
+import de.gurum.besseresser.data.HistoryDeleteManager
+import de.gurum.besseresser.data.HistoryReorderUseCase
 import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.data.NetworkConnectivityChecker
@@ -25,6 +27,7 @@ import de.gurum.besseresser.data.PhotoStorage
 import de.gurum.besseresser.data.ProfileRepository
 import de.gurum.besseresser.data.PromptRepository
 import de.gurum.besseresser.data.SettingsRepository
+import de.gurum.besseresser.data.TriggerAutoFazitUseCase
 import de.gurum.besseresser.data.UiPrefsRepository
 import de.gurum.besseresser.data.appDataStore
 import de.gurum.besseresser.ui.AppStateViewModel
@@ -71,17 +74,20 @@ val repositoryModule = module {
     single<UiPrefsRepository> { DefaultUiPrefsRepository(get()) }
     single<HistoryRepository> { DefaultHistoryRepository(get(), get(), get(), get()) }
     single { FazitManager(get(), get(), get(), getOrNull(), getOrNull(), get()) }
+    factory { HistoryDeleteManager(get()) }
+    factory { HistoryReorderUseCase(get()) }
+    factory { TriggerAutoFazitUseCase(get(), get(), getOrNull(), getOrNull()) }
 }
 
 val viewModelModule = module {
     viewModel { AppStateViewModel(get(), get(), get(), get()) }
-    viewModel { MainViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get(), promptRepository = get(), networkChecker = get()) }
-    viewModel { HistoryViewModel(get(), get(), get(), get(), get(), get(), savedStateHandle = get(), profileRepository = get(), promptRepository = get(), networkChecker = get()) }
+    viewModel { MainViewModel(get(), get(), get(), get(), get(), getOrNull(), savedStateHandle = get(), promptRepository = getOrNull(), networkChecker = get()) }
+    viewModel { HistoryViewModel(get(), get(), get(), get(), get(), getOrNull(), savedStateHandle = get(), profileRepository = getOrNull(), promptRepository = getOrNull(), fazitManager = get(), networkChecker = get(), deleteManager = get(), reorderUseCase = get(), autoFazitUseCase = get()) }
     viewModel { SetupViewModel(get(), get(), get(), savedStateHandle = get()) }
     viewModel { ProfileViewModel(get()) }
     viewModel { ConfigViewModel(get(), get()) }
     viewModel { RecentNotesViewModel(get()) }
-    viewModel { (entryId: Long) -> HistoryDetailViewModel(entryId, get(), get(), get(), get(), get(), promptRepository = get(), networkChecker = get()) }
+    viewModel { (entryId: Long) -> HistoryDetailViewModel(entryId, get(), get(), get(), get(), get(), promptRepository = getOrNull(), networkChecker = get()) }
 }
 
 val appModules = listOf(

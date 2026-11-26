@@ -17,6 +17,9 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.io.File
 import de.gurum.besseresser.data.AppDispatchers
+import de.gurum.besseresser.data.AutoFazitCallbacks
+import de.gurum.besseresser.data.AutoFazitHistoryContext
+import de.gurum.besseresser.data.AutoFazitPromptConfig
 import de.gurum.besseresser.data.BesseresserApiService
 import de.gurum.besseresser.data.FazitManager
 import de.gurum.besseresser.data.HistoryDeleteManager
@@ -52,24 +55,29 @@ class HistoryViewModel(
     private val savedStateHandle: SavedStateHandle = SavedStateHandle(),
     private val profileRepository: ProfileRepository? = null,
     private val promptRepository: PromptRepository? = null,
-    private val fazitManager: FazitManager = FazitManager(
+    fazitManager: FazitManager? = null,
+    private val networkChecker: NetworkConnectivityChecker = NetworkConnectivityChecker { true },
+    deleteManager: HistoryDeleteManager? = null,
+    reorderUseCase: HistoryReorderUseCase? = null,
+    autoFazitUseCase: TriggerAutoFazitUseCase? = null
+) : ViewModel() {
+
+    private val fazitManager: FazitManager = fazitManager ?: FazitManager(
         apiService = apiService,
         historyRepository = historyRepository,
         settingsRepository = settingsRepository,
         profileRepository = profileRepository,
         promptRepository = promptRepository,
         dispatchers = dispatchers
-    ),
-    private val networkChecker: NetworkConnectivityChecker = NetworkConnectivityChecker { true },
-    private val deleteManager: HistoryDeleteManager = HistoryDeleteManager(historyRepository),
-    private val reorderUseCase: HistoryReorderUseCase = HistoryReorderUseCase(historyRepository),
-    private val autoFazitUseCase: TriggerAutoFazitUseCase = TriggerAutoFazitUseCase(
-        fazitManager = fazitManager,
+    )
+    private val deleteManager: HistoryDeleteManager = deleteManager ?: HistoryDeleteManager(historyRepository)
+    private val reorderUseCase: HistoryReorderUseCase = reorderUseCase ?: HistoryReorderUseCase(historyRepository)
+    private val autoFazitUseCase: TriggerAutoFazitUseCase = autoFazitUseCase ?: TriggerAutoFazitUseCase(
+        fazitManager = this.fazitManager,
         settingsRepository = settingsRepository,
         profileRepository = profileRepository,
         promptRepository = promptRepository
     )
-) : ViewModel() {
 
     fun createCaptureFile(): Pair<File, Uri> {
         return photoCaptureManager?.createCaptureFile()
@@ -609,18 +617,26 @@ class HistoryViewModel(
             val entries = _uiState.value.entries
             if (entries.isEmpty()) return@launch
 
-            autoFazitUseCase.checkAndTriggerAutoFazits(
+            val historyContext = AutoFazitHistoryContext(
                 entries = entries,
                 fazitMap = _uiState.value.fazitMap,
                 loadingFazits = _uiState.value.loadingFazits,
                 weekFazitMap = _uiState.value.weekFazitMap,
-                loadingWeeks = _uiState.value.loadingWeeks,
+                loadingWeeks = _uiState.value.loadingWeeks
+            )
+
+            val callbacks = AutoFazitCallbacks(
                 onGenerateDayFazit = { day, ratedEntries, settings, promptContext, mealDescriptions, prompts ->
                     generateFazit(day, ratedEntries, settings, promptContext, mealDescriptions, prompts)
                 },
                 onGenerateWeekFazit = { settings, promptContext, weekKey, mealDescriptions, prompts ->
                     generateWeekFazit(settings, promptContext, weekKey, mealDescriptions, prompts)
                 }
+            )
+
+            autoFazitUseCase.checkAndTriggerAutoFazits(
+                historyContext = historyContext,
+                callbacks = callbacks
             )
         }
     }
@@ -639,24 +655,36 @@ class HistoryViewModel(
             val entries = _uiState.value.entries
             if (entries.isEmpty()) return@launch
 
-            autoFazitUseCase.checkAndTriggerAutoFazits(
+            val historyContext = AutoFazitHistoryContext(
                 entries = entries,
                 fazitMap = _uiState.value.fazitMap,
                 loadingFazits = _uiState.value.loadingFazits,
                 weekFazitMap = _uiState.value.weekFazitMap,
-                loadingWeeks = _uiState.value.loadingWeeks,
+                loadingWeeks = _uiState.value.loadingWeeks
+            )
+
+            val promptConfig = AutoFazitPromptConfig(
                 settings = settings,
                 promptContext = promptContext,
                 dayPrompts = dayPrompts,
                 weekPromptsProvider = weekPromptsProvider,
                 daymealDescriptionsProvider = daymealDescriptionsProvider,
-                weekmealDescriptionsProvider = weekmealDescriptionsProvider,
+                weekmealDescriptionsProvider = weekmealDescriptionsProvider
+            )
+
+            val callbacks = AutoFazitCallbacks(
                 onGenerateDayFazit = { day, ratedEntries, set, ctx, descriptions, prompts ->
                     generateFazit(day, ratedEntries, set, ctx, descriptions, prompts)
                 },
                 onGenerateWeekFazit = { set, ctx, weekKey, descriptions, prompts ->
                     generateWeekFazit(set, ctx, weekKey, descriptions, prompts)
                 }
+            )
+
+            autoFazitUseCase.checkAndTriggerAutoFazits(
+                historyContext = historyContext,
+                promptConfig = promptConfig,
+                callbacks = callbacks
             )
         }
     }

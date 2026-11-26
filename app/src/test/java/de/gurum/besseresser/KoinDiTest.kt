@@ -77,10 +77,14 @@ class KoinDiTest : KoinTest {
             single<ImagePreprocessor> { FakeImagePreprocessor() }
             single<PhotoCaptureManager> { FakePhotoCaptureManager() }
             single { de.gurum.besseresser.data.AppDispatchers() }
+            single { de.gurum.besseresser.data.FazitManager(get(), get(), get()) }
+            factory { de.gurum.besseresser.data.HistoryDeleteManager(get()) }
+            factory { de.gurum.besseresser.data.HistoryReorderUseCase(get()) }
+            factory { de.gurum.besseresser.data.TriggerAutoFazitUseCase(get(), get()) }
 
             factory { AppStateViewModel(get(), get(), get(), get()) }
             factory { MainViewModel(get(), get(), get(), get(), get(), get()) }
-            factory { HistoryViewModel(get(), get(), get(), get(), get(), get()) }
+            factory { HistoryViewModel(get(), get(), get(), get(), get(), get(), fazitManager = get(), deleteManager = get(), reorderUseCase = get(), autoFazitUseCase = get()) }
             factory { SetupViewModel(get(), get(), get()) }
             factory { ProfileViewModel(get()) }
             factory { ConfigViewModel(get(), get()) }
@@ -100,6 +104,10 @@ class KoinDiTest : KoinTest {
         assertNotNull(get<BesseresserApiService>())
         assertNotNull(get<ImagePreprocessor>())
         assertNotNull(get<PhotoCaptureManager>())
+        assertNotNull(get<de.gurum.besseresser.data.FazitManager>())
+        assertNotNull(get<de.gurum.besseresser.data.HistoryDeleteManager>())
+        assertNotNull(get<de.gurum.besseresser.data.HistoryReorderUseCase>())
+        assertNotNull(get<de.gurum.besseresser.data.TriggerAutoFazitUseCase>())
 
         assertNotNull(get<AppStateViewModel>())
         assertNotNull(get<MainViewModel>())
