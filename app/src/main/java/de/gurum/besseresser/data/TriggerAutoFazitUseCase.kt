@@ -149,14 +149,18 @@ class TriggerAutoFazitUseCase(
                     )
                 }
             } else if (isFazitOutdated(fazit, ratedEntries)) {
-                onGenerateDayFazit(
-                    group.day,
-                    ratedEntries,
-                    params.settings,
-                    params.promptContext,
-                    params.daymealDescriptionsProvider(ratedEntries),
-                    params.dayPrompts
-                )
+                val attemptKey = "$key:${de.gurum.besseresser.model.dayFingerprint(ratedEntries)}"
+                if (attemptKey !in DayFazitSession.attemptedOutdated) {
+                    DayFazitSession.attemptedOutdated.add(attemptKey)
+                    onGenerateDayFazit(
+                        group.day,
+                        ratedEntries,
+                        params.settings,
+                        params.promptContext,
+                        params.daymealDescriptionsProvider(ratedEntries),
+                        params.dayPrompts
+                    )
+                }
             }
         }
     }

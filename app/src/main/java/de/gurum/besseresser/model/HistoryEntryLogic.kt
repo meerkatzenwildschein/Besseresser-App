@@ -107,4 +107,10 @@ fun calendarWeekOfKey(weekKey: String): Int =
     weekMondayOfKey(weekKey)?.let { calendarWeekOf(it) } ?: calendarWeekOf()
 
 fun dayFingerprint(entries: List<HistoryEntry>): String =
-    entries.filter { it.isRated }.sortedBy { it.id }.joinToString("|") { "${it.id}:${it.recognizedMeal}" }.hashCode().toString(16)
+    entries.filter { it.isRated }
+        .sortedBy { it.id }
+        .joinToString("|") { e ->
+            "${e.id}:${e.recognizedMeal}:${e.note}:${e.goalResults.joinToString(",") { g -> "${g.goal}:${g.rating}" }}"
+        }
+        .hashCode()
+        .toString(16)

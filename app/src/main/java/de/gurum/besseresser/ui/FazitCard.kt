@@ -341,7 +341,11 @@ fun handleAutoDayFazit(
             onGenerateFazit(group.day, ratedEntries)
         }
     } else if (isFazitOutdated(fazit, ratedEntries)) {
-        onGenerateFazit(group.day, ratedEntries)
+        val attemptKey = "$key:${dayFingerprint(ratedEntries)}"
+        if (attemptKey !in DayFazitSession.attemptedOutdated) {
+            DayFazitSession.attemptedOutdated.add(attemptKey)
+            onGenerateFazit(group.day, ratedEntries)
+        }
     }
 }
 

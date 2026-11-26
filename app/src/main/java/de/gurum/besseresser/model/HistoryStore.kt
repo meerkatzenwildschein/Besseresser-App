@@ -71,4 +71,5 @@ data class DayFazit(
 object DayFazitSession {
     val attempted = mutableSetOf<String>()
     val attemptedWeekly = mutableSetOf<String>()
+    val attemptedOutdated = mutableSetOf<String>()
 }

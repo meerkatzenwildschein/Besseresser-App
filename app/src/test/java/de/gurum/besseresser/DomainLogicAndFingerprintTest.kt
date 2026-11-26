@@ -64,6 +64,34 @@ class DomainLogicAndFingerprintTest {
     }
 
     @Test
+    fun testDayFingerprintChangesOnGoalRatingChange() {
+        val entry1 = HistoryEntry(
+            id = 10L,
+            recognizedMeal = "Salat",
+            goalResults = listOf(GoalResult("Z1", TrafficLight.GREEN, "Gut"))
+        )
+        val fpOriginal = dayFingerprint(listOf(entry1))
+
+        val entry1ReEvaluated = entry1.copy(
+            goalResults = listOf(GoalResult("Z1", TrafficLight.YELLOW, "Mittel"))
+        )
+        val fpModified = dayFingerprint(listOf(entry1ReEvaluated))
+
+        assertNotEquals("Fingerprint must change when goal ratings change on re-evaluation", fpOriginal, fpModified)
+    }
+
+    @Test
+    fun testDayFingerprintChangesOnNoteChange() {
+        val entry1 = HistoryEntry(id = 10L, recognizedMeal = "Salat", note = "Frisch")
+        val fpOriginal = dayFingerprint(listOf(entry1))
+
+        val entry1NoteChanged = entry1.copy(note = "Mit Dressing")
+        val fpModified = dayFingerprint(listOf(entry1NoteChanged))
+
+        assertNotEquals("Fingerprint must change when user note changes", fpOriginal, fpModified)
+    }
+
+    @Test
     fun testDayFingerprintChangesOnAddedOrRemovedEntry() {
         val entry1 = HistoryEntry(id = 10L, recognizedMeal = "Salat")
         val entry2 = HistoryEntry(id = 20L, recognizedMeal = "Suppe")
@@ -338,6 +366,16 @@ class DomainLogicAndFingerprintTest {
 
         // 5. Existing fazit that became outdated (new meal added) -> DOES re-trigger
         val outdatedFazit = DayFazit(dayKey = key, rating = TrafficLight.GREEN, text = "Alt", entryIds = listOf(999L))
+        handleAutoDayFazit(
+            group = group,
+            fazitMap = mapOf(key to outdatedFazit),
+            loadingFazits = emptyList(),
+            autoFazitTime = true,
+            onGenerateFazit = { _, _ -> triggeredCount++ }
+        )
+        assertEquals(2, triggeredCount)
+
+        // 6. Calling again in the same session without entry changes -> does NOT re-trigger
         handleAutoDayFazit(
             group = group,
             fazitMap = mapOf(key to outdatedFazit),
