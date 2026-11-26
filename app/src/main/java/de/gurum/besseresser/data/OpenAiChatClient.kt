@@ -1,5 +1,7 @@
 package de.gurum.besseresser.data
 
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -11,12 +13,18 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import java.io.IOException
 import java.util.Collections
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 /**
  * HTTP-Fehlerobjekt mit HTTP-Statuscode und Antwort-Body für strukturierte Fehler- und Debug-Reports.
@@ -25,44 +33,79 @@ class ChatHttpException(val code: Int, val bodyText: String) :
     RuntimeException("HTTP $code: ${bodyText.take(300)}")
 
 /**
- * Low-Level-HTTP-Client für OpenAI-kompatible /chat/completions Endpunkte mit Connection Pooling und HTTP/2.
+ * Schnittstelle für OpenAI-kompatible Chat-Completions-Anfragen.
  */
-object OpenAiChatClient {
+interface ChatCompletionClient {
+    fun markModelNeedsBoostedBudget(model: String)
+    fun hasBoostedBudget(model: String): Boolean
+    suspend fun postChat(
+        url: String,
+        apiKey: String,
+        body: JsonObject,
+        client: OkHttpClient? = null
+    ): String
+    fun chatBody(
+        model: String,
+        baseUrl: String,
+        temperature: Double,
+        maxTokens: Int,
+        messages: JsonArray,
+        highBudgetRetry: Boolean = false
+    ): JsonObject
+    fun isLengthTruncatedWithoutContent(resp: JsonObject): Boolean
+    fun tolerantJson(content: String): JsonObject
+    fun extractContent(resp: JsonObject): String?
+    fun parseMessageContent(contentElement: JsonElement?): String?
+    fun closeJson(text: String): String
+}
 
-    const val BOOSTED_MAX_TOKENS = 16384
-
-    val defaultOkHttpClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(120, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
-            .build()
+/**
+ * Asynchrone Coroutine-Extension für OkHttp-Anfragen.
+ */
+suspend fun Call.awaitResponse(): Response = suspendCancellableCoroutine { continuation ->
+    continuation.invokeOnCancellation {
+        cancel()
     }
+    enqueue(object : Callback {
+        override fun onResponse(call: Call, response: Response) {
+            continuation.resume(response)
+        }
 
-    /** Merkt sich Modelle, deren Reasoning das Standard-Token-Budget gesprengt hat,
-     *  damit Folgeaufrufe (und der automatische Retry) sofort mit erhöhtem Budget starten. */
-    internal val boostedBudgetModels: MutableSet<String> =
+        override fun onFailure(call: Call, e: IOException) {
+            if (!continuation.isCancelled) {
+                continuation.resumeWithException(e)
+            }
+        }
+    })
+}
+
+/**
+ * Standard-Implementierung des ChatCompletionClient mit asynchronem OkHttp-Netzwerkzugriff.
+ */
+class DefaultChatCompletionClient(
+    private val defaultClient: OkHttpClient = OpenAiChatClient.defaultOkHttpClient,
+    private val dispatchers: AppDispatchers = AppDispatchers()
+) : ChatCompletionClient {
+
+    private val boostedBudgetModels: MutableSet<String> =
         Collections.synchronizedSet(mutableSetOf<String>())
 
-    fun markModelNeedsBoostedBudget(model: String) {
+    override fun markModelNeedsBoostedBudget(model: String) {
         val key = model.trim().lowercase()
         if (key.isNotBlank()) {
             boostedBudgetModels.add(key)
         }
     }
 
-    fun hasBoostedBudget(model: String): Boolean =
+    override fun hasBoostedBudget(model: String): Boolean =
         model.trim().lowercase() in boostedBudgetModels
 
-    /**
-     * Führt einen POST-Request an den angegebenen Chat-Completions-Endpunkt aus.
-     */
-    fun postChat(
+    override suspend fun postChat(
         url: String,
         apiKey: String,
         body: JsonObject,
-        client: OkHttpClient = defaultOkHttpClient
-    ): String {
+        client: OkHttpClient?
+    ): String = withContext(dispatchers.io) {
         NetworkSecurity.requirePermittedEndpoint(url)
         val mediaType = "application/json; charset=utf-8".toMediaType()
         val requestBody = body.toString().toRequestBody(mediaType)
@@ -73,33 +116,29 @@ object OpenAiChatClient {
             .header("Authorization", "Bearer ${apiKey.trim()}")
             .build()
 
-        client.newCall(request).execute().use { response ->
-            val code = response.code
-            val text = response.body?.string().orEmpty()
-            if (!response.isSuccessful) {
+        val effectiveClient = client ?: defaultClient
+        val response = effectiveClient.newCall(request).awaitResponse()
+        response.use { resp ->
+            val code = resp.code
+            val text = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) {
                 throw ChatHttpException(code, text)
             }
-            return text
+            text
         }
     }
 
-    /**
-     * Erstellt den JSON-Payload für Chat-Completions inklusive Modell, Temperatur, Budget und Reasoning-Steuerung.
-     * Wichtig für OpenRouter / Hybrid-Modelle (wie deepseek-v4.1-flash):
-     * Ein bloßes `{"exclude": true}` ohne `"effort": "low"` aktiviert bei OpenRouter volles Reasoning
-     * und frisst das `max_tokens`-Budget komplett auf, während die Ausgabe unterdrückt wird (`content: null`).
-     */
-    fun chatBody(
+    override fun chatBody(
         model: String,
         baseUrl: String,
         temperature: Double,
         maxTokens: Int,
         messages: JsonArray,
-        highBudgetRetry: Boolean = false
+        highBudgetRetry: Boolean
     ): JsonObject = buildJsonObject {
         val trimmedModel = model.trim()
         val boosted = highBudgetRetry || hasBoostedBudget(trimmedModel)
-        val effectiveMaxTokens = if (boosted) maxOf(maxTokens, BOOSTED_MAX_TOKENS) else maxTokens
+        val effectiveMaxTokens = if (boosted) maxOf(maxTokens, OpenAiChatClient.BOOSTED_MAX_TOKENS) else maxTokens
 
         put("model", trimmedModel)
         put("temperature", temperature)
@@ -115,11 +154,7 @@ object OpenAiChatClient {
         put("messages", messages)
     }
 
-    /**
-     * Prüft, ob die KI-Antwort wegen des Token-Limits (`finish_reason == "length"`) abgebrochen wurde,
-     * bevor überhaupt Antworttext in `content` erzeugt werden konnte.
-     */
-    fun isLengthTruncatedWithoutContent(resp: JsonObject): Boolean {
+    override fun isLengthTruncatedWithoutContent(resp: JsonObject): Boolean {
         if (!extractContent(resp).isNullOrBlank()) return false
         return try {
             val first = (resp["choices"] as? JsonArray)?.firstOrNull() as? JsonObject ?: return false
@@ -131,24 +166,27 @@ object OpenAiChatClient {
         }
     }
 
-    /**
-     * Toleranter JSON-Parser für KI-Antworten: Code-Fences strippen, {…}-Block suchen, closeJson-Reparatur.
-     */
-    fun tolerantJson(content: String): JsonObject = LlmResponseParser.tolerantJson(content)
+    override fun tolerantJson(content: String): JsonObject = LlmResponseParser.tolerantJson(content)
 
-    /**
-     * Holt den Antworttext tolerant aus verschiedenen Provider-Formaten.
-     */
-    fun extractContent(resp: JsonObject): String? = LlmResponseParser.extractContent(resp)
+    override fun extractContent(resp: JsonObject): String? = LlmResponseParser.extractContent(resp)
 
-    /**
-     * Extrahiert den Text aus unterschiedlichen `content`-Strukturen (Primitive oder Parts-Array).
-     */
-    fun parseMessageContent(contentElement: JsonElement?): String? = LlmResponseParser.parseMessageContent(contentElement)
+    override fun parseMessageContent(contentElement: JsonElement?): String? = LlmResponseParser.parseMessageContent(contentElement)
 
-    /**
-     * Schließt abgeschnittene JSON-Antworten tolerant: offene Strings schließen,
-     * hängende Kommas entfernen und fehlende schließende Klammern ergänzen.
-     */
-    fun closeJson(text: String): String = LlmResponseParser.closeJson(text)
+    override fun closeJson(text: String): String = LlmResponseParser.closeJson(text)
+}
+
+/**
+ * Singleton- und Delegate-Objekt für OpenAI-kompatible /chat/completions Endpunkte.
+ */
+object OpenAiChatClient : ChatCompletionClient by DefaultChatCompletionClient() {
+
+    const val BOOSTED_MAX_TOKENS = 16384
+
+    val defaultOkHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .writeTimeout(60, TimeUnit.SECONDS)
+            .build()
+    }
 }

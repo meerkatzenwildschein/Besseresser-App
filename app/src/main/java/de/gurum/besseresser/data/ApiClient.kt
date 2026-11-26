@@ -131,6 +131,8 @@ suspend fun BesseresserApiService.dayFazit(
 
 /** Kommunikation mit der OpenAI-kompatiblen API: Foto-Bewertung, Modell-Liste, Ziele-Aufteilung. */
 class ApiClient(
+    private val chatClient: ChatCompletionClient = OpenAiChatClient,
+    private val httpClient: OkHttpClient = OpenAiChatClient.defaultOkHttpClient,
     private val dispatchers: AppDispatchers = AppDispatchers()
 ) : BesseresserApiService {
     companion object {
@@ -180,17 +182,17 @@ class ApiClient(
         val url = settings.baseUrl.trim().trimEnd('/') + CHAT_COMPLETIONS_PATH
 
         runWithOneRetry { isRetry ->
-            val text = OpenAiChatClient.postChat(
+            val text = chatClient.postChat(
                 url,
                 settings.apiKey,
                 buildAnalyzeBody(settings, prompt, imageDataUri, highBudgetRetry = isRetry)
             )
             val resp = AppJson.parseToJsonElement(text).jsonObject
-            val rawContent = OpenAiChatClient.extractContent(resp)
+            val rawContent = chatClient.extractContent(resp)
 
             if (rawContent.isNullOrBlank()) {
-                if (OpenAiChatClient.isLengthTruncatedWithoutContent(resp)) {
-                    OpenAiChatClient.markModelNeedsBoostedBudget(settings.model)
+                if (chatClient.isLengthTruncatedWithoutContent(resp)) {
+                    chatClient.markModelNeedsBoostedBudget(settings.model)
                 }
                 throw buildAnalyzeMissingContentException(resp, text)
             }
@@ -205,7 +207,7 @@ class ApiClient(
         dataUri: String,
         highBudgetRetry: Boolean = false
     ): JsonObject =
-        OpenAiChatClient.chatBody(
+        chatClient.chatBody(
             model = settings.model,
             baseUrl = settings.baseUrl,
             temperature = 0.3,
@@ -271,10 +273,10 @@ class ApiClient(
         }
 
         runWithOneRetry { isRetry ->
-            val respText = OpenAiChatClient.postChat(
+            val respText = chatClient.postChat(
                 url,
                 settings.apiKey,
-                OpenAiChatClient.chatBody(
+                chatClient.chatBody(
                     model = settings.model,
                     baseUrl = settings.baseUrl,
                     temperature = 0.3,
@@ -284,16 +286,16 @@ class ApiClient(
                 )
             )
             val respObj = AppJson.parseToJsonElement(respText).jsonObject
-            val rawContent = OpenAiChatClient.extractContent(respObj)
+            val rawContent = chatClient.extractContent(respObj)
 
             if (rawContent.isNullOrBlank()) {
-                if (OpenAiChatClient.isLengthTruncatedWithoutContent(respObj)) {
-                    OpenAiChatClient.markModelNeedsBoostedBudget(settings.model)
+                if (chatClient.isLengthTruncatedWithoutContent(respObj)) {
+                    chatClient.markModelNeedsBoostedBudget(settings.model)
                 }
                 throw buildDayFazitMissingContentException(respObj, respText)
             }
 
-            val obj = OpenAiChatClient.tolerantJson(rawContent)
+            val obj = chatClient.tolerantJson(rawContent)
             val rating = TrafficLight.fromString(LlmResponseParser.pickString(obj, listOf("ampel", "rating", "status", "farbe")))
             val fazitText = LlmResponseParser.pickString(obj, listOf("text", "fazit", "summary"))
             check(fazitText.isNotBlank()) { "KI-Antwort ohne Fazit-Text (Roh: ${rawContent.take(200)})" }
@@ -332,10 +334,10 @@ class ApiClient(
         }
 
         runWithOneRetry { isRetry ->
-            val text = OpenAiChatClient.postChat(
+            val text = chatClient.postChat(
                 url,
                 settings.apiKey,
-                OpenAiChatClient.chatBody(
+                chatClient.chatBody(
                     model = settings.model,
                     baseUrl = settings.baseUrl,
                     temperature = 0.3,
@@ -345,11 +347,11 @@ class ApiClient(
                 )
             )
             val resp = AppJson.parseToJsonElement(text).jsonObject
-            val rawContent = OpenAiChatClient.extractContent(resp)
+            val rawContent = chatClient.extractContent(resp)
 
             if (rawContent.isNullOrBlank()) {
-                if (OpenAiChatClient.isLengthTruncatedWithoutContent(resp)) {
-                    OpenAiChatClient.markModelNeedsBoostedBudget(settings.model)
+                if (chatClient.isLengthTruncatedWithoutContent(resp)) {
+                    chatClient.markModelNeedsBoostedBudget(settings.model)
                 }
                 throw IllegalStateException("Die KI hat keinen Text geliefert. Roh-Antwort: ${text.take(300)}")
             }
@@ -373,7 +375,7 @@ class ApiClient(
         }
 
         val attemptResult = runWithOneRetry { isRetry ->
-            val req = OpenAiChatClient.chatBody(
+            val req = chatClient.chatBody(
                 model = request.model,
                 baseUrl = request.baseUrl,
                 temperature = 0.1,
@@ -381,11 +383,11 @@ class ApiClient(
                 messages = messages,
                 highBudgetRetry = isRetry
             )
-            val respBody = OpenAiChatClient.postChat(requestUrl, request.apiKey, req)
+            val respBody = chatClient.postChat(requestUrl, request.apiKey, req)
 
-            val content = OpenAiChatClient.extractContent(AppJson.parseToJsonElement(respBody).jsonObject)
+            val content = chatClient.extractContent(AppJson.parseToJsonElement(respBody).jsonObject)
                 ?: throw IllegalStateException("Kein Antwortinhalt")
-            val obj = OpenAiChatClient.tolerantJson(content)
+            val obj = chatClient.tolerantJson(content)
             val rawArr = obj["ziele"]?.takeIf { it is JsonArray }?.jsonArray
                 ?: obj["goals"]?.takeIf { it is JsonArray }?.jsonArray
                 ?: obj["ziel_liste"]?.takeIf { it is JsonArray }?.jsonArray
@@ -436,7 +438,7 @@ class ApiClient(
                 .header("Authorization", "Bearer ${apiKey.trim()}")
                 .build()
 
-            OpenAiChatClient.defaultOkHttpClient.newCall(request).execute().use { response ->
+            httpClient.newCall(request).execute().use { response ->
                 httpCode = response.code
                 body = response.body?.string().orEmpty()
                 check(response.isSuccessful) { "HTTP $httpCode" }

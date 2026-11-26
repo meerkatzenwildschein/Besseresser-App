@@ -10,6 +10,8 @@ import de.gurum.besseresser.data.BackupManager
 import de.gurum.besseresser.data.BackupService
 import de.gurum.besseresser.data.BackupStorage
 import de.gurum.besseresser.data.BesseresserApiService
+import de.gurum.besseresser.data.ChatCompletionClient
+import de.gurum.besseresser.data.DefaultChatCompletionClient
 import de.gurum.besseresser.data.DefaultHistoryRepository
 import de.gurum.besseresser.data.DefaultPhotoCaptureManager
 import de.gurum.besseresser.data.DefaultProfileRepository
@@ -22,6 +24,7 @@ import de.gurum.besseresser.data.HistoryReorderUseCase
 import de.gurum.besseresser.data.HistoryRepository
 import de.gurum.besseresser.data.ImagePreprocessor
 import de.gurum.besseresser.data.NetworkConnectivityChecker
+import de.gurum.besseresser.data.OpenAiChatClient
 import de.gurum.besseresser.data.PhotoCaptureManager
 import de.gurum.besseresser.data.PhotoStorage
 import de.gurum.besseresser.data.ProfileRepository
@@ -55,8 +58,10 @@ val databaseModule = module {
 }
 
 val networkModule = module {
+    single { OpenAiChatClient.defaultOkHttpClient }
+    single<ChatCompletionClient> { DefaultChatCompletionClient(defaultClient = get(), dispatchers = get()) }
     single<NetworkConnectivityChecker> { AndroidNetworkConnectivityChecker(androidContext()) }
-    single<BesseresserApiService> { ApiClient(dispatchers = get()) }
+    single<BesseresserApiService> { ApiClient(chatClient = get(), httpClient = get(), dispatchers = get()) }
 }
 
 val storageModule = module {
