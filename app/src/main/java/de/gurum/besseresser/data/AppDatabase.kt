@@ -246,7 +246,7 @@ interface WeekFazitDao {
 @Database(
     entities = [HistoryEntryEntity::class, DayFazitEntity::class, WeekFazitEntity::class],
     version = 3,
-    exportSchema = false
+    exportSchema = true
 )
 @TypeConverters(RoomConverters::class)
 abstract class AppDatabase : RoomDatabase() {

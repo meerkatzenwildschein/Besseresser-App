@@ -94,11 +94,13 @@ android {
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
-    bundle {
-        language {
-            enableSplit = false
-        }
+    sourceSets {
+        getByName("test").assets.srcDirs(file("$projectDir/schemas"))
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -130,6 +132,7 @@ dependencies {
     implementation(libs.coil.compose)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
+    testImplementation(libs.androidx.room.testing)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.kotlinx.serialization.json)
     testImplementation(libs.koin.test)
