@@ -7,11 +7,11 @@ import java.time.format.DateTimeFormatter
 import java.util.Properties
 
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jetbrains.kotlin.plugin.serialization")
-    id("com.google.devtools.ksp")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
 }
 
 // Deterministic build timestamp: taken from the current git HEAD commit date
@@ -36,22 +36,6 @@ val keystoreProps = Properties().apply {
     if (f.exists()) FileInputStream(f).use { load(it) }
 }
 val hasSigningConfig = keystoreProps.getProperty("storeFile") != null
-
-val composeBomVersion = "2024.12.01"
-val coreKtxVersion = "1.16.0"
-val activityComposeVersion = "1.10.1"
-val lifecycleVersion = "2.8.7"
-val cameraVersion = "1.5.0"
-val kotlinxSerializationVersion = "1.7.3"
-val roomVersion = "2.7.0"
-val koinVersion = "4.0.4"
-val datastoreVersion = "1.1.3"
-val navigationVersion = "2.8.8"
-val exifVersion = "1.3.7"
-val okhttpVersion = "4.12.0"
-val junitVersion = "4.13.2"
-val coroutinesVersion = "1.9.0"
-val coilVersion = "2.7.0"
 
 android {
     namespace = "de.gurum.besseresser"
@@ -118,36 +102,36 @@ android {
 }
 
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:$composeBomVersion")
+    val composeBom = platform(libs.androidx.compose.bom)
     implementation(composeBom)
-    implementation("androidx.core:core-ktx:$coreKtxVersion")
-    implementation("androidx.activity:activity-compose:$activityComposeVersion")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-core")
-    implementation("androidx.camera:camera-core:$cameraVersion")
-    implementation("androidx.camera:camera-camera2:$cameraVersion")
-    implementation("androidx.camera:camera-lifecycle:$cameraVersion")
-    implementation("androidx.camera:camera-view:$cameraVersion")
-    implementation("androidx.room:room-runtime:$roomVersion")
-    implementation("androidx.room:room-ktx:$roomVersion")
-    ksp("androidx.room:room-compiler:$roomVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
-    implementation("io.insert-koin:koin-android:$koinVersion")
-    implementation("io.insert-koin:koin-androidx-compose:$koinVersion")
-    implementation("androidx.datastore:datastore-preferences:$datastoreVersion")
-    implementation("androidx.navigation:navigation-compose:$navigationVersion")
-    implementation("androidx.exifinterface:exifinterface:$exifVersion")
-    implementation("com.squareup.okhttp3:okhttp:$okhttpVersion")
-    implementation("io.coil-kt:coil-compose:$coilVersion")
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    testImplementation("junit:junit:$junitVersion")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
-    testImplementation("io.insert-koin:koin-test:$koinVersion")
-    testImplementation("io.insert-koin:koin-test-junit4:$koinVersion")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.core)
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.exifinterface)
+    implementation(libs.okhttp)
+    implementation(libs.coil.compose)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.koin.test)
+    testImplementation(libs.koin.test.junit4)
 }
