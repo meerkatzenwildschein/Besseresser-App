@@ -44,6 +44,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import androidx.compose.ui.tooling.preview.Preview
 import de.gurum.besseresser.R
 import de.gurum.besseresser.model.DayFazit
 import de.gurum.besseresser.model.HistoryEntry
@@ -245,5 +246,33 @@ fun ScoreBadge(entry: HistoryEntry) {
             fontSize = 9.5.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun DayGroupHeaderPreview() {
+    MaterialTheme {
+        DayGroupHeader(
+            date = LocalDate.now(),
+            fazit = DayFazit("20261126", TrafficLight.GREEN, "Guter Tag!", listOf(1L), 1700000000000L, "fp"),
+            loading = false,
+            stale = false,
+            expanded = false,
+            onToggleExpand = {},
+            onGenerate = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun ScoreBadgePreview() {
+    MaterialTheme {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            ScoreCircle(score = 85, tooltipRes = R.string.score_tooltip_ok)
+            ScoreCircle(score = 60, tooltipRes = R.string.score_tooltip_ok)
+            ScoreCircle(score = 30, tooltipRes = R.string.score_tooltip_ok)
+        }
     }
 }

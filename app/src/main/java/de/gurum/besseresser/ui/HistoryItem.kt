@@ -53,13 +53,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import de.gurum.besseresser.R
+import de.gurum.besseresser.model.GoalResult
 import de.gurum.besseresser.model.HistoryEntry
+import de.gurum.besseresser.model.TrafficLight
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -472,4 +475,47 @@ fun ShortSwipeToDeleteBox(
             content()
         }
     )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HistoryItemRatedPreview() {
+    MaterialTheme {
+        HistoryItem(
+            entry = HistoryEntry(
+                id = 1L,
+                dateMillis = System.currentTimeMillis(),
+                photoFile = "",
+                goalResults = listOf(
+                    GoalResult("Viel Gemüse", TrafficLight.GREEN, "Sehr gut"),
+                    GoalResult("Wenig Zucker", TrafficLight.YELLOW, "Mäßig")
+                ),
+                summary = "Gesunde Mahlzeit",
+                note = "Mittagessen",
+                recognizedMeal = "Gemüsepfanne mit Reis",
+                backdated = false
+            ),
+            onClick = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HistoryItemUnratedPreview() {
+    MaterialTheme {
+        HistoryItem(
+            entry = HistoryEntry(
+                id = 2L,
+                dateMillis = System.currentTimeMillis(),
+                photoFile = "",
+                goalResults = emptyList(),
+                summary = "",
+                note = "Schnelles Abendbrot",
+                recognizedMeal = "",
+                backdated = true
+            ),
+            onClick = {}
+        )
+    }
 }
